@@ -1,0 +1,12 @@
+[Unit]
+Description=Media Sharing Server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/sakura/media-server
+ExecStart=/usr/bin/java -jar /home/sakura/media-server/target/media-server-1.0.0.jar
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,20 @@
+# Dependency directories
+node_modules/
+
+# Build outputs
+target/
+
+# Database files
+*.db
+*.mv.db
+*.trace.db
+
+# Temp uploads directory
+temp-chunks/
+
+# Log files
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

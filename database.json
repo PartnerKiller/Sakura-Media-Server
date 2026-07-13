@@ -1,0 +1,24 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "username": "sakura",
+      "passwordHash": "$2a$10$oe7t0dKHqUHsab/uj//p4.yY45eX8IKs.qDuktM3l9l7mBX78YPUu",
+      "role": "admin"
+    },
+    {
+      "id": 3,
+      "username": "tani",
+      "passwordHash": "$2a$10$k03Yrs3L629nxq7PWHme..vwyHMQYjZ5reqTEkEy8LTqe/oeyBOU.",
+      "role": "user"
+    }
+  ],
+  "permissions": [
+    {
+      "userId": 3,
+      "path": "/media/storage/tani",
+      "read": true,
+      "write": true
+    }
+  ]
+}
