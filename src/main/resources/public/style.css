@@ -1030,6 +1030,16 @@ video {
   display: block;
 }
 
+#html5-video-player {
+  width: auto !important;
+  max-width: 100% !important;
+  height: auto !important;
+  max-height: 65vh !important;
+  margin: 0 auto;
+  display: block;
+  background: #000;
+}
+
 /* IMAGE VIEWER MODAL STYLING */
 .modal-image {
   max-width: 600px;
@@ -1385,6 +1395,9 @@ video {
   }
   .modal-video video {
     max-height: 55vh;
+  }
+  #html5-video-player {
+    max-height: 55vh !important;
   }
 }
 
