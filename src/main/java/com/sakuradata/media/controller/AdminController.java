@@ -201,26 +201,38 @@ public class AdminController {
         }
 
         try {
-            Process process = Runtime.getRuntime().exec(new String[]{"df", "-l", "-P", "-B1", "/home/sakura", "/media/storage"});
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            List<String> lines = reader.lines().collect(Collectors.toList());
-            process.waitFor(3, TimeUnit.SECONDS);
+            File homeFile = new File("/home/sakura");
+            File storageFile = new File("/media/storage");
 
             Map<String, Object> homeStats = null;
             Map<String, Object> storageStats = null;
 
-            for (String line : lines) {
-                String trimmed = line.trim();
-                if (trimmed.startsWith("Filesystem")) continue;
-                
-                if (trimmed.endsWith(" /") || trimmed.contains("/home/sakura")) {
-                    Map<String, Object> stats = parseDfLine(trimmed);
-                    if (stats != null) homeStats = stats;
-                }
-                if (trimmed.contains("/media/storage")) {
-                    Map<String, Object> stats = parseDfLine(trimmed);
-                    if (stats != null) storageStats = stats;
-                }
+            if (homeFile.exists()) {
+                long total = homeFile.getTotalSpace();
+                long usable = homeFile.getUsableSpace();
+                long used = total - usable;
+                double percent = total > 0 ? (double) used / total * 100 : 0.0;
+                homeStats = new HashMap<>();
+                homeStats.put("filesystem", "local");
+                homeStats.put("total", total);
+                homeStats.put("used", used);
+                homeStats.put("available", usable);
+                homeStats.put("usePercent", String.format(Locale.US, "%.0f%%", percent));
+                homeStats.put("mountedOn", "/home/sakura");
+            }
+
+            if (storageFile.exists()) {
+                long total = storageFile.getTotalSpace();
+                long usable = storageFile.getUsableSpace();
+                long used = total - usable;
+                double percent = total > 0 ? (double) used / total * 100 : 0.0;
+                storageStats = new HashMap<>();
+                storageStats.put("filesystem", "storage");
+                storageStats.put("total", total);
+                storageStats.put("used", used);
+                storageStats.put("available", usable);
+                storageStats.put("usePercent", String.format(Locale.US, "%.0f%%", percent));
+                storageStats.put("mountedOn", "/media/storage");
             }
 
             Map<String, Object> response = new HashMap<>();
@@ -241,35 +253,24 @@ public class AdminController {
         }
     }
 
-    private Map<String, Object> parseDfLine(String line) {
-        if (line == null || line.trim().isEmpty()) return null;
-        String[] parts = line.trim().split("\\s+");
-        if (parts.length < 6) return null;
-        try {
-            Map<String, Object> map = new HashMap<>();
-            map.put("filesystem", parts[0]);
-            map.put("total", Long.parseLong(parts[1]));
-            map.put("used", Long.parseLong(parts[2]));
-            map.put("available", Long.parseLong(parts[3]));
-            map.put("usePercent", parts[4]);
-            map.put("mountedOn", parts[5]);
-            return map;
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
     @GetMapping("/admin/server-metrics")
     public ResponseEntity<?> getServerMetrics(HttpServletRequest request) {
         if (!isAdmin(request)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
         }
 
+        Process process = null;
         try {
             // Run systemctl to check statuses
-            Process process = Runtime.getRuntime().exec(new String[]{"systemctl", "--user", "is-active", "media-server", "cloudflared"});
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            List<String> statuses = reader.lines().collect(Collectors.toList());
+            process = Runtime.getRuntime().exec(new String[]{"systemctl", "--user", "is-active", "media-server", "cloudflared"});
+            try {
+                process.getOutputStream().close();
+            } catch (Exception e) {}
+            
+            List<String> statuses;
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                statuses = reader.lines().collect(Collectors.toList());
+            }
             process.waitFor();
 
             String mediaServerStatus = statuses.size() > 0 ? statuses.get(0) : "unknown";
@@ -318,6 +319,10 @@ public class AdminController {
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("error", "Failed to retrieve server metrics: " + e.getMessage()));
+        } finally {
+            if (process != null) {
+                process.destroy();
+            }
         }
     }
 
@@ -351,12 +356,19 @@ public class AdminController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
         }
 
+        Process process = null;
         try {
             // Standard ps shell stream pipeline command
             ProcessBuilder builder = new ProcessBuilder("sh", "-c", "ps -eo pid,pcpu,pmem,etime,args | grep -E 'ffmpeg|ffprobe' | grep -v grep");
-            Process process = builder.start();
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            List<String> lines = reader.lines().collect(Collectors.toList());
+            process = builder.start();
+            try {
+                process.getOutputStream().close();
+            } catch (Exception e) {}
+            
+            List<String> lines;
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                lines = reader.lines().collect(Collectors.toList());
+            }
             process.waitFor();
 
             List<Map<String, String>> processes = lines.stream().map(line -> {
@@ -374,6 +386,10 @@ public class AdminController {
             return ResponseEntity.ok(processes);
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("error", "Failed to retrieve processes: " + e.getMessage()));
+        } finally {
+            if (process != null) {
+                process.destroy();
+            }
         }
     }
 
@@ -383,15 +399,26 @@ public class AdminController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
         }
 
+        Process process = null;
         try {
-            Process process = Runtime.getRuntime().exec(new String[]{"journalctl", "--user", "-u", "media-server", "--no-pager", "-n", "100"});
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            String stdout = reader.lines().collect(Collectors.joining("\n"));
+            process = Runtime.getRuntime().exec(new String[]{"journalctl", "--user", "-u", "media-server", "--no-pager", "-n", "100"});
+            try {
+                process.getOutputStream().close();
+            } catch (Exception e) {}
+            
+            String stdout;
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                stdout = reader.lines().collect(Collectors.joining("\n"));
+            }
             process.waitFor();
 
             return ResponseEntity.ok(Map.of("logs", stdout));
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("error", "Failed to retrieve logs: " + e.getMessage()));
+        } finally {
+            if (process != null) {
+                process.destroy();
+            }
         }
     }
 
@@ -412,29 +439,26 @@ public class AdminController {
                 return ResponseEntity.badRequest().body(Map.of("error", "PID is required to kill process"));
             }
             int pid = Integer.parseInt(pidObj.toString());
+            Process process = null;
             try {
-                Process process = Runtime.getRuntime().exec(new String[]{"kill", "-9", String.valueOf(pid)});
+                process = Runtime.getRuntime().exec(new String[]{"kill", "-9", String.valueOf(pid)});
                 process.waitFor();
                 return ResponseEntity.ok(Map.of("success", true, "message", "Process " + pid + " killed successfully"));
             } catch (Exception e) {
                 return ResponseEntity.status(500).body(Map.of("error", "Failed to kill process: " + e.getMessage()));
+            } finally {
+                if (process != null) {
+                    process.destroy();
+                }
             }
         } else if ("restart-service".equals(action)) {
             scheduler.schedule(() -> {
-                try {
-                    Runtime.getRuntime().exec(new String[]{"systemctl", "--user", "restart", "media-server"});
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
+                runSystemCommand(new String[]{"systemctl", "--user", "restart", "media-server"});
             }, 500, TimeUnit.MILLISECONDS);
             return ResponseEntity.ok(Map.of("success", true, "message", "Application service restart scheduled"));
         } else if ("reboot-host".equals(action)) {
             scheduler.schedule(() -> {
-                try {
-                    Runtime.getRuntime().exec(new String[]{"systemctl", "reboot"});
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
+                runSystemCommand(new String[]{"systemctl", "reboot"});
             }, 500, TimeUnit.MILLISECONDS);
             return ResponseEntity.ok(Map.of("success", true, "message", "Host machine reboot scheduled"));
         } else {
@@ -447,12 +471,23 @@ public class AdminController {
     // -------------------------------------------------------------
 
     private Map<String, Object> runSystemCommand(String[] cmd) {
+        Process process = null;
         try {
-            Process process = Runtime.getRuntime().exec(cmd);
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            String stdout = reader.lines().collect(Collectors.joining("\n"));
-            BufferedReader errReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
-            String stderr = errReader.lines().collect(Collectors.joining("\n"));
+            process = Runtime.getRuntime().exec(cmd);
+            try {
+                process.getOutputStream().close();
+            } catch (Exception e) {}
+
+            String stdout;
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                stdout = reader.lines().collect(Collectors.joining("\n"));
+            }
+            
+            String stderr;
+            try (BufferedReader errReader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+                stderr = errReader.lines().collect(Collectors.joining("\n"));
+            }
+            
             int exitCode = process.waitFor();
 
             Map<String, Object> result = new HashMap<>();
@@ -465,6 +500,10 @@ public class AdminController {
             result.put("exitCode", -1);
             result.put("error", e.getMessage());
             return result;
+        } finally {
+            if (process != null) {
+                process.destroy();
+            }
         }
     }
 
