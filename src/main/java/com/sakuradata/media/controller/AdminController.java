@@ -10,7 +10,9 @@ import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.InputStreamReader;
+import org.springframework.transaction.annotation.Transactional;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
@@ -155,6 +157,7 @@ public class AdminController {
     }
 
     @PutMapping("/users/{id}/permissions")
+    @Transactional
     public ResponseEntity<?> savePermissions(HttpServletRequest request, @PathVariable Long id, @RequestBody Map<String, List<Map<String, Object>>> body) {
         if (!isAdmin(request)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
@@ -185,8 +188,23 @@ public class AdminController {
 
         List<Permission> newPermissions = rules.stream().map(r -> {
             String path = (String) r.get("path");
-            boolean read = (boolean) r.getOrDefault("allowRead", true);
-            boolean write = (boolean) r.getOrDefault("allowWrite", false);
+            
+            boolean read = true;
+            Object readVal = r.get("allowRead");
+            if (readVal instanceof Boolean) {
+                read = (Boolean) readVal;
+            } else if (readVal != null) {
+                read = Boolean.parseBoolean(readVal.toString());
+            }
+
+            boolean write = false;
+            Object writeVal = r.get("allowWrite");
+            if (writeVal instanceof Boolean) {
+                write = (Boolean) writeVal;
+            } else if (writeVal != null) {
+                write = Boolean.parseBoolean(writeVal.toString());
+            }
+
             return new Permission(id, path, read, write);
         }).collect(Collectors.toList());
 
