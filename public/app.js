@@ -217,7 +217,7 @@ function showDashboard() {
   // Update user profile info in sidebar
   document.getElementById('user-avatar').innerText = state.user.username[0].toUpperCase();
   document.getElementById('user-display-name').innerText = state.user.username;
-  document.getElementById('user-display-role').innerText = state.user.role === 'admin' ? 'Owner / Admin' : 'Viewer';
+  document.getElementById('user-display-role').innerText = state.user.role === 'admin' ? 'Owner / Admin' : 'User';
 
   // Toggle Admin Section Visibility
   if (state.user.role === 'admin') {
@@ -1074,6 +1074,9 @@ function openPermissionsModal(userId, username) {
     ? JSON.parse(JSON.stringify(user.permissions)) // deep clone
     : [];
 
+  const writeEl = document.getElementById('rule-write');
+  if (writeEl) writeEl.checked = true;
+
   renderPermissionRules();
   openModal('modal-permissions');
 }
@@ -1126,7 +1129,7 @@ function handleAddPermissionRule() {
 
   // reset inputs
   pathEl.value = '';
-  writeEl.checked = false;
+  writeEl.checked = true;
 
   renderPermissionRules();
 }

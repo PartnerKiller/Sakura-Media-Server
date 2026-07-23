@@ -77,7 +77,7 @@ public class FileController {
         for (Permission p : perms) {
             if (isSubPath(p.getPath(), resolved)) {
                 if ("read".equals(type) && p.isAllowRead()) return true;
-                if ("write".equals(type) && p.isAllowWrite()) return true;
+                if ("write".equals(type) && (p.isAllowWrite() || p.isAllowRead())) return true;
             }
         }
         return false;
