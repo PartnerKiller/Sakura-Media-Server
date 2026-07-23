@@ -384,9 +384,23 @@ function selectRoot(root) {
   browsePath(root.path);
 }
 
+function updateUploadActionsVisibility() {
+  const isWritable = state.user.role === 'admin' || (state.currentRoot && state.currentRoot.allowWrite);
+  const displayStyle = isWritable ? 'flex' : 'none';
+  
+  const btnNewFolder = document.getElementById('btn-new-folder');
+  const btnUpload = document.getElementById('btn-upload-trigger');
+  const btnUploadFolder = document.getElementById('btn-upload-folder-trigger');
+  
+  if (btnNewFolder) btnNewFolder.style.display = displayStyle;
+  if (btnUpload) btnUpload.style.display = displayStyle;
+  if (btnUploadFolder) btnUploadFolder.style.display = displayStyle;
+}
+
 async function browsePath(targetPath) {
   state.currentPath = targetPath;
   document.getElementById('search-input').value = ''; // clear search
+  updateUploadActionsVisibility();
   
   try {
     const res = await apiCall(`/api/files/browse?path=${encodeURIComponent(targetPath)}`);
@@ -1075,10 +1089,11 @@ function renderPermissionRules() {
 
   state.activePermissionsList.forEach((rule, idx) => {
     const tr = document.createElement('tr');
+    const hasWrite = rule.allowWrite !== undefined ? rule.allowWrite : (rule.write !== undefined ? rule.write : false);
     tr.innerHTML = `
       <td><code>${rule.path}</code></td>
       <td><span class="badge-yes">Yes</span></td>
-      <td><span class="${rule.write ? 'badge-yes' : 'badge-no'}">${rule.write ? 'Yes' : 'No'}</span></td>
+      <td><span class="${hasWrite ? 'badge-yes' : 'badge-no'}">${hasWrite ? 'Yes' : 'No'}</span></td>
       <td>
         <button class="btn btn-secondary" onclick="handleRemovePermissionRule(${idx})" style="padding: 4px 8px;">
           <i data-lucide="trash-2" style="width:14px; height:14px;"></i>
@@ -1105,8 +1120,8 @@ function handleAddPermissionRule() {
 
   state.activePermissionsList.push({
     path: pathVal,
-    read: true, // read is implicitly true for folders you have permission to
-    write: writeEl.checked
+    allowRead: true, // read is implicitly true for folders you have permission to
+    allowWrite: writeEl.checked
   });
 
   // reset inputs
@@ -1124,11 +1139,17 @@ function handleRemovePermissionRule(index) {
 async function handleSavePermissions() {
   if (!state.activePermissionsUserId) return;
 
+  const permissionsToSend = state.activePermissionsList.map(r => ({
+    path: r.path,
+    allowRead: r.allowRead !== undefined ? r.allowRead : (r.read !== undefined ? r.read : true),
+    allowWrite: r.allowWrite !== undefined ? r.allowWrite : (r.write !== undefined ? r.write : false)
+  }));
+
   try {
     await apiCall(`/api/users/${state.activePermissionsUserId}/permissions`, {
       method: 'PUT',
       body: JSON.stringify({
-        permissions: state.activePermissionsList
+        permissions: permissionsToSend
       })
     });
     

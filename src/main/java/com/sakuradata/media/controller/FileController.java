@@ -44,17 +44,21 @@ public class FileController {
     }
 
     // Get all authorized roots for the current user
-    private List<Map<String, String>> getAuthorizedRoots(User user) {
-        List<Map<String, String>> roots = new ArrayList<>();
+    private List<Map<String, Object>> getAuthorizedRoots(User user) {
+        List<Map<String, Object>> roots = new ArrayList<>();
         if ("admin".equals(user.getRole())) {
-            roots.add(Map.of("name", "Home root", "path", SAKURA_ROOT));
-            roots.add(Map.of("name", "Storage root", "path", STORAGE_ROOT));
+            roots.add(Map.of("name", "Home root", "path", SAKURA_ROOT, "allowWrite", true));
+            roots.add(Map.of("name", "Storage root", "path", STORAGE_ROOT, "allowWrite", true));
         } else {
             List<Permission> perms = permissionRepository.findByUserId(user.getId());
             for (Permission p : perms) {
                 if (p.isAllowRead()) {
                     File file = new File(p.getPath());
-                    roots.add(Map.of("name", file.getName().isEmpty() ? p.getPath() : file.getName(), "path", p.getPath()));
+                    Map<String, Object> r = new HashMap<>();
+                    r.put("name", file.getName().isEmpty() ? p.getPath() : file.getName());
+                    r.put("path", p.getPath());
+                    r.put("allowWrite", p.isAllowWrite());
+                    roots.add(r);
                 }
             }
         }
