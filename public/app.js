@@ -17,7 +17,13 @@ let state = {
   isUploadCancelled: false
 };
 
-function cancelUpload() {
+function cancelUpload(e) {
+  if (e) {
+    try {
+      e.preventDefault();
+      e.stopPropagation();
+    } catch (err) {}
+  }
   state.isUploadCancelled = true;
   if (state.activeUploadXhr) {
     try {
@@ -25,6 +31,11 @@ function cancelUpload() {
     } catch (e) {}
     state.activeUploadXhr = null;
   }
+  const progressContainer = document.getElementById('upload-progress-container');
+  if (progressContainer) {
+    progressContainer.style.display = 'none';
+  }
+  browsePath(state.currentPath);
 }
 window.cancelUpload = cancelUpload;
 

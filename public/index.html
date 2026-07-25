@@ -145,8 +145,8 @@
               <span id="upload-filename">file.mp4</span>
               <div class="progress-info-right">
                 <span id="upload-percentage">0%</span>
-                <button id="btn-cancel-upload" class="btn-cancel-upload" title="Cancel Upload" onclick="cancelUpload()">
-                  <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+                <button type="button" id="btn-cancel-upload" class="btn-cancel-upload" title="Cancel Upload" onclick="window.cancelUpload && window.cancelUpload(event)">
+                  <i data-lucide="x" style="width: 14px; height: 14px; pointer-events: none;"></i>
                 </button>
               </div>
             </div>

@@ -737,25 +737,31 @@ button, .btn {
 }
 
 .btn-cancel-upload {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--text-primary);
   border-radius: var(--radius-sm);
-  width: 22px;
-  height: 22px;
-  display: flex;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all var(--transition-fast);
   padding: 0;
+  position: relative;
+  z-index: 10;
+}
+
+.btn-cancel-upload * {
+  pointer-events: none;
 }
 
 .btn-cancel-upload:hover {
-  background: rgba(255, 74, 136, 0.25);
+  background: rgba(255, 74, 136, 0.3);
   border-color: var(--primary);
   color: #fff;
-  transform: scale(1.08);
+  transform: scale(1.1);
 }
 
 .progress-bar-bg {
