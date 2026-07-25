@@ -35,9 +35,19 @@ function cancelUpload(e) {
   if (progressContainer) {
     progressContainer.style.display = 'none';
   }
+  const fileInput = document.getElementById('file-input');
+  if (fileInput) fileInput.value = '';
+  const folderInput = document.getElementById('folder-input');
+  if (folderInput) folderInput.value = '';
   browsePath(state.currentPath);
 }
 window.cancelUpload = cancelUpload;
+
+document.addEventListener('click', (e) => {
+  if (e.target && e.target.closest && e.target.closest('#btn-cancel-upload')) {
+    cancelUpload(e);
+  }
+});
 
 // API Fetch Helper
 async function apiCall(endpoint, options = {}) {
@@ -812,6 +822,11 @@ async function uploadFileInChunks(file, basePath, relPath, onProgress) {
     const chunkFile = new File([chunkBlob], file.name);
 
     await new Promise((resolve, reject) => {
+      if (state.isUploadCancelled) {
+        reject(new Error('Upload cancelled'));
+        return;
+      }
+
       const formData = new FormData();
       formData.append('file', chunkFile);
 
@@ -824,6 +839,7 @@ async function uploadFileInChunks(file, basePath, relPath, onProgress) {
       xhr.setRequestHeader('Authorization', `Bearer ${state.token}`);
 
       xhr.upload.onprogress = (e) => {
+        if (state.isUploadCancelled) return;
         if (e.lengthComputable && onProgress) {
           const chunkLoaded = e.loaded;
           const chunkTotal = e.total;
@@ -832,37 +848,39 @@ async function uploadFileInChunks(file, basePath, relPath, onProgress) {
         }
       };
 
-      xhr.onload = () => {
+      let settled = false;
+      const handleDone = (errMessage) => {
+        if (settled) return;
+        settled = true;
         state.activeUploadXhr = null;
-        if (state.isUploadCancelled) {
+        if (state.isUploadCancelled || (errMessage && errMessage.includes('cancelled'))) {
           reject(new Error('Upload cancelled'));
+        } else if (errMessage) {
+          reject(new Error(errMessage));
+        } else {
+          resolve();
+        }
+      };
+
+      xhr.onload = () => {
+        if (state.isUploadCancelled) {
+          handleDone('Upload cancelled');
           return;
         }
         if (xhr.status >= 200 && xhr.status < 300) {
-          resolve();
+          handleDone(null);
         } else {
           let errMsg = `Failed to upload chunk ${chunkIndex}`;
           try {
             const res = JSON.parse(xhr.responseText);
             errMsg = res.error || errMsg;
           } catch (e) {}
-          reject(new Error(errMsg));
+          handleDone(errMsg);
         }
       };
 
-      xhr.onerror = () => {
-        state.activeUploadXhr = null;
-        if (state.isUploadCancelled) {
-          reject(new Error('Upload cancelled'));
-        } else {
-          reject(new Error('Network error'));
-        }
-      };
-
-      xhr.onabort = () => {
-        state.activeUploadXhr = null;
-        reject(new Error('Upload cancelled'));
-      };
+      xhr.onerror = () => handleDone('Network error');
+      xhr.onabort = () => handleDone('Upload cancelled');
 
       xhr.send(formData);
     });
@@ -897,13 +915,14 @@ async function handleFolderUpload() {
     
     try {
       await uploadFileInChunks(file, state.currentPath, relPath, (fileRatio) => {
+        if (state.isUploadCancelled) return;
         const overallPercent = Math.round(((i + fileRatio) / totalFiles) * 100);
         filenameEl.innerText = `Uploading: ${relPath} (${i + 1}/${totalFiles})`;
         percentEl.innerText = `${overallPercent}%`;
         fillEl.style.width = `${overallPercent}%`;
       });
     } catch (err) {
-      if (state.isUploadCancelled || err.message === 'Upload cancelled') {
+      if (state.isUploadCancelled || !err || err.message === 'Upload cancelled' || (err.message && err.message.includes('cancelled'))) {
         console.log('Folder upload cancelled by user');
         break;
       }
@@ -944,13 +963,14 @@ async function handleFileUpload() {
     const file = files[i];
     try {
       await uploadFileInChunks(file, state.currentPath, '', (fileRatio) => {
+        if (state.isUploadCancelled) return;
         const overallPercent = Math.round(((i + fileRatio) / totalFiles) * 100);
         filenameEl.innerText = totalFiles === 1 ? file.name : `Uploading: ${file.name} (${i + 1}/${totalFiles})`;
         percentEl.innerText = `${overallPercent}%`;
         fillEl.style.width = `${overallPercent}%`;
       });
     } catch (err) {
-      if (state.isUploadCancelled || err.message === 'Upload cancelled') {
+      if (state.isUploadCancelled || !err || err.message === 'Upload cancelled' || (err.message && err.message.includes('cancelled'))) {
         console.log('File upload cancelled by user');
         break;
       }
