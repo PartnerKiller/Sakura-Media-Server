@@ -859,31 +859,37 @@ async function handleFileUpload() {
   const fileInput = document.getElementById('file-input');
   if (fileInput.files.length === 0) return;
 
-  const file = fileInput.files[0];
+  const files = Array.from(fileInput.files);
+  const totalFiles = files.length;
+
   const progressContainer = document.getElementById('upload-progress-container');
   const filenameEl = document.getElementById('upload-filename');
   const percentEl = document.getElementById('upload-percentage');
   const fillEl = document.getElementById('upload-progress-fill');
 
-  filenameEl.innerText = file.name;
+  filenameEl.innerText = totalFiles === 1 ? files[0].name : `Preparing upload... (0/${totalFiles} files)`;
   percentEl.innerText = '0%';
   fillEl.style.width = '0%';
   progressContainer.style.display = 'block';
 
-  try {
-    await uploadFileInChunks(file, state.currentPath, '', (ratio) => {
-      const percentComplete = Math.round(ratio * 100);
-      percentEl.innerText = `${percentComplete}%`;
-      fillEl.style.width = `${percentComplete}%`;
-    });
-    progressContainer.style.display = 'none';
-    fileInput.value = '';
-    browsePath(state.currentPath);
-  } catch (err) {
-    progressContainer.style.display = 'none';
-    fileInput.value = '';
-    alert(`Upload failed: ${err.message}`);
+  for (let i = 0; i < totalFiles; i++) {
+    const file = files[i];
+    try {
+      await uploadFileInChunks(file, state.currentPath, '', (fileRatio) => {
+        const overallPercent = Math.round(((i + fileRatio) / totalFiles) * 100);
+        filenameEl.innerText = totalFiles === 1 ? file.name : `Uploading: ${file.name} (${i + 1}/${totalFiles})`;
+        percentEl.innerText = `${overallPercent}%`;
+        fillEl.style.width = `${overallPercent}%`;
+      });
+    } catch (err) {
+      console.error('File upload error:', err);
+      alert(`Upload failed for ${file.name}: ${err.message}`);
+    }
   }
+
+  progressContainer.style.display = 'none';
+  fileInput.value = '';
+  browsePath(state.currentPath);
 }
 
 async function loadStorageAnalysis() {
