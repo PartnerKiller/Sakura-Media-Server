@@ -12,8 +12,21 @@ let state = {
   serverMetricsTimer: null,
   viewMode: localStorage.getItem('viewMode') || 'grid',
   sortBy: localStorage.getItem('sortBy') || 'name-asc',
-  filterType: 'all'
+  filterType: 'all',
+  activeUploadXhr: null,
+  isUploadCancelled: false
 };
+
+function cancelUpload() {
+  state.isUploadCancelled = true;
+  if (state.activeUploadXhr) {
+    try {
+      state.activeUploadXhr.abort();
+    } catch (e) {}
+    state.activeUploadXhr = null;
+  }
+}
+window.cancelUpload = cancelUpload;
 
 // API Fetch Helper
 async function apiCall(endpoint, options = {}) {
@@ -770,10 +783,18 @@ window.handleDownloadFolder = handleDownloadFolder;
 const CHUNK_SIZE = 8 * 1024 * 1024; // 8MB chunks (fits comfortably within Cloudflare limit)
 
 async function uploadFileInChunks(file, basePath, relPath, onProgress) {
+  if (state.isUploadCancelled) {
+    throw new Error('Upload cancelled');
+  }
+
   const uploadId = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
   const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
 
   for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+    if (state.isUploadCancelled) {
+      throw new Error('Upload cancelled');
+    }
+
     const start = chunkIndex * CHUNK_SIZE;
     const end = Math.min(start + CHUNK_SIZE, file.size);
     const chunkBlob = file.slice(start, end);
@@ -784,6 +805,8 @@ async function uploadFileInChunks(file, basePath, relPath, onProgress) {
       formData.append('file', chunkFile);
 
       const xhr = new XMLHttpRequest();
+      state.activeUploadXhr = xhr;
+
       const uploadUrl = `/api/files/upload-chunk?uploadId=${uploadId}&chunkIndex=${chunkIndex}&totalChunks=${totalChunks}&path=${encodeURIComponent(basePath)}&relativePath=${encodeURIComponent(relPath || '')}&filename=${encodeURIComponent(file.name)}`;
       
       xhr.open('POST', uploadUrl, true);
@@ -799,6 +822,11 @@ async function uploadFileInChunks(file, basePath, relPath, onProgress) {
       };
 
       xhr.onload = () => {
+        state.activeUploadXhr = null;
+        if (state.isUploadCancelled) {
+          reject(new Error('Upload cancelled'));
+          return;
+        }
         if (xhr.status >= 200 && xhr.status < 300) {
           resolve();
         } else {
@@ -811,7 +839,20 @@ async function uploadFileInChunks(file, basePath, relPath, onProgress) {
         }
       };
 
-      xhr.onerror = () => reject(new Error('Network error'));
+      xhr.onerror = () => {
+        state.activeUploadXhr = null;
+        if (state.isUploadCancelled) {
+          reject(new Error('Upload cancelled'));
+        } else {
+          reject(new Error('Network error'));
+        }
+      };
+
+      xhr.onabort = () => {
+        state.activeUploadXhr = null;
+        reject(new Error('Upload cancelled'));
+      };
+
       xhr.send(formData);
     });
   }
@@ -820,6 +861,9 @@ async function uploadFileInChunks(file, basePath, relPath, onProgress) {
 async function handleFolderUpload() {
   const folderInput = document.getElementById('folder-input');
   if (folderInput.files.length === 0) return;
+
+  state.isUploadCancelled = false;
+  state.activeUploadXhr = null;
 
   const files = Array.from(folderInput.files);
   const totalFiles = files.length;
@@ -833,8 +877,10 @@ async function handleFolderUpload() {
   percentEl.innerText = '0%';
   fillEl.style.width = '0%';
   progressContainer.style.display = 'block';
+  lucide.createIcons();
 
   for (let i = 0; i < totalFiles; i++) {
+    if (state.isUploadCancelled) break;
     const file = files[i];
     const relPath = file.webkitRelativePath || file.name;
     
@@ -846,18 +892,27 @@ async function handleFolderUpload() {
         fillEl.style.width = `${overallPercent}%`;
       });
     } catch (err) {
+      if (state.isUploadCancelled || err.message === 'Upload cancelled') {
+        console.log('Folder upload cancelled by user');
+        break;
+      }
       console.error('File upload error in folder:', err);
     }
   }
 
   progressContainer.style.display = 'none';
   folderInput.value = ''; // Reset picker input
+  state.activeUploadXhr = null;
+  state.isUploadCancelled = false;
   browsePath(state.currentPath);
 }
 
 async function handleFileUpload() {
   const fileInput = document.getElementById('file-input');
   if (fileInput.files.length === 0) return;
+
+  state.isUploadCancelled = false;
+  state.activeUploadXhr = null;
 
   const files = Array.from(fileInput.files);
   const totalFiles = files.length;
@@ -871,8 +926,10 @@ async function handleFileUpload() {
   percentEl.innerText = '0%';
   fillEl.style.width = '0%';
   progressContainer.style.display = 'block';
+  lucide.createIcons();
 
   for (let i = 0; i < totalFiles; i++) {
+    if (state.isUploadCancelled) break;
     const file = files[i];
     try {
       await uploadFileInChunks(file, state.currentPath, '', (fileRatio) => {
@@ -882,6 +939,10 @@ async function handleFileUpload() {
         fillEl.style.width = `${overallPercent}%`;
       });
     } catch (err) {
+      if (state.isUploadCancelled || err.message === 'Upload cancelled') {
+        console.log('File upload cancelled by user');
+        break;
+      }
       console.error('File upload error:', err);
       alert(`Upload failed for ${file.name}: ${err.message}`);
     }
@@ -889,6 +950,8 @@ async function handleFileUpload() {
 
   progressContainer.style.display = 'none';
   fileInput.value = '';
+  state.activeUploadXhr = null;
+  state.isUploadCancelled = false;
   browsePath(state.currentPath);
 }
 

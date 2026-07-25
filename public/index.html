@@ -143,7 +143,12 @@
           <div class="upload-progress-card" id="upload-progress-container" style="display: none;">
             <div class="progress-info">
               <span id="upload-filename">file.mp4</span>
-              <span id="upload-percentage">0%</span>
+              <div class="progress-info-right">
+                <span id="upload-percentage">0%</span>
+                <button id="btn-cancel-upload" class="btn-cancel-upload" title="Cancel Upload" onclick="cancelUpload()">
+                  <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+                </button>
+              </div>
             </div>
             <div class="progress-bar-bg">
               <div class="progress-bar-fill" id="upload-progress-fill"></div>

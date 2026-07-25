@@ -724,9 +724,38 @@ button, .btn {
 .progress-info {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   font-size: 13px;
   margin-bottom: 8px;
   font-weight: 500;
+}
+
+.progress-info-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-cancel-upload {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  padding: 0;
+}
+
+.btn-cancel-upload:hover {
+  background: rgba(255, 74, 136, 0.25);
+  border-color: var(--primary);
+  color: #fff;
+  transform: scale(1.08);
 }
 
 .progress-bar-bg {
