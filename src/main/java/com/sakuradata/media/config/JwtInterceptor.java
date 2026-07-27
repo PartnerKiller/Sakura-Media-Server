@@ -17,7 +17,9 @@ import java.util.Optional;
 @Component
 public class JwtInterceptor implements HandlerInterceptor {
 
-    public static final String JWT_SECRET = "sakura-media-server-secret-key-2026";
+    public static final String JWT_SECRET = System.getenv("JWT_SECRET") != null 
+            ? System.getenv("JWT_SECRET") 
+            : "sakura-media-server-secret-key-default";
 
     @Autowired
     private UserRepository userRepository;

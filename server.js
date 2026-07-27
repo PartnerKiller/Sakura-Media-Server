@@ -14,7 +14,7 @@ const os = require('os');
 const app = express();
 const server = http.createServer(app);
 const PORT = 5000;
-const JWT_SECRET = 'sakura-media-server-secret-key-2026';
+const JWT_SECRET = process.env.JWT_SECRET || 'sakura-media-server-secret-key-default';
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));

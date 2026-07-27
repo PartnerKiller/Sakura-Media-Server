@@ -15,20 +15,16 @@ public class DbSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        java.util.Optional<User> sakuraOpt = userRepository.findByUsername("sakura");
-        if (sakuraOpt.isPresent()) {
-            User sakuraUser = sakuraOpt.get();
+        String adminUser = System.getenv("DEFAULT_ADMIN_USER") != null ? System.getenv("DEFAULT_ADMIN_USER") : "sakura";
+        String adminPass = System.getenv("DEFAULT_ADMIN_PASS") != null ? System.getenv("DEFAULT_ADMIN_PASS") : "sakura";
+
+        java.util.Optional<User> adminOpt = userRepository.findByUsername(adminUser);
+        if (adminOpt.isEmpty() && userRepository.count() == 0) {
             String salt = BCrypt.gensalt(10);
-            String hashed = BCrypt.hashpw("nishimiya", salt);
-            sakuraUser.setPasswordHash(hashed);
-            userRepository.save(sakuraUser);
-            System.out.println("Owner creds updated to: sakura / nishimiya");
-        } else {
-            String salt = BCrypt.gensalt(10);
-            String hashed = BCrypt.hashpw("nishimiya", salt);
-            User defaultAdmin = new User("sakura", hashed, "admin");
+            String hashed = BCrypt.hashpw(adminPass, salt);
+            User defaultAdmin = new User(adminUser, hashed, "admin");
             userRepository.save(defaultAdmin);
-            System.out.println("H2 Database seeded with default owner admin account: sakura / nishimiya");
+            System.out.println("Database initialized with default administrator account.");
         }
     }
 }

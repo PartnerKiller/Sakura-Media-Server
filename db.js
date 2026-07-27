@@ -13,15 +13,16 @@ function saveDb(data) {
 
 function loadDb() {
   if (!fs.existsSync(DB_PATH)) {
-    // Generate initial DB with owner user
+    const adminUser = process.env.ADMIN_USERNAME || 'admin';
+    const adminPass = process.env.ADMIN_PASSWORD || 'admin';
     const salt = bcrypt.genSaltSync(10);
-    const passwordHash = bcrypt.hashSync('sakura', salt);
+    const passwordHash = bcrypt.hashSync(adminPass, salt);
     
     const initialDb = {
       users: [
         {
           id: 1,
-          username: 'sakura',
+          username: adminUser,
           passwordHash: passwordHash,
           role: 'admin' // Owner has full access
         }

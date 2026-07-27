@@ -8,6 +8,8 @@ target/
 *.db
 *.mv.db
 *.trace.db
+database.json
+*.json.tmp
 
 # Temp uploads directory
 temp-chunks/
