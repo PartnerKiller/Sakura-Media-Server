@@ -9,6 +9,8 @@ Designed to easily stream media files and manage server resources with friends u
 ## 🚀 Features
 
 ### 📁 Media Explorer & File Manager
+- **Multiple & Batch File Uploads**: Select and upload multiple files simultaneously with real-time overall progress tracking.
+- **Upload Cancellation**: Instant `✕` cancel button to cleanly abort active chunk uploads and batch queues.
 - **Dynamic View Layouts**: Switch between a visual **Grid View** (cards) and a compact **List View** (table rows).
 - **Format Filtering**: Isolate items instantly by category (Folders, Videos, Images, Audio, or Other formats).
 - **Sort Controls**: Sort items dynamically by Name (A-Z / Z-A), Size (Smallest / Largest), and Date Modified (Newest / Oldest) with directory pinning.
@@ -16,13 +18,13 @@ Designed to easily stream media files and manage server resources with friends u
 - **Folder Downloads**: Pack and download entire directories as ZIP archives on the fly.
 
 ### 🎬 Media Playback
-- **Browser-Native Video Player**: Premium, responsive HTML5 video streaming modal.
+- **Responsive Video Player**: Browser-native HTML5 video streaming modal with dynamic portrait/vertical aspect ratio scaling.
 - **External Player Casting**: Export standard-compliant M3U playlists to cast media streams directly to external players (like VLC).
 - **Image Viewer**: Integrated inline image rendering.
 
 ### 🛡️ User & Security Management
-- **Token-Based Sessions**: Robust JWT-based authentication system.
-- **Granular Permissions Manager**: Create, list, and modify targeted path access rules (Read and Write) mapped to specific users.
+- **Token-Based Sessions**: Robust JWT-based authentication system with environment-driven secret key support.
+- **Granular Permissions Manager**: Create, list, and modify targeted path access rules (Read and Write) mapped to specific users. Normal user read permissions automatically grant upload capabilities.
 - **Modern Login Security**: Password eye-toggle, autofill theme overrides, and session duration toggling ("Remember Me" checkbox).
 
 ### 🖥️ Server Management Dashboard (Admin Only)
@@ -34,7 +36,7 @@ Designed to easily stream media files and manage server resources with friends u
 - **System Scheduler**: View, execute, and configure background Cron jobs.
 - **APT Packages Manager**: Search and refresh upgradable server packages with inline status reports.
 - **Log Telemetry**: Real-time inspection of System Logs and Audit Logs (user activity streams).
-- **Robust Storage Analyzer**: Multi-partition telemetry showing exact capacity configurations.
+- **Native Storage Telemetry**: Multi-partition storage capacity analysis using native Java File system APIs to prevent resource leaks.
 
 ---
 
@@ -44,7 +46,7 @@ Designed to easily stream media files and manage server resources with friends u
 - **Database**: H2 Database (File-based local persistence).
 - **Frontend**: Standard HTML5, Vanilla CSS (Cyberpunk-styled UI variables), Vanilla Javascript.
 - **UI Enhancements**: Lucide Icons, Chart.js.
-- **System Integration**: `ffmpeg`, `ffprobe`, `df`, `ufw`, `docker`, `systemctl`.
+- **System Integration**: `ffmpeg`, `ffprobe`, `ufw`, `docker`, `systemctl`.
 
 ---
 
@@ -53,7 +55,6 @@ Designed to easily stream media files and manage server resources with friends u
 ```
 sakura-media-server/
 ├── pom.xml                     # Maven project configuration
-├── database.json               # Seed parameters
 ├── db.js / server.js           # Development mocks and environment helpers
 ├── media-server.service        # Systemd service deployment configuration template
 ├── public/                     # Static web assets (compiled assets deployment)
@@ -76,14 +77,21 @@ sakura-media-server/
 
 ---
 
-## ⚙️ Getting Started
+## ⚙️ Configuration & Environment Variables
 
-### 📋 Prerequisites
-- **Java Development Kit (JDK)**: Version 21 or later.
-- **Maven**: For dependency resolution and packaging.
-- **System Tools**: `ffmpeg` and `ffprobe` installed on the host environment path.
+The server can be configured via environment variables or `src/main/resources/application.properties`:
 
-### 📥 Installation & Running
+| Environment Variable | Default Value | Description |
+| :--- | :--- | :--- |
+| `JWT_SECRET` | `sakura-media-server-secret-key-default` | Secret key used for signing authentication JWT tokens |
+| `DEFAULT_ADMIN_USER` | `sakura` | Username for initial seed administrator account |
+| `DEFAULT_ADMIN_PASS` | `sakura` | Password for initial seed administrator account |
+| `DB_USER` | `sa` | H2 Database connection username |
+| `DB_PASS` | *(empty)* | H2 Database connection password |
+
+---
+
+## 📥 Installation & Running
 
 1. **Clone the repository**:
    ```bash
@@ -92,7 +100,7 @@ sakura-media-server/
    ```
 
 2. **Configure environment settings**:
-   Customize storage roots, upload thresholds, and database parameters inside `src/main/resources/application.properties`.
+   Customize storage roots, upload thresholds, and database parameters inside `src/main/resources/application.properties` or export environment variables.
 
 3. **Build the production package**:
    ```bash
