@@ -192,10 +192,10 @@ public class FileController {
         return (contentType != null) ? contentType : "application/octet-stream";
     }
 
-    private ResponseEntity<?> handleStreamRequest(HttpServletRequest request, 
-                                                  String targetPath, 
-                                                  String rangeHeader, 
-                                                  User user) {
+    private ResponseEntity<ResourceRegion> handleStreamRequest(HttpServletRequest request, 
+                                                               String targetPath, 
+                                                               String rangeHeader, 
+                                                               User user) {
         if (targetPath == null) {
             return ResponseEntity.badRequest().build();
         }
@@ -239,19 +239,20 @@ public class FileController {
             }
         }
 
+        ResourceRegion entireRegion = new ResourceRegion(resource, 0, fileLength);
         return ResponseEntity.ok()
                 .header(HttpHeaders.ACCEPT_RANGES, "bytes")
                 .header(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*")
                 .header(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, "*")
                 .contentLength(fileLength)
                 .contentType(MediaType.parseMediaType(contentType))
-                .body(resource);
+                .body(entireRegion);
     }
 
     @GetMapping("/stream")
-    public ResponseEntity<?> stream(HttpServletRequest request, 
-                                     @RequestParam String path, 
-                                     @RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader) {
+    public ResponseEntity<ResourceRegion> stream(HttpServletRequest request, 
+                                                 @RequestParam String path, 
+                                                 @RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader) {
         User user = (User) request.getAttribute("user");
         String targetPath = resolvePath(path);
         return handleStreamRequest(request, targetPath, rangeHeader, user);
@@ -273,9 +274,9 @@ public class FileController {
     }
 
     @GetMapping("/stream-media/{base64Path}")
-    public ResponseEntity<?> streamMedia(HttpServletRequest request,
-                                         @PathVariable String base64Path,
-                                         @RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader) {
+    public ResponseEntity<ResourceRegion> streamMedia(HttpServletRequest request,
+                                                     @PathVariable String base64Path,
+                                                     @RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader) {
         User user = (User) request.getAttribute("user");
         String targetPath = decodeBase64Path(base64Path);
         return handleStreamRequest(request, targetPath, rangeHeader, user);
