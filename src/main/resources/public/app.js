@@ -17,6 +17,19 @@ let state = {
   isUploadCancelled: false
 };
 
+function safeBase64Encode(str) {
+  if (!str) return '';
+  const utf8Bytes = new TextEncoder().encode(str);
+  let binary = '';
+  for (let i = 0; i < utf8Bytes.length; i++) {
+    binary += String.fromCharCode(utf8Bytes[i]);
+  }
+  return btoa(binary)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+}
+
 function encodePathQuery(pathStr) {
   if (!pathStr) return '';
   return pathStr.split('/').map(segment => encodeURIComponent(segment)).join('/');
@@ -89,6 +102,13 @@ document.addEventListener('DOMContentLoaded', () => {
   initApp();
 });
 
+function safeAddListener(id, event, callback) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.addEventListener(event, callback);
+  }
+}
+
 function initApp() {
   lucide.createIcons();
   
@@ -99,17 +119,17 @@ function initApp() {
   }
 
   // Bind Login Form
-  document.getElementById('login-form').addEventListener('submit', handleLogin);
+  safeAddListener('login-form', 'submit', handleLogin);
   
   // Login Password Toggle
   const toggleBtn = document.getElementById('btn-toggle-login-password');
   if (toggleBtn) {
     toggleBtn.addEventListener('click', () => {
       const pwdInput = document.getElementById('password');
-      if (pwdInput.type === 'password') {
+      if (pwdInput && pwdInput.type === 'password') {
         pwdInput.type = 'text';
         toggleBtn.innerHTML = '<i data-lucide="eye-off"></i>';
-      } else {
+      } else if (pwdInput) {
         pwdInput.type = 'password';
         toggleBtn.innerHTML = '<i data-lucide="eye"></i>';
       }
@@ -118,44 +138,46 @@ function initApp() {
   }
   
   // Bind Logout Button
-  document.getElementById('btn-logout').addEventListener('click', logout);
+  safeAddListener('btn-logout', 'click', logout);
 
   // Bind Sidebar Navigation
-  document.getElementById('nav-explorer').addEventListener('click', () => switchPanel('explorer'));
-  document.getElementById('nav-users').addEventListener('click', () => switchPanel('users'));
-  document.getElementById('nav-server').addEventListener('click', () => switchPanel('server'));
+  safeAddListener('nav-explorer', 'click', () => switchPanel('explorer'));
+  safeAddListener('nav-users', 'click', () => switchPanel('users'));
+  safeAddListener('nav-server', 'click', () => switchPanel('server'));
 
   // Bind Mobile Bottom Navigation
-  document.getElementById('mobile-nav-explorer').addEventListener('click', () => switchPanel('explorer'));
-  document.getElementById('mobile-nav-users').addEventListener('click', () => switchPanel('users'));
-  document.getElementById('mobile-nav-server').addEventListener('click', () => switchPanel('server'));
-  document.getElementById('mobile-nav-logout').addEventListener('click', logout);
-
-
+  safeAddListener('mobile-nav-explorer', 'click', () => switchPanel('explorer'));
+  safeAddListener('mobile-nav-users', 'click', () => switchPanel('users'));
+  safeAddListener('mobile-nav-server', 'click', () => switchPanel('server'));
+  safeAddListener('mobile-nav-logout', 'click', logout);
 
   // Bind Explorer Controls
-  document.getElementById('btn-new-folder').addEventListener('click', () => openModal('modal-new-folder'));
-  document.getElementById('new-folder-form').addEventListener('submit', handleCreateFolder);
+  safeAddListener('btn-new-folder', 'click', () => openModal('modal-new-folder'));
+  safeAddListener('new-folder-form', 'submit', handleCreateFolder);
   
   const fileInput = document.getElementById('file-input');
-  document.getElementById('btn-upload-trigger').addEventListener('click', () => fileInput.click());
-  fileInput.addEventListener('change', handleFileUpload);
+  if (fileInput) {
+    safeAddListener('btn-upload-trigger', 'click', () => fileInput.click());
+    fileInput.addEventListener('change', handleFileUpload);
+  }
 
   const folderInput = document.getElementById('folder-input');
-  document.getElementById('btn-upload-folder-trigger').addEventListener('click', () => folderInput.click());
-  folderInput.addEventListener('change', handleFolderUpload);
+  if (folderInput) {
+    safeAddListener('btn-upload-folder-trigger', 'click', () => folderInput.click());
+    folderInput.addEventListener('change', handleFolderUpload);
+  }
 
   // Search input
-  document.getElementById('search-input').addEventListener('input', filterFiles);
+  safeAddListener('search-input', 'input', filterFiles);
 
   // View toggles
-  document.getElementById('view-grid').addEventListener('click', () => {
+  safeAddListener('view-grid', 'click', () => {
     state.viewMode = 'grid';
     localStorage.setItem('viewMode', 'grid');
     updateViewButtons();
     processAndRenderFiles();
   });
-  document.getElementById('view-list').addEventListener('click', () => {
+  safeAddListener('view-list', 'click', () => {
     state.viewMode = 'list';
     localStorage.setItem('viewMode', 'list');
     updateViewButtons();
@@ -163,11 +185,14 @@ function initApp() {
   });
 
   // Sort select
-  document.getElementById('sort-select').addEventListener('change', (e) => {
-    state.sortBy = e.target.value;
-    localStorage.setItem('sortBy', e.target.value);
-    processAndRenderFiles();
-  });
+  const sortSelect = document.getElementById('sort-select');
+  if (sortSelect) {
+    sortSelect.addEventListener('change', (e) => {
+      state.sortBy = e.target.value;
+      localStorage.setItem('sortBy', e.target.value);
+      processAndRenderFiles();
+    });
+  }
 
   // Filter select
   const filterSelect = document.getElementById('filter-select');
@@ -182,27 +207,27 @@ function initApp() {
   initToolbar();
 
   // Add User Form
-  document.getElementById('btn-add-user').addEventListener('click', () => openModal('modal-add-user'));
-  document.getElementById('add-user-form').addEventListener('submit', handleAddUser);
+  safeAddListener('btn-add-user', 'click', () => openModal('modal-add-user'));
+  safeAddListener('add-user-form', 'submit', handleAddUser);
 
   // Edit User Form & Visibility Toggle
-  document.getElementById('edit-user-form').addEventListener('submit', handleEditUser);
-  document.getElementById('btn-toggle-edit-password').addEventListener('click', toggleEditPasswordVisibility);
+  safeAddListener('edit-user-form', 'submit', handleEditUser);
+  safeAddListener('btn-toggle-edit-password', 'click', toggleEditPasswordVisibility);
 
   // Permission management bindings
-  document.getElementById('btn-add-rule').addEventListener('click', handleAddPermissionRule);
-  document.getElementById('btn-save-permissions').addEventListener('click', handleSavePermissions);
+  safeAddListener('btn-add-rule', 'click', handleAddPermissionRule);
+  safeAddListener('btn-save-permissions', 'click', handleSavePermissions);
 
   // Explorer refresh
-  document.getElementById('btn-refresh-explorer').addEventListener('click', () => browsePath(state.currentPath));
+  safeAddListener('btn-refresh-explorer', 'click', () => browsePath(state.currentPath));
 
   // Server Management bindings
-  document.getElementById('btn-restart-server-service').addEventListener('click', () => runServerAction('restart-service'));
-  document.getElementById('btn-reboot-server').addEventListener('click', () => runServerAction('reboot-host'));
-  document.getElementById('btn-refresh-processes').addEventListener('click', () => {
+  safeAddListener('btn-restart-server-service', 'click', () => runServerAction('restart-service'));
+  safeAddListener('btn-reboot-server', 'click', () => runServerAction('reboot-host'));
+  safeAddListener('btn-refresh-processes', 'click', () => {
     loadServerProcesses();
   });
-  document.getElementById('btn-refresh-logs').addEventListener('click', () => {
+  safeAddListener('btn-refresh-logs', 'click', () => {
     loadServerLogs();
   });
 
@@ -215,35 +240,40 @@ function initApp() {
   });
 
   // Server actions bindings
-  document.getElementById('btn-refresh-docker').addEventListener('click', loadDockerContainers);
-  document.getElementById('btn-refresh-services').addEventListener('click', loadsystemdServices);
-  document.getElementById('btn-refresh-firewall').addEventListener('click', loadFirewallRules);
-  document.getElementById('btn-refresh-cron').addEventListener('click', loadCronJobs);
-  document.getElementById('btn-refresh-audit').addEventListener('click', loadAuditLogs);
-  document.getElementById('btn-apt-search').addEventListener('click', () => {
-    loadAptPackages(document.getElementById('apt-search-input').value);
+  safeAddListener('btn-refresh-docker', 'click', loadDockerContainers);
+  safeAddListener('btn-refresh-services', 'click', loadsystemdServices);
+  safeAddListener('btn-refresh-firewall', 'click', loadFirewallRules);
+  safeAddListener('btn-refresh-cron', 'click', loadCronJobs);
+  safeAddListener('btn-refresh-audit', 'click', loadAuditLogs);
+  safeAddListener('btn-apt-search', 'click', () => {
+    const searchInput = document.getElementById('apt-search-input');
+    loadAptPackages(searchInput ? searchInput.value : '');
   });
-  document.getElementById('btn-apt-upgrade-all').addEventListener('click', () => {
+  safeAddListener('btn-apt-upgrade-all', 'click', () => {
     runPackageAction('upgrade', '');
   });
-  document.getElementById('btn-refresh-apt').addEventListener('click', () => {
-    loadAptPackages(document.getElementById('apt-search-input').value);
+  safeAddListener('btn-refresh-apt', 'click', () => {
+    const searchInput = document.getElementById('apt-search-input');
+    loadAptPackages(searchInput ? searchInput.value : '');
   });
 
-  document.getElementById('firewall-rule-form').addEventListener('submit', handleAddFirewallRule);
-  document.getElementById('cron-job-form').addEventListener('submit', handleAddCronJob);
+  safeAddListener('firewall-rule-form', 'submit', handleAddFirewallRule);
+  safeAddListener('cron-job-form', 'submit', handleAddCronJob);
 
   // Video close
-  document.getElementById('btn-close-video').addEventListener('click', () => {
+  safeAddListener('btn-close-video', 'click', () => {
     const player = document.getElementById('html5-video-player');
-    player.pause();
-    player.removeAttribute('src');
-    player.load();
-    player.onerror = null;
+    if (player) {
+      player.pause();
+      player.removeAttribute('src');
+      player.load();
+      player.onerror = null;
+    }
     const errorBanner = document.getElementById('video-error-banner');
     if (errorBanner) errorBanner.style.display = 'none';
     closeModal('modal-video-player');
   });
+}
 }
 
 // AUTHENTICATION FLOWS
@@ -705,7 +735,7 @@ function openMedia(filePath, fileName, category) {
     if (errorBanner) errorBanner.style.display = 'none';
     player.style.display = 'block';
     
-    const relativeStreamUrl = `/api/files/stream?path=${encodePathQuery(filePath)}&token=${state.token}`;
+    const relativeStreamUrl = `/api/files/stream-media/${safeBase64Encode(filePath)}?token=${state.token}`;
     player.src = relativeStreamUrl;
 
     player.onerror = () => {

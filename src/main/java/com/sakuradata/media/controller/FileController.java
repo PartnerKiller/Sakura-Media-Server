@@ -192,12 +192,10 @@ public class FileController {
         return (contentType != null) ? contentType : "application/octet-stream";
     }
 
-    @GetMapping("/stream")
-    public ResponseEntity<?> stream(HttpServletRequest request, 
-                                     @RequestParam String path, 
-                                     @RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader) {
-        User user = (User) request.getAttribute("user");
-        String targetPath = resolvePath(path);
+    private ResponseEntity<?> handleStreamRequest(HttpServletRequest request, 
+                                                  String targetPath, 
+                                                  String rangeHeader, 
+                                                  User user) {
         if (targetPath == null) {
             return ResponseEntity.badRequest().build();
         }
@@ -248,6 +246,39 @@ public class FileController {
                 .contentLength(fileLength)
                 .contentType(MediaType.parseMediaType(contentType))
                 .body(resource);
+    }
+
+    @GetMapping("/stream")
+    public ResponseEntity<?> stream(HttpServletRequest request, 
+                                     @RequestParam String path, 
+                                     @RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader) {
+        User user = (User) request.getAttribute("user");
+        String targetPath = resolvePath(path);
+        return handleStreamRequest(request, targetPath, rangeHeader, user);
+    }
+
+    private String decodeBase64Path(String base64Path) {
+        try {
+            byte[] decoded = java.util.Base64.getUrlDecoder().decode(base64Path);
+            String raw = new String(decoded, java.nio.charset.StandardCharsets.UTF_8);
+            return java.net.URLDecoder.decode(raw, java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            try {
+                byte[] decoded = java.util.Base64.getDecoder().decode(base64Path);
+                String raw = new String(decoded, java.nio.charset.StandardCharsets.UTF_8);
+                return java.net.URLDecoder.decode(raw, java.nio.charset.StandardCharsets.UTF_8);
+            } catch (Exception ignored) {}
+        }
+        return null;
+    }
+
+    @GetMapping("/stream-media/{base64Path}")
+    public ResponseEntity<?> streamMedia(HttpServletRequest request,
+                                         @PathVariable String base64Path,
+                                         @RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader) {
+        User user = (User) request.getAttribute("user");
+        String targetPath = decodeBase64Path(base64Path);
+        return handleStreamRequest(request, targetPath, rangeHeader, user);
     }
 
     @GetMapping("/download-folder")
