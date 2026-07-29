@@ -229,8 +229,6 @@ public class FileController {
                             .header(HttpHeaders.ACCEPT_RANGES, "bytes")
                             .header(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*")
                             .header(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, "*")
-                            .header(HttpHeaders.CONTENT_RANGE, "bytes " + start + "-" + (start + chunkSize - 1) + "/" + fileLength)
-                            .contentLength(chunkSize)
                             .contentType(MediaType.parseMediaType(contentType))
                             .body(region);
                 }
@@ -244,7 +242,6 @@ public class FileController {
                 .header(HttpHeaders.ACCEPT_RANGES, "bytes")
                 .header(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*")
                 .header(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, "*")
-                .contentLength(fileLength)
                 .contentType(MediaType.parseMediaType(contentType))
                 .body(entireRegion);
     }
