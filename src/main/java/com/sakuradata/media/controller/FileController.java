@@ -90,14 +90,23 @@ public class FileController {
         return ResponseEntity.ok(getAuthorizedRoots(user));
     }
 
+    private String resolvePath(String inputPath) {
+        if (inputPath == null || inputPath.trim().isEmpty()) return null;
+        String raw = inputPath;
+        try {
+            raw = java.net.URLDecoder.decode(inputPath, java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Exception ignored) {}
+        return Paths.get(raw).toAbsolutePath().normalize().toString().replace("\\", "/");
+    }
+
     @GetMapping("/browse")
     public ResponseEntity<?> browse(HttpServletRequest request, @RequestParam String path) {
         User user = (User) request.getAttribute("user");
-        if (path == null || path.trim().isEmpty()) {
+        String targetPath = resolvePath(path);
+        if (targetPath == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "Path is required"));
         }
 
-        String targetPath = Paths.get(path).toAbsolutePath().normalize().toString().replace("\\", "/");
         if (!hasPermission(user, targetPath, "read")) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Permission denied"));
         }
@@ -139,11 +148,11 @@ public class FileController {
     @GetMapping("/download")
     public ResponseEntity<Resource> download(HttpServletRequest request, @RequestParam String path) {
         User user = (User) request.getAttribute("user");
-        if (path == null || path.trim().isEmpty()) {
+        String targetPath = resolvePath(path);
+        if (targetPath == null) {
             return ResponseEntity.badRequest().build();
         }
 
-        String targetPath = Paths.get(path).toAbsolutePath().normalize().toString().replace("\\", "/");
         if (!hasPermission(user, targetPath, "read")) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
@@ -188,11 +197,10 @@ public class FileController {
                                      @RequestParam String path, 
                                      @RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader) {
         User user = (User) request.getAttribute("user");
-        if (path == null || path.trim().isEmpty()) {
+        String targetPath = resolvePath(path);
+        if (targetPath == null) {
             return ResponseEntity.badRequest().build();
         }
-
-        String targetPath = Paths.get(path).toAbsolutePath().normalize().toString().replace("\\", "/");
         if (!hasPermission(user, targetPath, "read")) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }

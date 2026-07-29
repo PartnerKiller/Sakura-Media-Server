@@ -17,6 +17,11 @@ let state = {
   isUploadCancelled: false
 };
 
+function encodePathQuery(pathStr) {
+  if (!pathStr) return '';
+  return pathStr.split('/').map(segment => encodeURIComponent(segment)).join('/');
+}
+
 function cancelUpload(e) {
   if (e) {
     try {
@@ -700,7 +705,7 @@ function openMedia(filePath, fileName, category) {
     if (errorBanner) errorBanner.style.display = 'none';
     player.style.display = 'block';
     
-    const relativeStreamUrl = `/api/files/stream?path=${encodeURIComponent(filePath)}&token=${state.token}`;
+    const relativeStreamUrl = `/api/files/stream?path=${encodePathQuery(filePath)}&token=${state.token}`;
     player.src = relativeStreamUrl;
 
     player.onerror = () => {
@@ -713,7 +718,7 @@ function openMedia(filePath, fileName, category) {
     };
     
     const downloadBtn = document.getElementById('btn-download-video');
-    downloadBtn.href = `/api/files/download?path=${encodeURIComponent(filePath)}&token=${state.token}`;
+    downloadBtn.href = `/api/files/download?path=${encodePathQuery(filePath)}&token=${state.token}`;
 
     // Configure VLC Streaming Options
     const absoluteStreamUrl = window.location.origin + relativeStreamUrl;
