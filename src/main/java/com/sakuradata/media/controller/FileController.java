@@ -163,9 +163,12 @@ public class FileController {
         }
 
         Resource resource = new FileSystemResource(file);
+        String contentType = getCustomMimeType(targetPath, request);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + file.getName() + "\"")
                 .header(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*")
+                .contentLength(file.length())
+                .contentType(MediaType.parseMediaType(contentType))
                 .body(resource);
     }
 
