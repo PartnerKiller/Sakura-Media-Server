@@ -6,6 +6,7 @@ import com.sakuradata.media.repository.PermissionRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceRegion;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -159,8 +160,33 @@ public class FileController {
                 .body(resource);
     }
 
+    private String getCustomMimeType(String filePath, HttpServletRequest request) {
+        String lower = filePath.toLowerCase();
+        if (lower.endsWith(".mkv")) return "video/x-matroska";
+        if (lower.endsWith(".mp4") || lower.endsWith(".m4v")) return "video/mp4";
+        if (lower.endsWith(".webm")) return "video/webm";
+        if (lower.endsWith(".mov")) return "video/quicktime";
+        if (lower.endsWith(".avi")) return "video/x-msvideo";
+        if (lower.endsWith(".flv")) return "video/x-flv";
+        if (lower.endsWith(".ts")) return "video/mp2t";
+        if (lower.endsWith(".3gp")) return "video/3gpp";
+        if (lower.endsWith(".ogv")) return "video/ogg";
+        if (lower.endsWith(".m3u8")) return "application/x-mpegurl";
+        if (lower.endsWith(".mp3")) return "audio/mpeg";
+        if (lower.endsWith(".flac")) return "audio/flac";
+        if (lower.endsWith(".aac")) return "audio/aac";
+        if (lower.endsWith(".ogg") || lower.endsWith(".oga")) return "audio/ogg";
+        if (lower.endsWith(".m4a")) return "audio/mp4";
+        if (lower.endsWith(".wav")) return "audio/wav";
+
+        String contentType = request.getServletContext().getMimeType(filePath);
+        return (contentType != null) ? contentType : "application/octet-stream";
+    }
+
     @GetMapping("/stream")
-    public ResponseEntity<Resource> stream(HttpServletRequest request, @RequestParam String path) {
+    public ResponseEntity<?> stream(HttpServletRequest request, 
+                                     @RequestParam String path, 
+                                     @RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader) {
         User user = (User) request.getAttribute("user");
         if (path == null || path.trim().isEmpty()) {
             return ResponseEntity.badRequest().build();
@@ -176,15 +202,42 @@ public class FileController {
             return ResponseEntity.notFound().build();
         }
 
-        Resource resource = new FileSystemResource(file);
-        String contentType = request.getServletContext().getMimeType(file.getAbsolutePath());
-        if (contentType == null) {
-            contentType = "application/octet-stream";
+        String contentType = getCustomMimeType(targetPath, request);
+        FileSystemResource resource = new FileSystemResource(file);
+        long fileLength = file.length();
+
+        if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
+            try {
+                List<HttpRange> ranges = HttpRange.parseRanges(rangeHeader);
+                if (!ranges.isEmpty()) {
+                    HttpRange range = ranges.get(0);
+                    long start = range.getRangeStart(fileLength);
+                    long end = range.getRangeEnd(fileLength);
+                    long rangeLength = end - start + 1;
+
+                    // Limit range chunk size to 10MB maximum per request for smooth streaming performance
+                    long chunkSize = Math.min(10 * 1024 * 1024L, rangeLength);
+                    ResourceRegion region = new ResourceRegion(resource, start, chunkSize);
+
+                    return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
+                            .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                            .header(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*")
+                            .header(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, "*")
+                            .header(HttpHeaders.CONTENT_RANGE, "bytes " + start + "-" + (start + chunkSize - 1) + "/" + fileLength)
+                            .contentLength(chunkSize)
+                            .contentType(MediaType.parseMediaType(contentType))
+                            .body(region);
+                }
+            } catch (Exception e) {
+                // Ignore range parsing error and fall through to full response
+            }
         }
 
         return ResponseEntity.ok()
+                .header(HttpHeaders.ACCEPT_RANGES, "bytes")
                 .header(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*")
                 .header(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, "*")
+                .contentLength(fileLength)
                 .contentType(MediaType.parseMediaType(contentType))
                 .body(resource);
     }

@@ -795,6 +795,13 @@
       </div>
       <div class="modal-body video-body" style="padding: 0; background: #000; overflow: hidden; position: relative;">
         <video id="html5-video-player" autoplay controls preload="metadata" style="max-width: 100%; max-height: 75vh; display: block; margin: 0 auto; outline: none;"></video>
+        <div id="video-error-banner" style="display: none; padding: 32px 24px; text-align: center; color: var(--text-secondary); background: rgba(15, 17, 26, 0.95);">
+          <i data-lucide="alert-triangle" style="width: 42px; height: 42px; color: #ffb703; margin-bottom: 12px;"></i>
+          <h4 style="color: #fff; margin-bottom: 8px; font-size: 1.1rem; font-weight: 600;">Unsupported Browser Video Codec</h4>
+          <p style="font-size: 0.88rem; max-width: 500px; margin: 0 auto 18px auto; line-height: 1.5; color: var(--text-secondary);">
+            Your browser cannot decode this video's specific codec (such as HEVC / x265 or AC3 audio). Click <strong>Stream in VLC (M3U)</strong> below to stream it seamlessly in VLC Media Player, or <strong>Download</strong> the file.
+          </p>
+        </div>
       </div>
       <div class="modal-footer" style="display: flex; gap: 8px; flex-wrap: wrap;">
         <a id="btn-download-video" href="#" class="btn btn-secondary" download style="display: flex; align-items: center; gap: 6px;">
@@ -818,27 +825,27 @@
     <div class="modal modal-image">
       <div class="modal-header">
         <h3 id="image-viewer-title">Image Viewer</h3>
-        <button class="btn-close-modal" onclick="closeModal('modal-image-viewer')">
+        <button class="btn-close-modal" id="btn-close-image">
           <i data-lucide="x"></i>
         </button>
       </div>
       <div class="modal-body image-body">
-        <img id="viewer-img" src="" alt="Viewing file">
+        <img id="viewer-img" src="" alt="Media Preview">
       </div>
       <div class="modal-footer">
-        <a id="btn-download-image" href="#" class="btn btn-primary" download>
-          <i data-lucide="download"></i>
+        <a id="btn-download-image" href="#" class="btn btn-primary" download style="display: flex; align-items: center; gap: 6px;">
+          <i data-lucide="download" style="width: 16px; height: 16px;"></i>
           <span>Download</span>
         </a>
       </div>
     </div>
   </div>
 
-  <!-- MOBILE BOTTOM NAVIGATION -->
-  <nav class="mobile-nav-bar">
-    <button class="mobile-nav-item active" id="mobile-nav-explorer">
-      <i data-lucide="folder-open"></i>
-      <span>Explorer</span>
+  <!-- MOBILE NAVIGATION BAR -->
+  <nav class="mobile-nav" id="mobile-nav">
+    <button class="mobile-nav-item active" id="mobile-nav-files">
+      <i data-lucide="folder"></i>
+      <span>Files</span>
     </button>
     <button class="mobile-nav-item admin-only" id="mobile-nav-users">
       <i data-lucide="users"></i>
@@ -854,6 +861,6 @@
     </button>
   </nav>
 
-  <script src="/app.js?v=3.3"></script>
+  <script src="/app.js?v=3.4"></script>
 </body>
 </html>

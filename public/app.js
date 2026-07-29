@@ -232,7 +232,11 @@ function initApp() {
   document.getElementById('btn-close-video').addEventListener('click', () => {
     const player = document.getElementById('html5-video-player');
     player.pause();
-    player.src = "";
+    player.removeAttribute('src');
+    player.load();
+    player.onerror = null;
+    const errorBanner = document.getElementById('video-error-banner');
+    if (errorBanner) errorBanner.style.display = 'none';
     closeModal('modal-video-player');
   });
 }
@@ -691,9 +695,22 @@ function openMedia(filePath, fileName, category) {
   if (category === 'video') {
     document.getElementById('video-player-title').innerText = fileName;
     const player = document.getElementById('html5-video-player');
+    const errorBanner = document.getElementById('video-error-banner');
+    
+    if (errorBanner) errorBanner.style.display = 'none';
+    player.style.display = 'block';
     
     const relativeStreamUrl = `/api/files/stream?path=${encodeURIComponent(filePath)}&token=${state.token}`;
     player.src = relativeStreamUrl;
+
+    player.onerror = () => {
+      console.warn('HTML5 video player encountered an error (likely unsupported codec). Showing external stream options.');
+      player.style.display = 'none';
+      if (errorBanner) {
+        errorBanner.style.display = 'block';
+        lucide.createIcons();
+      }
+    };
     
     const downloadBtn = document.getElementById('btn-download-video');
     downloadBtn.href = `/api/files/download?path=${encodeURIComponent(filePath)}&token=${state.token}`;
