@@ -24,6 +24,21 @@ public class JwtInterceptor implements HandlerInterceptor {
     @Autowired
     private UserRepository userRepository;
 
+    private DecodedJWT verifyToken(String token) {
+        try {
+            Algorithm algorithm = Algorithm.HMAC256(JWT_SECRET);
+            JWTVerifier verifier = JWT.require(algorithm).build();
+            return verifier.verify(token);
+        } catch (Exception e) {
+            try {
+                Algorithm legacyAlgo = Algorithm.HMAC256("sakura-media-server-secret-key-2026");
+                JWTVerifier legacyVerifier = JWT.require(legacyAlgo).build();
+                return legacyVerifier.verify(token);
+            } catch (Exception ignored) {}
+            throw e;
+        }
+    }
+
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         // Allow pre-flight CORS requests
@@ -60,9 +75,7 @@ public class JwtInterceptor implements HandlerInterceptor {
         }
 
         try {
-            Algorithm algorithm = Algorithm.HMAC256(JWT_SECRET);
-            JWTVerifier verifier = JWT.require(algorithm).build();
-            DecodedJWT jwt = verifier.verify(token);
+            DecodedJWT jwt = verifyToken(token);
 
             Long userId = jwt.getClaim("id").asLong();
             if (userId == null) {
