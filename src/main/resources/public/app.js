@@ -274,7 +274,6 @@ function initApp() {
     closeModal('modal-video-player');
   });
 }
-}
 
 // AUTHENTICATION FLOWS
 function showLogin() {
