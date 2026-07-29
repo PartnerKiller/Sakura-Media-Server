@@ -1248,8 +1248,8 @@ video {
 
 
 /* MOBILE BOTTOM NAV BAR */
-.mobile-nav-bar {
-  display: none;
+.mobile-nav, .mobile-nav-bar {
+  display: none !important;
 }
 
 /* RESPONSIVE DESIGN */
@@ -1367,8 +1367,8 @@ video {
   }
 
   /* MOBILE BOTTOM NAV BAR STYLE */
-  .mobile-nav-bar {
-    display: flex;
+  .mobile-nav, .mobile-nav-bar {
+    display: flex !important;
     position: fixed;
     bottom: 0;
     left: 0;

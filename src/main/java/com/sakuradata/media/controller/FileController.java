@@ -162,7 +162,7 @@ public class FileController {
 
     private String getCustomMimeType(String filePath, HttpServletRequest request) {
         String lower = filePath.toLowerCase();
-        if (lower.endsWith(".mkv")) return "video/x-matroska";
+        if (lower.endsWith(".mkv")) return "video/webm";
         if (lower.endsWith(".mp4") || lower.endsWith(".m4v")) return "video/mp4";
         if (lower.endsWith(".webm")) return "video/webm";
         if (lower.endsWith(".mov")) return "video/quicktime";
