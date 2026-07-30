@@ -173,23 +173,23 @@ public class FileController {
     }
 
     private String getCustomMimeType(String filePath, HttpServletRequest request) {
-        String lower = filePath.toLowerCase();
-        if (lower.endsWith(".mkv")) return "video/webm";
-        if (lower.endsWith(".mp4") || lower.endsWith(".m4v")) return "video/mp4";
-        if (lower.endsWith(".webm")) return "video/webm";
-        if (lower.endsWith(".mov")) return "video/quicktime";
-        if (lower.endsWith(".avi")) return "video/x-msvideo";
-        if (lower.endsWith(".flv")) return "video/x-flv";
-        if (lower.endsWith(".ts")) return "video/mp2t";
-        if (lower.endsWith(".3gp")) return "video/3gpp";
-        if (lower.endsWith(".ogv")) return "video/ogg";
-        if (lower.endsWith(".m3u8")) return "application/x-mpegurl";
-        if (lower.endsWith(".mp3")) return "audio/mpeg";
-        if (lower.endsWith(".flac")) return "audio/flac";
-        if (lower.endsWith(".aac")) return "audio/aac";
-        if (lower.endsWith(".ogg") || lower.endsWith(".oga")) return "audio/ogg";
-        if (lower.endsWith(".m4a")) return "audio/mp4";
-        if (lower.endsWith(".wav")) return "audio/wav";
+        String filename = Paths.get(filePath).getFileName().toString().toLowerCase();
+        if (filename.endsWith(".mkv") || filename.contains(".mkv.")) return "video/webm";
+        if (filename.endsWith(".mp4") || filename.endsWith(".m4v")) return "video/mp4";
+        if (filename.endsWith(".webm")) return "video/webm";
+        if (filename.endsWith(".mov")) return "video/quicktime";
+        if (filename.endsWith(".avi")) return "video/x-msvideo";
+        if (filename.endsWith(".flv")) return "video/x-flv";
+        if (filename.endsWith(".ts")) return "video/mp2t";
+        if (filename.endsWith(".3gp")) return "video/3gpp";
+        if (filename.endsWith(".ogv")) return "video/ogg";
+        if (filename.endsWith(".m3u8")) return "application/x-mpegurl";
+        if (filename.endsWith(".mp3")) return "audio/mpeg";
+        if (filename.endsWith(".flac")) return "audio/flac";
+        if (filename.endsWith(".aac")) return "audio/aac";
+        if (filename.endsWith(".ogg") || filename.endsWith(".oga")) return "audio/ogg";
+        if (filename.endsWith(".m4a")) return "audio/mp4";
+        if (filename.endsWith(".wav")) return "audio/wav";
 
         String contentType = request.getServletContext().getMimeType(filePath);
         return (contentType != null) ? contentType : "application/octet-stream";
