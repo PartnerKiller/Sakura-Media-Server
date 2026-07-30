@@ -35,6 +35,17 @@ function encodePathQuery(pathStr) {
   return pathStr.split('/').map(segment => encodeURIComponent(segment)).join('/');
 }
 
+function getVlcUrl(filePath) {
+  if (!filePath) return '#';
+  const relativeStreamUrl = `/api/files/stream-media/${safeBase64Encode(filePath)}?token=${state.token}`;
+  const absoluteStreamUrl = window.location.origin + relativeStreamUrl;
+  if (absoluteStreamUrl.startsWith('https://')) {
+    return 'vlcs://' + absoluteStreamUrl.substring(8);
+  } else {
+    return 'vlc://' + absoluteStreamUrl.substring(7);
+  }
+}
+
 function cancelUpload(e) {
   if (e) {
     try {
@@ -641,6 +652,11 @@ function renderFiles(files) {
       </div>
       <div class="file-actions">
         ${file.isFile ? `
+          ${category === 'video' ? `
+            <a class="btn-card-action btn-play-vlc" href="${getVlcUrl(filePath)}" onclick="event.stopPropagation();" title="Play in VLC" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 6px; background: rgba(230, 92, 0, 0.15); color: #e65c00; margin-right: 4px;">
+              <i data-lucide="play" style="width: 16px; height: 16px;"></i>
+            </a>
+          ` : ''}
           <button class="btn-card-action btn-download" onclick="handleDownloadFile(event, '${filePath.replace(/'/g, "\\'")}')" title="Download">
             <i data-lucide="download"></i>
           </button>
@@ -792,7 +808,13 @@ function openMedia(filePath, fileName, category) {
     // Configure VLC Streaming Options
     const absoluteStreamUrl = window.location.origin + relativeStreamUrl;
 
-    // 1. M3U playlist file generation
+    // 1. Direct VLC App link
+    const vlcDirectBtn = document.getElementById('btn-stream-vlc-direct');
+    if (vlcDirectBtn) {
+      vlcDirectBtn.href = getVlcUrl(filePath);
+    }
+
+    // 2. M3U playlist file generation
     const m3uBtn = document.getElementById('btn-stream-vlc-m3u');
     const m3uContent = `#EXTM3U\n#EXTINF:-1,${fileName}\n${absoluteStreamUrl}`;
     const blob = new Blob([m3uContent], { type: 'application/x-mpegurl' });
