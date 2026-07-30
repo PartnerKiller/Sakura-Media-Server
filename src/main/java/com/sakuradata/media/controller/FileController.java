@@ -174,7 +174,13 @@ public class FileController {
 
     private String getCustomMimeType(String filePath, HttpServletRequest request) {
         String filename = Paths.get(filePath).getFileName().toString().toLowerCase();
-        if (filename.endsWith(".mkv") || filename.contains(".mkv.")) return "video/webm";
+        if (filename.endsWith(".mkv") || filename.contains(".mkv.")) {
+            String userAgent = request.getHeader("User-Agent");
+            if (userAgent != null && userAgent.contains("Firefox")) {
+                return "video/x-matroska";
+            }
+            return "video/webm";
+        }
         if (filename.endsWith(".mp4") || filename.endsWith(".m4v")) return "video/mp4";
         if (filename.endsWith(".webm")) return "video/webm";
         if (filename.endsWith(".mov")) return "video/quicktime";
