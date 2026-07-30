@@ -48,7 +48,7 @@ public class JwtInterceptor implements HandlerInterceptor {
 
         String path = request.getRequestURI();
         // Skip auth check for auth endpoints, static resources, and h2-console
-        if (path.startsWith("/api/auth/login") || path.startsWith("/api/users") || path.startsWith("/h2-console") || !path.startsWith("/api/")) {
+        if (path.startsWith("/api/auth/login") || path.startsWith("/h2-console") || !path.startsWith("/api/")) {
             return true;
         }
 

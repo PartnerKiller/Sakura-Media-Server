@@ -2131,7 +2131,8 @@ function openEditUserModal(userId, username, role, bandwidthLimit) {
   document.getElementById('edit-password').value = '';
   document.getElementById('edit-password').type = 'password';
   document.getElementById('edit-role').value = role;
-  document.getElementById('edit-bandwidth').value = bandwidthLimit ? bandwidthLimit : '';
+  const parsedLimit = parseFloat(bandwidthLimit);
+  document.getElementById('edit-bandwidth').value = (parsedLimit && parsedLimit > 0) ? parsedLimit : '';
   document.getElementById('edit-user-error').innerText = '';
   
   const icon = document.querySelector('#btn-toggle-edit-password i');
