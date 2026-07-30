@@ -162,7 +162,12 @@ public class FileController {
             return ResponseEntity.notFound().build();
         }
 
-        Resource resource = new FileSystemResource(file);
+        Resource resource;
+        if (user != null && user.getBandwidthLimit() != null && user.getBandwidthLimit() > 0) {
+            resource = new com.sakuradata.media.util.ThrottledFileSystemResource(file, user.getBandwidthLimit() * 1024L);
+        } else {
+            resource = new FileSystemResource(file);
+        }
         String contentType = getCustomMimeType(targetPath, request);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + file.getName() + "\"")
@@ -218,7 +223,12 @@ public class FileController {
         }
 
         String contentType = getCustomMimeType(targetPath, request);
-        FileSystemResource resource = new FileSystemResource(file);
+        FileSystemResource resource;
+        if (user != null && user.getBandwidthLimit() != null && user.getBandwidthLimit() > 0) {
+            resource = new com.sakuradata.media.util.ThrottledFileSystemResource(file, user.getBandwidthLimit() * 1024L);
+        } else {
+            resource = new FileSystemResource(file);
+        }
         long fileLength = file.length();
 
         if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {

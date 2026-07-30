@@ -240,6 +240,7 @@
                   <th>Username</th>
                   <th>Role</th>
                   <th>Permissions count</th>
+                  <th>Bandwidth Limit</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -643,6 +644,10 @@
               <option value="admin">Administrator</option>
             </select>
           </div>
+          <div class="input-group">
+            <label for="new-bandwidth">Bandwidth Limit (KB/s) (0 or empty for unlimited)</label>
+            <input type="number" id="new-bandwidth" placeholder="e.g. 2048" min="0">
+          </div>
           <div class="error-message" id="add-user-error"></div>
         </div>
         <div class="modal-footer">
@@ -684,6 +689,10 @@
               <option value="user">Standard User</option>
               <option value="admin">Administrator</option>
             </select>
+          </div>
+          <div class="input-group">
+            <label for="edit-bandwidth">Bandwidth Limit (KB/s) (0 or empty for unlimited)</label>
+            <input type="number" id="edit-bandwidth" placeholder="e.g. 2048" min="0">
           </div>
           <div class="error-message" id="edit-user-error"></div>
         </div>

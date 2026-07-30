@@ -19,12 +19,22 @@ public class User {
     @Column(nullable = false)
     private String role; // "admin" or "user"
 
+    @Column(name = "bandwidth_limit")
+    private Integer bandwidthLimit; // in KB/s. null or <= 0 means unlimited.
+
     public User() {}
 
     public User(String username, String passwordHash, String role) {
         this.username = username;
         this.passwordHash = passwordHash;
         this.role = role;
+    }
+
+    public User(String username, String passwordHash, String role, Integer bandwidthLimit) {
+        this.username = username;
+        this.passwordHash = passwordHash;
+        this.role = role;
+        this.bandwidthLimit = bandwidthLimit;
     }
 
     public Long getId() {
@@ -57,5 +67,13 @@ public class User {
 
     public void setRole(String role) {
         this.role = role;
+    }
+
+    public Integer getBandwidthLimit() {
+        return bandwidthLimit;
+    }
+
+    public void setBandwidthLimit(Integer bandwidthLimit) {
+        this.bandwidthLimit = bandwidthLimit;
     }
 }

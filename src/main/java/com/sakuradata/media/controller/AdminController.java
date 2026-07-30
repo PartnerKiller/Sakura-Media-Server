@@ -60,6 +60,7 @@ public class AdminController {
             map.put("id", u.getId());
             map.put("username", u.getUsername());
             map.put("role", u.getRole());
+            map.put("bandwidthLimit", u.getBandwidthLimit());
             map.put("permissions", permissionRepository.findByUserId(u.getId()));
             return map;
         }).collect(Collectors.toList());
@@ -68,14 +69,21 @@ public class AdminController {
     }
 
     @PostMapping("/users")
-    public ResponseEntity<?> createUser(HttpServletRequest request, @RequestBody Map<String, String> body) {
+    public ResponseEntity<?> createUser(HttpServletRequest request, @RequestBody Map<String, Object> body) {
         if (!isAdmin(request)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
         }
 
-        String username = body.get("username");
-        String password = body.get("password");
-        String role = body.getOrDefault("role", "user");
+        String username = body.get("username") != null ? body.get("username").toString() : null;
+        String password = body.get("password") != null ? body.get("password").toString() : null;
+        String role = body.get("role") != null ? body.get("role").toString() : "user";
+        
+        Integer bandwidthLimit = null;
+        if (body.get("bandwidthLimit") != null && !body.get("bandwidthLimit").toString().trim().isEmpty()) {
+            try {
+                bandwidthLimit = Integer.valueOf(body.get("bandwidthLimit").toString().trim());
+            } catch (NumberFormatException ignored) {}
+        }
 
         if (username == null || password == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "Username and password required"));
@@ -87,13 +95,14 @@ public class AdminController {
 
         String salt = BCrypt.gensalt(10);
         String hashed = BCrypt.hashpw(password, salt);
-        User user = new User(username, hashed, role);
+        User user = new User(username, hashed, role, bandwidthLimit);
         userRepository.save(user);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                 "id", user.getId(),
                 "username", user.getUsername(),
-                "role", user.getRole()
+                "role", user.getRole(),
+                "bandwidthLimit", user.getBandwidthLimit() != null ? user.getBandwidthLimit() : 0
         ));
     }
 
@@ -120,7 +129,7 @@ public class AdminController {
     }
 
     @PutMapping("/users/{id}")
-    public ResponseEntity<?> updateUser(HttpServletRequest request, @PathVariable Long id, @RequestBody Map<String, String> body) {
+    public ResponseEntity<?> updateUser(HttpServletRequest request, @PathVariable Long id, @RequestBody Map<String, Object> body) {
         if (!isAdmin(request)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
         }
@@ -131,8 +140,8 @@ public class AdminController {
         }
 
         User user = userOpt.get();
-        String role = body.get("role");
-        String password = body.get("password");
+        String role = body.get("role") != null ? body.get("role").toString() : null;
+        String password = body.get("password") != null ? body.get("password").toString() : null;
 
         if (role != null) {
             if (id == 1L && !"admin".equals(role)) {
@@ -147,12 +156,24 @@ public class AdminController {
             user.setPasswordHash(hashed);
         }
 
+        if (body.containsKey("bandwidthLimit")) {
+            Object limitVal = body.get("bandwidthLimit");
+            if (limitVal == null || limitVal.toString().trim().isEmpty()) {
+                user.setBandwidthLimit(null);
+            } else {
+                try {
+                    user.setBandwidthLimit(Integer.valueOf(limitVal.toString().trim()));
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+
         userRepository.save(user);
 
         return ResponseEntity.ok(Map.of(
                 "id", user.getId(),
                 "username", user.getUsername(),
-                "role", user.getRole()
+                "role", user.getRole(),
+                "bandwidthLimit", user.getBandwidthLimit() != null ? user.getBandwidthLimit() : 0
         ));
     }
 

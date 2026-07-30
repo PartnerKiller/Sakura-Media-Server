@@ -35,6 +35,14 @@ function encodePathQuery(pathStr) {
   return pathStr.split('/').map(segment => encodeURIComponent(segment)).join('/');
 }
 
+function formatBandwidth(kbps) {
+  if (!kbps || kbps <= 0) return 'Unlimited';
+  if (kbps >= 1024) {
+    return (kbps / 1024).toFixed(1) + ' MB/s';
+  }
+  return kbps + ' KB/s';
+}
+
 function cancelUpload(e) {
   if (e) {
     try {
@@ -1188,7 +1196,7 @@ function renderUsers() {
          </button>`
       : '<span class="text-muted" style="font-size: 13px;">Administrator</span>';
 
-    const editBtn = `<button class="btn btn-secondary" onclick="openEditUserModal(${u.id}, '${u.username}', '${u.role}')">
+    const editBtn = `<button class="btn btn-secondary" onclick="openEditUserModal(${u.id}, '${u.username}', '${u.role}', ${u.bandwidthLimit || 0})">
                        <i data-lucide="edit" style="width:16px; height:16px;"></i>
                        <span>Edit</span>
                      </button>`;
@@ -1197,6 +1205,7 @@ function renderUsers() {
       <td>${u.username}</td>
       <td><span class="role-badge ${u.role}">${u.role}</span></td>
       <td>${u.role === 'admin' ? 'All (Full access)' : permCount + ' path rule(s)'}</td>
+      <td>${formatBandwidth(u.bandwidthLimit)}</td>
       <td>
         <div style="display:flex; gap:8px; align-items: center;">
           ${configurePermsBtn}
@@ -1215,6 +1224,7 @@ async function handleAddUser(e) {
   const usernameEl = document.getElementById('new-username');
   const passwordEl = document.getElementById('new-password');
   const roleEl = document.getElementById('new-role');
+  const bandwidthEl = document.getElementById('new-bandwidth');
   const errorEl = document.getElementById('add-user-error');
   
   errorEl.innerText = '';
@@ -1225,7 +1235,8 @@ async function handleAddUser(e) {
       body: JSON.stringify({
         username: usernameEl.value.trim(),
         password: passwordEl.value,
-        role: roleEl.value
+        role: roleEl.value,
+        bandwidthLimit: bandwidthEl.value ? parseInt(bandwidthEl.value, 10) : 0
       })
     });
 
@@ -1234,6 +1245,7 @@ async function handleAddUser(e) {
     usernameEl.value = '';
     passwordEl.value = '';
     roleEl.value = 'user';
+    bandwidthEl.value = '';
     
     loadUsers();
   } catch (err) {
@@ -2115,13 +2127,14 @@ async function loadAuditLogs() {
 // -------------------------------------------------------------
 // EDIT USER ACTIONS
 // -------------------------------------------------------------
-function openEditUserModal(userId, username, role) {
+function openEditUserModal(userId, username, role, bandwidthLimit) {
   document.getElementById('edit-user-id').value = userId;
   document.getElementById('edit-username-title').innerText = username;
   document.getElementById('edit-username-display').value = username;
   document.getElementById('edit-password').value = '';
   document.getElementById('edit-password').type = 'password';
   document.getElementById('edit-role').value = role;
+  document.getElementById('edit-bandwidth').value = bandwidthLimit ? bandwidthLimit : '';
   document.getElementById('edit-user-error').innerText = '';
   
   const icon = document.querySelector('#btn-toggle-edit-password i');
@@ -2143,12 +2156,16 @@ async function handleEditUser(e) {
   const userId = document.getElementById('edit-user-id').value;
   const password = document.getElementById('edit-password').value;
   const role = document.getElementById('edit-role').value;
+  const bandwidth = document.getElementById('edit-bandwidth').value;
   const errorEl = document.getElementById('edit-user-error');
 
   errorEl.innerText = '';
 
   try {
-    const payload = { role };
+    const payload = { 
+      role,
+      bandwidthLimit: bandwidth ? parseInt(bandwidth, 10) : 0
+    };
     if (password.trim()) {
       payload.password = password;
     }
