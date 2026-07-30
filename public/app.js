@@ -268,6 +268,12 @@ function initApp() {
       player.removeAttribute('src');
       player.load();
       player.onerror = null;
+      player.onplaying = null;
+      player.ontimeupdate = null;
+    }
+    if (state.videoWatchdog) {
+      clearTimeout(state.videoWatchdog);
+      state.videoWatchdog = null;
     }
     const errorBanner = document.getElementById('video-error-banner');
     if (errorBanner) errorBanner.style.display = 'none';
@@ -737,8 +743,42 @@ function openMedia(filePath, fileName, category) {
     const relativeStreamUrl = `/api/files/stream-media/${safeBase64Encode(filePath)}?token=${state.token}`;
     player.src = relativeStreamUrl;
 
+    if (state.videoWatchdog) {
+      clearTimeout(state.videoWatchdog);
+    }
+    
+    // 4.0s watchdog to detect if video gets stuck at buffering due to unsupported decoder
+    state.videoWatchdog = setTimeout(() => {
+      if (player.currentTime === 0 && !player.paused) {
+        console.warn('Watchdog timed out. Video is stuck in loading state (likely unsupported video/audio codec). Showing external options.');
+        player.style.display = 'none';
+        if (errorBanner) {
+          errorBanner.style.display = 'block';
+          lucide.createIcons();
+        }
+      }
+    }, 4000);
+
+    player.onplaying = () => {
+      if (state.videoWatchdog) {
+        clearTimeout(state.videoWatchdog);
+        state.videoWatchdog = null;
+      }
+    };
+
+    player.ontimeupdate = () => {
+      if (player.currentTime > 0 && state.videoWatchdog) {
+        clearTimeout(state.videoWatchdog);
+        state.videoWatchdog = null;
+      }
+    };
+
     player.onerror = () => {
       console.warn('HTML5 video player encountered an error (likely unsupported codec). Showing external stream options.');
+      if (state.videoWatchdog) {
+        clearTimeout(state.videoWatchdog);
+        state.videoWatchdog = null;
+      }
       player.style.display = 'none';
       if (errorBanner) {
         errorBanner.style.display = 'block';
