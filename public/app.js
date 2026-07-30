@@ -35,12 +35,9 @@ function encodePathQuery(pathStr) {
   return pathStr.split('/').map(segment => encodeURIComponent(segment)).join('/');
 }
 
-function formatBandwidth(kbps) {
-  if (!kbps || kbps <= 0) return 'Unlimited';
-  if (kbps >= 1024) {
-    return (kbps / 1024).toFixed(1) + ' MB/s';
-  }
-  return kbps + ' KB/s';
+function formatBandwidth(mbps) {
+  if (!mbps || mbps <= 0) return 'Unlimited';
+  return mbps.toFixed(1) + ' MB/s';
 }
 
 function cancelUpload(e) {
@@ -1236,7 +1233,7 @@ async function handleAddUser(e) {
         username: usernameEl.value.trim(),
         password: passwordEl.value,
         role: roleEl.value,
-        bandwidthLimit: bandwidthEl.value ? parseInt(bandwidthEl.value, 10) : 0
+        bandwidthLimit: bandwidthEl.value ? parseFloat(bandwidthEl.value) : 0
       })
     });
 
@@ -2164,7 +2161,7 @@ async function handleEditUser(e) {
   try {
     const payload = { 
       role,
-      bandwidthLimit: bandwidth ? parseInt(bandwidth, 10) : 0
+      bandwidthLimit: bandwidth ? parseFloat(bandwidth) : 0
     };
     if (password.trim()) {
       payload.password = password;

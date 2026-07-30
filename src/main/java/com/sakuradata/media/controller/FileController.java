@@ -164,7 +164,7 @@ public class FileController {
 
         Resource resource;
         if (user != null && user.getBandwidthLimit() != null && user.getBandwidthLimit() > 0) {
-            resource = new com.sakuradata.media.util.ThrottledFileSystemResource(file, user.getBandwidthLimit() * 1024L);
+            resource = new com.sakuradata.media.util.ThrottledFileSystemResource(file, (long) (user.getBandwidthLimit() * 1024 * 1024));
         } else {
             resource = new FileSystemResource(file);
         }
@@ -225,7 +225,7 @@ public class FileController {
         String contentType = getCustomMimeType(targetPath, request);
         FileSystemResource resource;
         if (user != null && user.getBandwidthLimit() != null && user.getBandwidthLimit() > 0) {
-            resource = new com.sakuradata.media.util.ThrottledFileSystemResource(file, user.getBandwidthLimit() * 1024L);
+            resource = new com.sakuradata.media.util.ThrottledFileSystemResource(file, (long) (user.getBandwidthLimit() * 1024 * 1024));
         } else {
             resource = new FileSystemResource(file);
         }

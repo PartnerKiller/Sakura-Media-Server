@@ -78,10 +78,10 @@ public class AdminController {
         String password = body.get("password") != null ? body.get("password").toString() : null;
         String role = body.get("role") != null ? body.get("role").toString() : "user";
         
-        Integer bandwidthLimit = null;
+        Double bandwidthLimit = null;
         if (body.get("bandwidthLimit") != null && !body.get("bandwidthLimit").toString().trim().isEmpty()) {
             try {
-                bandwidthLimit = Integer.valueOf(body.get("bandwidthLimit").toString().trim());
+                bandwidthLimit = Double.valueOf(body.get("bandwidthLimit").toString().trim());
             } catch (NumberFormatException ignored) {}
         }
 
@@ -162,7 +162,7 @@ public class AdminController {
                 user.setBandwidthLimit(null);
             } else {
                 try {
-                    user.setBandwidthLimit(Integer.valueOf(limitVal.toString().trim()));
+                    user.setBandwidthLimit(Double.valueOf(limitVal.toString().trim()));
                 } catch (NumberFormatException ignored) {}
             }
         }

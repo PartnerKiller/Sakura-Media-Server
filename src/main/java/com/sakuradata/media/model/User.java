@@ -20,7 +20,7 @@ public class User {
     private String role; // "admin" or "user"
 
     @Column(name = "bandwidth_limit")
-    private Integer bandwidthLimit; // in KB/s. null or <= 0 means unlimited.
+    private Double bandwidthLimit; // in MB/s. null or <= 0 means unlimited.
 
     public User() {}
 
@@ -30,7 +30,7 @@ public class User {
         this.role = role;
     }
 
-    public User(String username, String passwordHash, String role, Integer bandwidthLimit) {
+    public User(String username, String passwordHash, String role, Double bandwidthLimit) {
         this.username = username;
         this.passwordHash = passwordHash;
         this.role = role;
@@ -69,11 +69,11 @@ public class User {
         this.role = role;
     }
 
-    public Integer getBandwidthLimit() {
+    public Double getBandwidthLimit() {
         return bandwidthLimit;
     }
 
-    public void setBandwidthLimit(Integer bandwidthLimit) {
+    public void setBandwidthLimit(Double bandwidthLimit) {
         this.bandwidthLimit = bandwidthLimit;
     }
 }
