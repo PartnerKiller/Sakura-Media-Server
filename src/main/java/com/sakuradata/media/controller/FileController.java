@@ -174,7 +174,7 @@ public class FileController {
 
     private String getCustomMimeType(String filePath, HttpServletRequest request) {
         String filename = Paths.get(filePath).getFileName().toString().toLowerCase();
-        if (filename.endsWith(".mkv") || filename.contains(".mkv.")) return "video/webm";
+        if (filename.endsWith(".mkv") || filename.contains(".mkv.")) return "video/x-matroska";
         if (filename.endsWith(".mp4") || filename.endsWith(".m4v")) return "video/mp4";
         if (filename.endsWith(".webm")) return "video/webm";
         if (filename.endsWith(".mov")) return "video/quicktime";
@@ -224,9 +224,7 @@ public class FileController {
                     long end = range.getRangeEnd(fileLength);
                     long rangeLength = end - start + 1;
 
-                    // Limit range chunk size to 10MB maximum per request for smooth streaming performance
-                    long chunkSize = Math.min(10 * 1024 * 1024L, rangeLength);
-                    ResourceRegion region = new ResourceRegion(resource, start, chunkSize);
+                    ResourceRegion region = new ResourceRegion(resource, start, rangeLength);
 
                     return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
                             .header(HttpHeaders.ACCEPT_RANGES, "bytes")
