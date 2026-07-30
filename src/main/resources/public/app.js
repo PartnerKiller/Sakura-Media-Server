@@ -741,73 +741,23 @@ function openMedia(filePath, fileName, category) {
     player.style.display = 'block';
     
     const relativeStreamUrl = `/api/files/stream-media/${safeBase64Encode(filePath)}?token=${state.token}`;
-    const transcodeStreamUrl = `/api/files/transcode/${safeBase64Encode(filePath)}?token=${state.token}`;
-    
-    let playMode = 'direct'; // 'direct' or 'transcode'
-    
-    function updatePlaybackStatus(text, color = '#10b981') {
-      const statusText = document.getElementById('video-playback-status-text');
-      const statusDot = document.getElementById('video-playback-status-dot');
-      if (statusText) statusText.innerText = text;
-      if (statusDot) statusDot.style.background = color;
+    player.src = relativeStreamUrl;
+
+    if (state.videoWatchdog) {
+      clearTimeout(state.videoWatchdog);
     }
     
-    function startWatchdog() {
-      if (state.videoWatchdog) {
-        clearTimeout(state.videoWatchdog);
-      }
-      state.videoWatchdog = setTimeout(() => {
-        if (player.currentTime === 0 && !player.paused) {
-          console.warn('Watchdog timed out. Video is stuck loading.');
-          handlePlaybackFailure();
-        }
-      }, 4000);
-    }
-    
-    function handlePlaybackFailure() {
-      if (state.videoWatchdog) {
-        clearTimeout(state.videoWatchdog);
-        state.videoWatchdog = null;
-      }
-      
-      if (playMode === 'direct') {
-        console.log('Direct play failed. Falling back to live transcoding mode...');
-        playMode = 'transcode';
-        updatePlaybackStatus('Live Transcoding (H.264)...', '#3b82f6');
-        player.src = transcodeStreamUrl;
-        player.load();
-        player.play().catch(e => console.warn('Autoplay failed for transcode:', e));
-        startWatchdog();
-      } else {
-        console.warn('Transcoding also failed. Fallback to external player.');
-        updatePlaybackStatus('Unsupported Video Format', '#ef4444');
+    // 4.0s watchdog to detect if video gets stuck at buffering due to unsupported decoder
+    state.videoWatchdog = setTimeout(() => {
+      if (player.currentTime === 0 && !player.paused) {
+        console.warn('Watchdog timed out. Video is stuck in loading state (likely unsupported video/audio codec). Showing external options.');
         player.style.display = 'none';
         if (errorBanner) {
           errorBanner.style.display = 'block';
           lucide.createIcons();
         }
       }
-    }
-    
-    const handleSeek = () => {
-      if (playMode === 'transcode') {
-        const seekTime = Math.floor(player.currentTime);
-        console.log('User seeking to', seekTime, 'seconds in transcode mode. Reloading stream.');
-        player.onseeking = null;
-        player.src = `${transcodeStreamUrl}&ss=${seekTime}`;
-        player.load();
-        player.play().catch(e => console.warn('Play failed after seek:', e));
-        setTimeout(() => {
-          player.onseeking = handleSeek;
-        }, 1500);
-      }
-    };
-    
-    player.onseeking = handleSeek;
-    
-    updatePlaybackStatus('Direct Play', '#10b981');
-    player.src = relativeStreamUrl;
-    startWatchdog();
+    }, 4000);
 
     player.onplaying = () => {
       if (state.videoWatchdog) {
@@ -824,8 +774,16 @@ function openMedia(filePath, fileName, category) {
     };
 
     player.onerror = () => {
-      console.warn('HTML5 video player error event triggered.');
-      handlePlaybackFailure();
+      console.warn('HTML5 video player encountered an error (likely unsupported codec). Showing external stream options.');
+      if (state.videoWatchdog) {
+        clearTimeout(state.videoWatchdog);
+        state.videoWatchdog = null;
+      }
+      player.style.display = 'none';
+      if (errorBanner) {
+        errorBanner.style.display = 'block';
+        lucide.createIcons();
+      }
     };
     
     const downloadBtn = document.getElementById('btn-download-video');
