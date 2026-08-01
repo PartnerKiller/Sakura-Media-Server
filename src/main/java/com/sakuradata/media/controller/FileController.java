@@ -190,10 +190,13 @@ public class FileController {
         String filename = Paths.get(filePath).getFileName().toString().toLowerCase();
         if (filename.endsWith(".mkv") || filename.contains(".mkv.")) {
             String userAgent = request.getHeader("User-Agent");
-            if (userAgent != null && userAgent.contains("Firefox")) {
-                return "video/x-matroska";
+            if (userAgent != null) {
+                String uaLower = userAgent.toLowerCase();
+                if ((uaLower.contains("chrome") || uaLower.contains("chromium")) && !uaLower.contains("vlc") && !uaLower.contains("libvlc")) {
+                    return "video/webm";
+                }
             }
-            return "video/webm";
+            return "video/x-matroska";
         }
         if (filename.endsWith(".mp4") || filename.endsWith(".m4v")) return "video/mp4";
         if (filename.endsWith(".webm")) return "video/webm";
