@@ -479,42 +479,37 @@ public class FileController {
         }
 
         try {
-            if ("user".equals(user.getRole())) {
-                File recycleBinFolder = new File("./recycle-bin");
-                if (!recycleBinFolder.exists()) {
-                    recycleBinFolder.mkdirs();
+            File recycleBinFolder = new File("./recycle-bin");
+            if (!recycleBinFolder.exists()) {
+                recycleBinFolder.mkdirs();
+            }
+            String tempName = UUID.randomUUID().toString() + "_" + file.getName();
+            File dest = new File(recycleBinFolder, tempName);
+            
+            boolean moved = file.renameTo(dest);
+            if (!moved) {
+                try {
+                    Files.move(file.toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                    moved = true;
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
-                String tempName = UUID.randomUUID().toString() + "_" + file.getName();
-                File dest = new File(recycleBinFolder, tempName);
-                
-                boolean moved = file.renameTo(dest);
-                if (!moved) {
-                    try {
-                        Files.move(file.toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                        moved = true;
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-                
-                if (moved) {
-                    com.sakuradata.media.model.RecycleItem item = new com.sakuradata.media.model.RecycleItem(
-                        user.getId(),
-                        targetPath,
-                        file.getName(),
-                        dest.getAbsolutePath(),
-                        java.time.LocalDateTime.now(),
-                        dest.isDirectory() ? null : dest.length(),
-                        dest.isDirectory()
-                    );
-                    recycleItemRepository.save(item);
-                    return ResponseEntity.ok(Map.of("success", true, "recycled", true));
-                } else {
-                    return ResponseEntity.status(500).body(Map.of("error", "Failed to move file to recycle bin."));
-                }
+            }
+            
+            if (moved) {
+                com.sakuradata.media.model.RecycleItem item = new com.sakuradata.media.model.RecycleItem(
+                    user.getId(),
+                    targetPath,
+                    file.getName(),
+                    dest.getAbsolutePath(),
+                    java.time.LocalDateTime.now(),
+                    dest.isDirectory() ? null : dest.length(),
+                    dest.isDirectory()
+                );
+                recycleItemRepository.save(item);
+                return ResponseEntity.ok(Map.of("success", true, "recycled", true));
             } else {
-                deleteRecursively(file);
-                return ResponseEntity.ok(Map.of("success", true));
+                return ResponseEntity.status(500).body(Map.of("error", "Failed to move file to recycle bin."));
             }
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("error", "Failed to delete: " + e.getMessage()));
