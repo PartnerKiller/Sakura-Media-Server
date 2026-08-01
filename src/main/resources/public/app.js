@@ -156,6 +156,7 @@ function initApp() {
   safeAddListener('mobile-nav-explorer', 'click', () => switchPanel('explorer'));
   safeAddListener('mobile-nav-users', 'click', () => switchPanel('users'));
   safeAddListener('mobile-nav-server', 'click', () => switchPanel('server'));
+  safeAddListener('mobile-nav-recycle-bin', 'click', () => switchPanel('recycle-bin'));
   safeAddListener('mobile-nav-logout', 'click', logout);
 
   // Bind Explorer Controls
@@ -431,6 +432,8 @@ function switchPanel(panelName) {
     }, 1000);
   } else if (panelName === 'recycle-bin') {
     document.getElementById('nav-recycle-bin').classList.add('active');
+    const mobRecycle = document.getElementById('mobile-nav-recycle-bin');
+    if (mobRecycle) mobRecycle.classList.add('active');
     document.getElementById('panel-recycle-bin').classList.add('active');
     document.getElementById('explorer-actions').style.display = 'none';
     loadRecycleBin();

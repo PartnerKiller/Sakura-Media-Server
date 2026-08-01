@@ -1434,6 +1434,12 @@ video {
   #html5-video-player {
     max-height: 55vh !important;
   }
+
+  .login-card {
+    padding: 24px 20px;
+    width: 90%;
+    max-width: 360px;
+  }
 }
 
 /* SERVER MANAGEMENT STYLES */
