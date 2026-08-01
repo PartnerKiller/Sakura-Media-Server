@@ -171,7 +171,13 @@ public class FileController {
         } else {
             resource = new FileSystemResource(file);
         }
-        String contentType = getCustomMimeType(targetPath, request);
+        String contentType;
+        String filenameLower = file.getName().toLowerCase();
+        if (filenameLower.endsWith(".mkv") || filenameLower.contains(".mkv.")) {
+            contentType = "video/x-matroska";
+        } else {
+            contentType = getCustomMimeType(targetPath, request);
+        }
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + file.getName() + "\"")
                 .header(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*")
