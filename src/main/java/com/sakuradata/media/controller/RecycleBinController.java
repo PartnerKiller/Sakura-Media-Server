@@ -58,6 +58,11 @@ public class RecycleBinController {
 
         if (src.renameTo(dest)) {
             recycleItemRepository.delete(item);
+
+            // Broadcast change event for destination parent path
+            String parentPath = dest.getParentFile().getAbsolutePath().replace("\\", "/");
+            SseController.broadcast("fs-change", Map.of("userId", user.getId(), "parentPath", parentPath));
+
             return ResponseEntity.ok(Map.of("success", true));
         } else {
             return ResponseEntity.status(500).body(Map.of("error", "Failed to restore item. Target path may be occupied or unwritable."));

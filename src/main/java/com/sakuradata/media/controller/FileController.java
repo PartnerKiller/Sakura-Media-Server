@@ -389,6 +389,7 @@ public class FileController {
         Path newFolderPath = Paths.get(targetDir, name);
         try {
             Files.createDirectories(newFolderPath);
+            SseController.broadcast("fs-change", Map.of("userId", user.getId(), "parentPath", targetDir));
             return ResponseEntity.ok(Map.of("success", true));
         } catch (IOException e) {
             return ResponseEntity.status(500).body(Map.of("error", "Failed to create folder: " + e.getMessage()));
@@ -457,6 +458,9 @@ public class FileController {
                         .map(Path::toFile)
                         .forEach(File::delete);
 
+                String parentPath = finalPath.getParent().toAbsolutePath().normalize().toString().replace("\\", "/");
+                SseController.broadcast("fs-change", Map.of("userId", user.getId(), "parentPath", parentPath));
+
                 return ResponseEntity.ok(Map.of("success", true, "merged", true));
             }
 
@@ -513,6 +517,11 @@ public class FileController {
                     dest.isDirectory()
                 );
                 recycleItemRepository.save(item);
+
+                // Broadcast change event for parent path
+                String parentPath = file.getParentFile().getAbsolutePath().replace("\\", "/");
+                SseController.broadcast("fs-change", Map.of("userId", user.getId(), "parentPath", parentPath));
+
                 return ResponseEntity.ok(Map.of("success", true, "recycled", true));
             } else {
                 return ResponseEntity.status(500).body(Map.of("error", "Failed to move file to recycle bin."));

@@ -313,6 +313,7 @@ function showDashboard() {
 
   switchPanel('explorer');
   loadRoots();
+  initSse();
 }
 
 async function handleLogin(e) {
@@ -378,6 +379,7 @@ function logout() {
   localStorage.removeItem('user');
   sessionStorage.removeItem('token');
   sessionStorage.removeItem('user');
+  closeSse();
   showLogin();
 }
 
@@ -2306,6 +2308,39 @@ async function handleEmptyRecycleBin() {
 window.restoreRecycleItem = restoreRecycleItem;
 window.deleteRecycleItemPermanently = deleteRecycleItemPermanently;
 window.handleEmptyRecycleBin = handleEmptyRecycleBin;
+
+let eventSource = null;
+
+function initSse() {
+  if (eventSource) {
+    eventSource.close();
+  }
+
+  eventSource = new EventSource(`/api/events?token=${encodeURIComponent(state.token)}`);
+
+  eventSource.addEventListener('fs-change', (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      // If we are looking at the directory where the change happened
+      if (data.parentPath === state.currentPath) {
+        browsePath(state.currentPath);
+      }
+    } catch (err) {
+      console.error('Failed to parse SSE event data:', err);
+    }
+  });
+
+  eventSource.onerror = (err) => {
+    console.warn('SSE connection error, closing. Browser will auto-reconnect.', err);
+  };
+}
+
+function closeSse() {
+  if (eventSource) {
+    eventSource.close();
+    eventSource = null;
+  }
+}
 
 
 
