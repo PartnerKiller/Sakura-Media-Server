@@ -79,6 +79,10 @@
           <i data-lucide="server"></i>
           <span>Server Management</span>
         </button>
+        <button class="nav-item" id="nav-recycle-bin">
+          <i data-lucide="trash-2"></i>
+          <span>Recycle Bin</span>
+        </button>
       </nav>
       <div class="sidebar-footer">
         <div class="user-profile">
@@ -612,6 +616,39 @@
 
         </section>
 
+        <!-- RECYCLE BIN PANEL -->
+        <section id="panel-recycle-bin" class="content-panel">
+          <div class="panel-header">
+            <div>
+              <h2>Recycle Bin</h2>
+              <p>Items deleted by you are kept here for 3 days before permanent automatic deletion</p>
+            </div>
+            <button id="btn-empty-recycle" class="btn btn-secondary text-error" style="display: flex; align-items: center; gap: 8px;">
+              <i data-lucide="trash-2"></i>
+              <span>Empty Recycle Bin</span>
+            </button>
+          </div>
+
+          <div class="users-list-card">
+            <div class="table-responsive">
+              <table class="users-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Original Path</th>
+                    <th>Size</th>
+                    <th>Deleted At</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="recycle-table-body">
+                  <tr><td colspan="5" class="p-4 text-center text-muted">Recycle bin is empty</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
       </div>
     </main>
   </div>
@@ -870,6 +907,6 @@
     </button>
   </nav>
 
-  <script src="/app.js?v=3.6"></script>
+  <script src="/app.js?v=3.7"></script>
 </body>
 </html>

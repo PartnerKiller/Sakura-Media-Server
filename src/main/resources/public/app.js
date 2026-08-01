@@ -149,6 +149,8 @@ function initApp() {
   safeAddListener('nav-explorer', 'click', () => switchPanel('explorer'));
   safeAddListener('nav-users', 'click', () => switchPanel('users'));
   safeAddListener('nav-server', 'click', () => switchPanel('server'));
+  safeAddListener('nav-recycle-bin', 'click', () => switchPanel('recycle-bin'));
+  safeAddListener('btn-empty-recycle', 'click', handleEmptyRecycleBin);
 
   // Bind Mobile Bottom Navigation
   safeAddListener('mobile-nav-explorer', 'click', () => switchPanel('explorer'));
@@ -422,6 +424,11 @@ function switchPanel(panelName) {
         refreshActiveSubTab(activeSubTab.id);
       }
     }, 1000);
+  } else if (panelName === 'recycle-bin') {
+    document.getElementById('nav-recycle-bin').classList.add('active');
+    document.getElementById('panel-recycle-bin').classList.add('active');
+    document.getElementById('explorer-actions').style.display = 'none';
+    loadRecycleBin();
   }
 }
 
@@ -2217,6 +2224,88 @@ function escapeHtml(str) {
   if (!str) return '';
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
+
+// RECYCLE BIN FUNCTIONALITY
+async function loadRecycleBin() {
+  const tbody = document.getElementById('recycle-table-body');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="5" class="text-center p-4">Loading recycle bin...</td></tr>';
+  try {
+    const items = await apiCall('/api/recycle-bin');
+    tbody.innerHTML = '';
+    if (items.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center p-4 text-muted">Recycle bin is empty</td></tr>';
+      return;
+    }
+    items.forEach(item => {
+      const tr = document.createElement('tr');
+      const sizeStr = item.isDirectory ? '--' : formatBytes(item.fileSize || 0);
+      const icon = item.isDirectory ? 'folder' : 'file';
+      const dateStr = new Date(item.deletedAt).toLocaleString();
+
+      tr.innerHTML = `
+        <td>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <i data-lucide="${icon}" style="width:18px; height:18px; color: var(--primary);"></i>
+            <span>${escapeHtml(item.fileName)}</span>
+          </div>
+        </td>
+        <td>${escapeHtml(item.originalPath)}</td>
+        <td>${sizeStr}</td>
+        <td>${dateStr}</td>
+        <td>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-secondary btn-sm" onclick="restoreRecycleItem(${item.id})" style="display:flex; align-items:center; gap:4px; padding: 4px 8px;">
+              <i data-lucide="rotate-ccw" style="width:14px; height:14px;"></i>
+              <span>Restore</span>
+            </button>
+            <button class="btn btn-secondary btn-sm text-error" onclick="deleteRecycleItemPermanently(${item.id})" style="display:flex; align-items:center; gap:4px; padding: 4px 8px;">
+              <i data-lucide="trash-2" style="width:14px; height:14px;"></i>
+              <span>Delete</span>
+            </button>
+          </div>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+    lucide.createIcons();
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" class="error-message">Failed to load recycle bin: ${err.message}</td></tr>`;
+  }
+}
+
+async function restoreRecycleItem(id) {
+  try {
+    await apiCall(`/api/recycle-bin/restore/${id}`, { method: 'POST' });
+    loadRecycleBin();
+  } catch (err) {
+    alert('Failed to restore item: ' + err.message);
+  }
+}
+
+async function deleteRecycleItemPermanently(id) {
+  if (!confirm('Are you sure you want to permanently delete this item? This action cannot be undone.')) return;
+  try {
+    await apiCall(`/api/recycle-bin/${id}`, { method: 'DELETE' });
+    loadRecycleBin();
+  } catch (err) {
+    alert('Failed to delete item: ' + err.message);
+  }
+}
+
+async function handleEmptyRecycleBin() {
+  if (!confirm('Are you sure you want to permanently delete all items in your recycle bin? This action cannot be undone.')) return;
+  try {
+    await apiCall('/api/recycle-bin/clean', { method: 'DELETE' });
+    loadRecycleBin();
+  } catch (err) {
+    alert('Failed to empty recycle bin: ' + err.message);
+  }
+}
+
+window.restoreRecycleItem = restoreRecycleItem;
+window.deleteRecycleItemPermanently = deleteRecycleItemPermanently;
+window.handleEmptyRecycleBin = handleEmptyRecycleBin;
 
 
 
