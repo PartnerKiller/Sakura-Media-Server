@@ -7,11 +7,14 @@ import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 @RestController
 @RequestMapping("/api/events")
 public class SseController {
 
     private static final List<SseEmitter> emitters = new CopyOnWriteArrayList<>();
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     @GetMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter subscribe() {
@@ -33,9 +36,15 @@ public class SseController {
     }
 
     public static void broadcast(String eventName, Object data) {
+        String json;
+        try {
+            json = objectMapper.writeValueAsString(data);
+        } catch (Exception e) {
+            json = "{}";
+        }
         for (SseEmitter emitter : emitters) {
             try {
-                emitter.send(SseEmitter.event().name(eventName).data(data));
+                emitter.send(SseEmitter.event().name(eventName).data(json));
             } catch (IOException e) {
                 emitters.remove(emitter);
             }

@@ -401,6 +401,9 @@ function switchPanel(panelName) {
     if (mobExplorer) mobExplorer.classList.add('active');
     document.getElementById('panel-explorer').classList.add('active');
     document.getElementById('explorer-actions').style.display = '';
+    if (state.currentPath) {
+      browsePath(state.currentPath);
+    }
   } else if (panelName === 'users') {
     document.getElementById('nav-users').classList.add('active');
     const mobUsers = document.getElementById('mobile-nav-users');
