@@ -1208,7 +1208,7 @@ function renderUsers() {
          </button>`
       : '<span class="text-muted" style="font-size: 13px;">Administrator</span>';
 
-    const editBtn = `<button class="btn btn-secondary" onclick="openEditUserModal(${u.id}, '${u.username}', '${u.role}', ${u.bandwidthLimit || 0})">
+    const editBtn = `<button class="btn btn-secondary" onclick="openEditUserModal(${u.id}, '${u.username}', '${u.role}', ${u.downloadBandwidthLimit || 0}, ${u.uploadBandwidthLimit || 0})">
                        <i data-lucide="edit" style="width:16px; height:16px;"></i>
                        <span>Edit</span>
                      </button>`;
@@ -1217,7 +1217,8 @@ function renderUsers() {
       <td>${u.username}</td>
       <td><span class="role-badge ${u.role}">${u.role}</span></td>
       <td>${u.role === 'admin' ? 'All (Full access)' : permCount + ' path rule(s)'}</td>
-      <td>${formatBandwidth(u.bandwidthLimit)}</td>
+      <td>${formatBandwidth(u.downloadBandwidthLimit)}</td>
+      <td>${formatBandwidth(u.uploadBandwidthLimit)}</td>
       <td>
         <div style="display:flex; gap:8px; align-items: center;">
           ${configurePermsBtn}
@@ -1236,7 +1237,8 @@ async function handleAddUser(e) {
   const usernameEl = document.getElementById('new-username');
   const passwordEl = document.getElementById('new-password');
   const roleEl = document.getElementById('new-role');
-  const bandwidthEl = document.getElementById('new-bandwidth');
+  const downloadBandwidthEl = document.getElementById('new-download-bandwidth');
+  const uploadBandwidthEl = document.getElementById('new-upload-bandwidth');
   const errorEl = document.getElementById('add-user-error');
   
   errorEl.innerText = '';
@@ -1248,7 +1250,8 @@ async function handleAddUser(e) {
         username: usernameEl.value.trim(),
         password: passwordEl.value,
         role: roleEl.value,
-        bandwidthLimit: bandwidthEl.value ? parseFloat(bandwidthEl.value) : 0
+        downloadBandwidthLimit: downloadBandwidthEl.value ? parseFloat(downloadBandwidthEl.value) : 0,
+        uploadBandwidthLimit: uploadBandwidthEl.value ? parseFloat(uploadBandwidthEl.value) : 0
       })
     });
 
@@ -1257,7 +1260,8 @@ async function handleAddUser(e) {
     usernameEl.value = '';
     passwordEl.value = '';
     roleEl.value = 'user';
-    bandwidthEl.value = '';
+    downloadBandwidthEl.value = '';
+    uploadBandwidthEl.value = '';
     
     loadUsers();
   } catch (err) {
@@ -2139,15 +2143,20 @@ async function loadAuditLogs() {
 // -------------------------------------------------------------
 // EDIT USER ACTIONS
 // -------------------------------------------------------------
-function openEditUserModal(userId, username, role, bandwidthLimit) {
+function openEditUserModal(userId, username, role, downloadBandwidthLimit, uploadBandwidthLimit) {
   document.getElementById('edit-user-id').value = userId;
   document.getElementById('edit-username-title').innerText = username;
   document.getElementById('edit-username-display').value = username;
   document.getElementById('edit-password').value = '';
   document.getElementById('edit-password').type = 'password';
   document.getElementById('edit-role').value = role;
-  const parsedLimit = parseFloat(bandwidthLimit);
-  document.getElementById('edit-bandwidth').value = (parsedLimit && parsedLimit > 0) ? parsedLimit : '';
+  
+  const parsedDlLimit = parseFloat(downloadBandwidthLimit);
+  document.getElementById('edit-download-bandwidth').value = (parsedDlLimit && parsedDlLimit > 0) ? parsedDlLimit : '';
+
+  const parsedUlLimit = parseFloat(uploadBandwidthLimit);
+  document.getElementById('edit-upload-bandwidth').value = (parsedUlLimit && parsedUlLimit > 0) ? parsedUlLimit : '';
+
   document.getElementById('edit-user-error').innerText = '';
   
   const icon = document.querySelector('#btn-toggle-edit-password i');
@@ -2169,7 +2178,8 @@ async function handleEditUser(e) {
   const userId = document.getElementById('edit-user-id').value;
   const password = document.getElementById('edit-password').value;
   const role = document.getElementById('edit-role').value;
-  const bandwidth = document.getElementById('edit-bandwidth').value;
+  const downloadBandwidth = document.getElementById('edit-download-bandwidth').value;
+  const uploadBandwidth = document.getElementById('edit-upload-bandwidth').value;
   const errorEl = document.getElementById('edit-user-error');
 
   errorEl.innerText = '';
@@ -2177,7 +2187,8 @@ async function handleEditUser(e) {
   try {
     const payload = { 
       role,
-      bandwidthLimit: bandwidth ? parseFloat(bandwidth) : 0
+      downloadBandwidthLimit: downloadBandwidth ? parseFloat(downloadBandwidth) : 0,
+      uploadBandwidthLimit: uploadBandwidth ? parseFloat(uploadBandwidth) : 0
     };
     if (password.trim()) {
       payload.password = password;

@@ -60,7 +60,8 @@ public class AdminController {
             map.put("id", u.getId());
             map.put("username", u.getUsername());
             map.put("role", u.getRole());
-            map.put("bandwidthLimit", u.getBandwidthLimit());
+            map.put("downloadBandwidthLimit", u.getDownloadBandwidthLimit());
+            map.put("uploadBandwidthLimit", u.getUploadBandwidthLimit());
             map.put("permissions", permissionRepository.findByUserId(u.getId()));
             return map;
         }).collect(Collectors.toList());
@@ -78,10 +79,17 @@ public class AdminController {
         String password = body.get("password") != null ? body.get("password").toString() : null;
         String role = body.get("role") != null ? body.get("role").toString() : "user";
         
-        Double bandwidthLimit = null;
-        if (body.get("bandwidthLimit") != null && !body.get("bandwidthLimit").toString().trim().isEmpty()) {
+        Double downloadBandwidthLimit = null;
+        if (body.get("downloadBandwidthLimit") != null && !body.get("downloadBandwidthLimit").toString().trim().isEmpty()) {
             try {
-                bandwidthLimit = Double.valueOf(body.get("bandwidthLimit").toString().trim());
+                downloadBandwidthLimit = Double.valueOf(body.get("downloadBandwidthLimit").toString().trim());
+            } catch (NumberFormatException ignored) {}
+        }
+
+        Double uploadBandwidthLimit = null;
+        if (body.get("uploadBandwidthLimit") != null && !body.get("uploadBandwidthLimit").toString().trim().isEmpty()) {
+            try {
+                uploadBandwidthLimit = Double.valueOf(body.get("uploadBandwidthLimit").toString().trim());
             } catch (NumberFormatException ignored) {}
         }
 
@@ -95,14 +103,15 @@ public class AdminController {
 
         String salt = BCrypt.gensalt(10);
         String hashed = BCrypt.hashpw(password, salt);
-        User user = new User(username, hashed, role, bandwidthLimit);
+        User user = new User(username, hashed, role, downloadBandwidthLimit, uploadBandwidthLimit);
         userRepository.save(user);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                 "id", user.getId(),
                 "username", user.getUsername(),
                 "role", user.getRole(),
-                "bandwidthLimit", user.getBandwidthLimit() != null ? user.getBandwidthLimit() : 0
+                "downloadBandwidthLimit", user.getDownloadBandwidthLimit() != null ? user.getDownloadBandwidthLimit() : 0,
+                "uploadBandwidthLimit", user.getUploadBandwidthLimit() != null ? user.getUploadBandwidthLimit() : 0
         ));
     }
 
@@ -156,13 +165,24 @@ public class AdminController {
             user.setPasswordHash(hashed);
         }
 
-        if (body.containsKey("bandwidthLimit")) {
-            Object limitVal = body.get("bandwidthLimit");
+        if (body.containsKey("downloadBandwidthLimit")) {
+            Object limitVal = body.get("downloadBandwidthLimit");
             if (limitVal == null || limitVal.toString().trim().isEmpty()) {
-                user.setBandwidthLimit(null);
+                user.setDownloadBandwidthLimit(null);
             } else {
                 try {
-                    user.setBandwidthLimit(Double.valueOf(limitVal.toString().trim()));
+                    user.setDownloadBandwidthLimit(Double.valueOf(limitVal.toString().trim()));
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+
+        if (body.containsKey("uploadBandwidthLimit")) {
+            Object limitVal = body.get("uploadBandwidthLimit");
+            if (limitVal == null || limitVal.toString().trim().isEmpty()) {
+                user.setUploadBandwidthLimit(null);
+            } else {
+                try {
+                    user.setUploadBandwidthLimit(Double.valueOf(limitVal.toString().trim()));
                 } catch (NumberFormatException ignored) {}
             }
         }
@@ -173,7 +193,8 @@ public class AdminController {
                 "id", user.getId(),
                 "username", user.getUsername(),
                 "role", user.getRole(),
-                "bandwidthLimit", user.getBandwidthLimit() != null ? user.getBandwidthLimit() : 0
+                "downloadBandwidthLimit", user.getDownloadBandwidthLimit() != null ? user.getDownloadBandwidthLimit() : 0,
+                "uploadBandwidthLimit", user.getUploadBandwidthLimit() != null ? user.getUploadBandwidthLimit() : 0
         ));
     }
 

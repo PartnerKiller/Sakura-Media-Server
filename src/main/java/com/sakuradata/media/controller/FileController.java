@@ -166,8 +166,8 @@ public class FileController {
         }
 
         Resource resource;
-        if (user != null && user.getBandwidthLimit() != null && user.getBandwidthLimit() > 0) {
-            resource = new com.sakuradata.media.util.ThrottledFileSystemResource(file, (long) (user.getBandwidthLimit() * 1024 * 1024));
+        if (user != null && user.getDownloadBandwidthLimit() != null && user.getDownloadBandwidthLimit() > 0) {
+            resource = new com.sakuradata.media.util.ThrottledFileSystemResource(file, (long) (user.getDownloadBandwidthLimit() * 1024 * 1024));
         } else {
             resource = new FileSystemResource(file);
         }
@@ -236,8 +236,8 @@ public class FileController {
 
         String contentType = getCustomMimeType(targetPath, request);
         FileSystemResource resource;
-        if (user != null && user.getBandwidthLimit() != null && user.getBandwidthLimit() > 0) {
-            resource = new com.sakuradata.media.util.ThrottledFileSystemResource(file, (long) (user.getBandwidthLimit() * 1024 * 1024));
+        if (user != null && user.getDownloadBandwidthLimit() != null && user.getDownloadBandwidthLimit() > 0) {
+            resource = new com.sakuradata.media.util.ThrottledFileSystemResource(file, (long) (user.getDownloadBandwidthLimit() * 1024 * 1024));
         } else {
             resource = new FileSystemResource(file);
         }
@@ -437,7 +437,11 @@ public class FileController {
         try {
             Files.createDirectories(chunkFolder);
             Path chunkFile = chunkFolder.resolve(String.valueOf(chunkIndex));
-            Files.copy(file.getInputStream(), chunkFile, StandardCopyOption.REPLACE_EXISTING);
+            java.io.InputStream inputStream = file.getInputStream();
+            if (user != null && user.getUploadBandwidthLimit() != null && user.getUploadBandwidthLimit() > 0) {
+                inputStream = new com.sakuradata.media.util.ThrottledInputStream(inputStream, (long) (user.getUploadBandwidthLimit() * 1024 * 1024));
+            }
+            Files.copy(inputStream, chunkFile, StandardCopyOption.REPLACE_EXISTING);
 
             // Check if all chunks have been uploaded
             File[] uploadedChunks = new File(chunkFolder.toString()).listFiles();

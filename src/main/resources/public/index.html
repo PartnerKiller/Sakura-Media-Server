@@ -244,7 +244,8 @@
                   <th>Username</th>
                   <th>Role</th>
                   <th>Permissions count</th>
-                  <th>Bandwidth Limit</th>
+                  <th>Download Limit</th>
+                  <th>Upload Limit</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -682,8 +683,12 @@
             </select>
           </div>
           <div class="input-group">
-            <label for="new-bandwidth">Bandwidth Limit (MB/s) (0 or empty for unlimited)</label>
-            <input type="number" id="new-bandwidth" placeholder="e.g. 2.5" min="0" step="0.1">
+            <label for="new-download-bandwidth">Download Bandwidth Limit (MB/s) (0 or empty for unlimited)</label>
+            <input type="number" id="new-download-bandwidth" placeholder="e.g. 5" min="0" step="0.1">
+          </div>
+          <div class="input-group">
+            <label for="new-upload-bandwidth">Upload Bandwidth Limit (MB/s) (0 or empty for unlimited)</label>
+            <input type="number" id="new-upload-bandwidth" placeholder="e.g. 5" min="0" step="0.1">
           </div>
           <div class="error-message" id="add-user-error"></div>
         </div>
@@ -728,8 +733,12 @@
             </select>
           </div>
           <div class="input-group">
-            <label for="edit-bandwidth">Bandwidth Limit (MB/s) (0 or empty for unlimited)</label>
-            <input type="number" id="edit-bandwidth" placeholder="e.g. 2.5" min="0" step="0.1">
+            <label for="edit-download-bandwidth">Download Bandwidth Limit (MB/s) (0 or empty for unlimited)</label>
+            <input type="number" id="edit-download-bandwidth" placeholder="e.g. 5" min="0" step="0.1">
+          </div>
+          <div class="input-group">
+            <label for="edit-upload-bandwidth">Upload Bandwidth Limit (MB/s) (0 or empty for unlimited)</label>
+            <input type="number" id="edit-upload-bandwidth" placeholder="e.g. 5" min="0" step="0.1">
           </div>
           <div class="error-message" id="edit-user-error"></div>
         </div>
@@ -911,6 +920,6 @@
     </button>
   </nav>
 
-  <script src="/app.js?v=3.9"></script>
+  <script src="/app.js?v=4.0"></script>
 </body>
 </html>

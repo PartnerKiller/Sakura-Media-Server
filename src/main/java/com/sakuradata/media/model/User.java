@@ -19,8 +19,11 @@ public class User {
     @Column(nullable = false)
     private String role; // "admin" or "user"
 
-    @Column(name = "bandwidth_limit")
-    private Double bandwidthLimit; // in MB/s. null or <= 0 means unlimited.
+    @Column(name = "download_bandwidth_limit")
+    private Double downloadBandwidthLimit; // in MB/s. null or <= 0 means unlimited.
+
+    @Column(name = "upload_bandwidth_limit")
+    private Double uploadBandwidthLimit; // in MB/s. null or <= 0 means unlimited.
 
     public User() {}
 
@@ -30,11 +33,12 @@ public class User {
         this.role = role;
     }
 
-    public User(String username, String passwordHash, String role, Double bandwidthLimit) {
+    public User(String username, String passwordHash, String role, Double downloadBandwidthLimit, Double uploadBandwidthLimit) {
         this.username = username;
         this.passwordHash = passwordHash;
         this.role = role;
-        this.bandwidthLimit = bandwidthLimit;
+        this.downloadBandwidthLimit = downloadBandwidthLimit;
+        this.uploadBandwidthLimit = uploadBandwidthLimit;
     }
 
     public Long getId() {
@@ -69,11 +73,19 @@ public class User {
         this.role = role;
     }
 
-    public Double getBandwidthLimit() {
-        return bandwidthLimit;
+    public Double getDownloadBandwidthLimit() {
+        return downloadBandwidthLimit;
     }
 
-    public void setBandwidthLimit(Double bandwidthLimit) {
-        this.bandwidthLimit = bandwidthLimit;
+    public void setDownloadBandwidthLimit(Double downloadBandwidthLimit) {
+        this.downloadBandwidthLimit = downloadBandwidthLimit;
+    }
+
+    public Double getUploadBandwidthLimit() {
+        return uploadBandwidthLimit;
+    }
+
+    public void setUploadBandwidthLimit(Double uploadBandwidthLimit) {
+        this.uploadBandwidthLimit = uploadBandwidthLimit;
     }
 }
