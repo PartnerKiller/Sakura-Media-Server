@@ -13,22 +13,28 @@ public class TempAdmin {
             String salt = BCrypt.gensalt(10);
             String hashed = BCrypt.hashpw("testpass", salt);
 
-            // Delete if exists
-            PreparedStatement psDel = conn.prepareStatement("DELETE FROM users WHERE username = 'test_admin'");
-            psDel.executeUpdate();
+            if (args.length > 0 && "delete".equals(args[0])) {
+                PreparedStatement psDel = conn.prepareStatement("DELETE FROM users WHERE username = 'test_admin'");
+                psDel.executeUpdate();
+                System.out.println("Temporary admin 'test_admin' deleted successfully!");
+            } else {
+                // Delete if exists
+                PreparedStatement psDel = conn.prepareStatement("DELETE FROM users WHERE username = 'test_admin'");
+                psDel.executeUpdate();
 
-            // Insert
-            PreparedStatement ps = conn.prepareStatement(
-                "INSERT INTO users (username, password_hash, role, download_bandwidth_limit, upload_bandwidth_limit) VALUES (?, ?, ?, ?, ?)"
-            );
-            ps.setString(1, "test_admin");
-            ps.setString(2, hashed);
-            ps.setString(3, "admin");
-            ps.setNull(4, java.sql.Types.DOUBLE);
-            ps.setNull(5, java.sql.Types.DOUBLE);
-            ps.executeUpdate();
+                // Insert
+                PreparedStatement ps = conn.prepareStatement(
+                    "INSERT INTO users (username, password_hash, role, download_bandwidth_limit, upload_bandwidth_limit) VALUES (?, ?, ?, ?, ?)"
+                );
+                ps.setString(1, "test_admin");
+                ps.setString(2, hashed);
+                ps.setString(3, "admin");
+                ps.setNull(4, java.sql.Types.DOUBLE);
+                ps.setNull(5, java.sql.Types.DOUBLE);
+                ps.executeUpdate();
 
-            System.out.println("Temporary admin 'test_admin' created successfully with password 'testpass'!");
+                System.out.println("Temporary admin 'test_admin' created successfully with password 'testpass'!");
+            }
             conn.close();
         } catch (Exception e) {
             e.printStackTrace();
