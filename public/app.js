@@ -396,7 +396,7 @@ function initApp() {
   });
 
   // Bind UI style card clicks dynamically
-  document.querySelectorAll('.ui-style-card').forEach(card => {
+  document.querySelectorAll('.ui-style-card:not(.profile-ui-style-card)').forEach(card => {
     card.addEventListener('click', (e) => {
       const styleName = e.currentTarget.id.replace('ui-style-card-', '');
       setSystemUiStyle(styleName);
