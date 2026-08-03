@@ -290,6 +290,15 @@ function initApp() {
     closeModal('modal-video-player');
   });
 
+  // Image close
+  safeAddListener('btn-close-image', 'click', () => {
+    const img = document.getElementById('viewer-img');
+    if (img) {
+      img.removeAttribute('src');
+    }
+    closeModal('modal-image-viewer');
+  });
+
   // Bind UI style card clicks dynamically
   document.querySelectorAll('.ui-style-card').forEach(card => {
     card.addEventListener('click', (e) => {
