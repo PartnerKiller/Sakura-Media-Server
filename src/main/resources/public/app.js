@@ -2670,29 +2670,16 @@ function closeSse() {
 }
 
 async function applyTheme() {
-  if (state.user) {
-    applyUserThemeAndStyle();
-    return;
-  }
+  let systemTheme = 'deep-ocean';
   try {
     const res = await fetch('/api/theme');
     if (res.ok) {
       const data = await res.json();
-      const theme = data.theme || 'deep-ocean';
+      systemTheme = data.theme || 'deep-ocean';
       
-      // Remove all theme classes
-      const allThemes = [
-        'theme-cyber-sakura', 'theme-deep-ocean', 'theme-midnight-azure', 'theme-carbon-gray',
-        'theme-aura-green', 'theme-neon-violet', 'theme-sunset-orange', 'theme-crimson-red',
-        'theme-forest-lagoon', 'theme-golden-amber'
-      ];
-      allThemes.forEach(t => document.body.classList.remove(t));
-      // Add active theme class
-      document.body.classList.add(`theme-${theme}`);
-      
-      // Highlight active theme card if visible
-      document.querySelectorAll('.theme-card').forEach(card => card.classList.remove('active'));
-      const activeCard = document.getElementById(`theme-card-${theme}`);
+      // Highlight active system theme card
+      document.querySelectorAll('.theme-card:not(.profile-theme-card)').forEach(card => card.classList.remove('active'));
+      const activeCard = document.getElementById(`theme-card-${systemTheme}`);
       if (activeCard) {
         activeCard.classList.add('active');
       }
@@ -2700,6 +2687,21 @@ async function applyTheme() {
   } catch (err) {
     console.error('Failed to load theme:', err);
   }
+
+  if (state.user) {
+    applyUserThemeAndStyle();
+    return;
+  }
+
+  // Remove all theme classes
+  const allThemes = [
+    'theme-cyber-sakura', 'theme-deep-ocean', 'theme-midnight-azure', 'theme-carbon-gray',
+    'theme-aura-green', 'theme-neon-violet', 'theme-sunset-orange', 'theme-crimson-red',
+    'theme-forest-lagoon', 'theme-golden-amber'
+  ];
+  allThemes.forEach(t => document.body.classList.remove(t));
+  // Add active theme class
+  document.body.classList.add(`theme-${systemTheme}`);
 }
 
 async function setSystemTheme(themeName) {
@@ -2709,6 +2711,13 @@ async function setSystemTheme(themeName) {
       body: JSON.stringify({ theme: themeName })
     });
     if (res.success) {
+      // Highlight active system theme card immediately
+      document.querySelectorAll('.theme-card:not(.profile-theme-card)').forEach(card => card.classList.remove('active'));
+      const activeCard = document.getElementById(`theme-card-${themeName}`);
+      if (activeCard) {
+        activeCard.classList.add('active');
+      }
+
       if (state.user) {
         await setProfileTheme(themeName);
       } else {
@@ -2721,29 +2730,16 @@ async function setSystemTheme(themeName) {
 }
 
 async function applyUiStyle() {
-  if (state.user) {
-    applyUserThemeAndStyle();
-    return;
-  }
+  let systemStyle = 'glassmorphism';
   try {
     const res = await fetch('/api/ui-style');
     if (res.ok) {
       const data = await res.json();
-      const style = data.style || 'glassmorphism';
+      systemStyle = data.style || 'glassmorphism';
       
-      // Remove all UI style classes
-      const allStyles = [
-        'style-glassmorphism', 'style-minimalist', 'style-retro-terminal', 'style-vaporwave-dream',
-        'style-cyberpunk', 'style-material-design', 'style-nebula-space', 'style-steel-chrome',
-        'style-nordic-aurora', 'style-aero-classic'
-      ];
-      allStyles.forEach(s => document.body.classList.remove(s));
-      // Add active style class
-      document.body.classList.add(`style-${style}`);
-      
-      // Highlight active UI style card if visible
+      // Highlight active system UI style card
       document.querySelectorAll('.ui-style-card:not(.profile-ui-style-card)').forEach(card => card.classList.remove('active'));
-      const activeCard = document.getElementById(`ui-style-card-${style}`);
+      const activeCard = document.getElementById(`ui-style-card-${systemStyle}`);
       if (activeCard) {
         activeCard.classList.add('active');
       }
@@ -2751,6 +2747,21 @@ async function applyUiStyle() {
   } catch (err) {
     console.error('Failed to load UI style:', err);
   }
+
+  if (state.user) {
+    applyUserThemeAndStyle();
+    return;
+  }
+
+  // Remove all UI style classes
+  const allStyles = [
+    'style-glassmorphism', 'style-minimalist', 'style-retro-terminal', 'style-vaporwave-dream',
+    'style-cyberpunk', 'style-material-design', 'style-nebula-space', 'style-steel-chrome',
+    'style-nordic-aurora', 'style-aero-classic'
+  ];
+  allStyles.forEach(s => document.body.classList.remove(s));
+  // Add active style class
+  document.body.classList.add(`style-${systemStyle}`);
 }
 
 async function setSystemUiStyle(styleName) {
@@ -2760,6 +2771,13 @@ async function setSystemUiStyle(styleName) {
       body: JSON.stringify({ style: styleName })
     });
     if (res.success) {
+      // Highlight active system UI style card immediately
+      document.querySelectorAll('.ui-style-card:not(.profile-ui-style-card)').forEach(card => card.classList.remove('active'));
+      const activeCard = document.getElementById(`ui-style-card-${styleName}`);
+      if (activeCard) {
+        activeCard.classList.add('active');
+      }
+
       if (state.user) {
         await setProfileUiStyle(styleName);
       } else {
