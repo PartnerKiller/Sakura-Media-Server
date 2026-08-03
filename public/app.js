@@ -243,6 +243,7 @@ function initApp() {
   safeAddListener('nav-users', 'click', () => switchPanel('users'));
   safeAddListener('nav-server', 'click', () => switchPanel('server'));
   safeAddListener('nav-recycle-bin', 'click', () => switchPanel('recycle-bin'));
+  safeAddListener('nav-profile', 'click', () => switchPanel('profile'));
   safeAddListener('btn-empty-recycle', 'click', handleEmptyRecycleBin);
 
   // Bind Mobile Bottom Navigation
@@ -250,7 +251,24 @@ function initApp() {
   safeAddListener('mobile-nav-users', 'click', () => switchPanel('users'));
   safeAddListener('mobile-nav-server', 'click', () => switchPanel('server'));
   safeAddListener('mobile-nav-recycle-bin', 'click', () => switchPanel('recycle-bin'));
+  safeAddListener('mobile-nav-profile', 'click', () => switchPanel('profile'));
   safeAddListener('mobile-nav-logout', 'click', logout);
+
+  // Bind Profile Settings
+  safeAddListener('profile-settings-form', 'submit', handleUpdateProfile);
+  safeAddListener('btn-toggle-profile-password', 'click', () => {
+    const passwordInput = document.getElementById('profile-password');
+    const eyeIconBtn = document.getElementById('btn-toggle-profile-password');
+    const eyeIcon = eyeIconBtn.querySelector('i');
+    if (passwordInput.type === 'password') {
+      passwordInput.type = 'text';
+      eyeIcon.setAttribute('data-lucide', 'eye-off');
+    } else {
+      passwordInput.type = 'password';
+      eyeIcon.setAttribute('data-lucide', 'eye');
+    }
+    lucide.createIcons();
+  });
 
   // Bind Explorer Controls
   safeAddListener('btn-new-folder', 'click', () => openModal('modal-new-folder'));
@@ -398,9 +416,7 @@ function showDashboard() {
   document.getElementById('dashboard-container').classList.add('active');
   
   // Update user profile info in sidebar
-  document.getElementById('user-avatar').innerText = state.user.username[0].toUpperCase();
-  document.getElementById('user-display-name').innerText = state.user.username;
-  document.getElementById('user-display-role').innerText = state.user.role === 'admin' ? 'Owner / Admin' : 'User';
+  updateUserProfileUI();
 
   // Toggle Admin Section Visibility
   if (state.user.role === 'admin') {
@@ -537,6 +553,20 @@ function switchPanel(panelName) {
     document.getElementById('panel-recycle-bin').classList.add('active');
     document.getElementById('explorer-actions').style.display = 'none';
     loadRecycleBin();
+  } else if (panelName === 'profile') {
+    const navProfile = document.getElementById('nav-profile');
+    if (navProfile) navProfile.classList.add('active');
+    const mobProfile = document.getElementById('mobile-nav-profile');
+    if (mobProfile) mobProfile.classList.add('active');
+    document.getElementById('panel-profile').classList.add('active');
+    document.getElementById('explorer-actions').style.display = 'none';
+    
+    document.getElementById('profile-username').value = state.user ? state.user.username : '';
+    document.getElementById('profile-password').value = '';
+    document.getElementById('profile-password').type = 'password';
+    document.getElementById('profile-current-password-display').innerText = (state.user && state.user.plainPassword) ? state.user.plainPassword : (state.user ? state.user.username : 'None');
+    document.getElementById('profile-error').innerText = '';
+    document.getElementById('profile-success').style.display = 'none';
   }
 }
 
@@ -2708,10 +2738,72 @@ async function setSystemUiStyle(styleName) {
   }
 }
 
+function updateUserProfileUI() {
+  if (state.user) {
+    document.getElementById('user-avatar').innerText = state.user.username[0].toUpperCase();
+    document.getElementById('user-display-name').innerText = state.user.username;
+    document.getElementById('user-display-role').innerText = state.user.role === 'admin' ? 'Owner / Admin' : 'User';
+  }
+}
+
+async function handleUpdateProfile(e) {
+  e.preventDefault();
+  const username = document.getElementById('profile-username').value;
+  const password = document.getElementById('profile-password').value;
+  const errorEl = document.getElementById('profile-error');
+  const successEl = document.getElementById('profile-success');
+
+  errorEl.innerText = '';
+  successEl.style.display = 'none';
+
+  try {
+    const payload = { username };
+    if (password.trim()) {
+      payload.password = password;
+    }
+
+    const res = await apiCall('/api/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    });
+
+    // Update state
+    state.token = res.token;
+    state.user.username = res.username;
+    if (res.plainPassword) {
+      state.user.plainPassword = res.plainPassword;
+    }
+    
+    // Save to local/session storage
+    const rememberMe = localStorage.getItem('token') !== null;
+    if (rememberMe) {
+      localStorage.setItem('token', res.token);
+      localStorage.setItem('user', JSON.stringify(state.user));
+    } else {
+      sessionStorage.setItem('token', res.token);
+      sessionStorage.setItem('user', JSON.stringify(state.user));
+    }
+
+    // Update UI
+    updateUserProfileUI();
+    document.getElementById('profile-current-password-display').innerText = res.plainPassword || username;
+    document.getElementById('profile-password').value = '';
+    
+    successEl.style.display = 'block';
+    setTimeout(() => {
+      successEl.style.display = 'none';
+    }, 5000);
+  } catch (err) {
+    errorEl.innerText = err.message || 'Failed to update profile';
+  }
+}
+
 window.applyTheme = applyTheme;
 window.setSystemTheme = setSystemTheme;
 window.applyUiStyle = applyUiStyle;
 window.setSystemUiStyle = setSystemUiStyle;
+window.updateUserProfileUI = updateUserProfileUI;
+window.handleUpdateProfile = handleUpdateProfile;
 
 
 

@@ -83,6 +83,10 @@
           <i data-lucide="trash-2"></i>
           <span>Recycle Bin</span>
         </button>
+        <button class="nav-item" id="nav-profile">
+          <i data-lucide="user"></i>
+          <span>Profile Settings</span>
+        </button>
       </nav>
       <div class="sidebar-footer">
         <div class="user-profile">
@@ -863,6 +867,44 @@
           </div>
         </section>
 
+        <!-- PROFILE SETTINGS PANEL -->
+        <section id="panel-profile" class="content-panel">
+          <div class="panel-header">
+            <div>
+              <h2>Profile Settings</h2>
+              <p>Manage your account username and password settings</p>
+            </div>
+          </div>
+
+          <div class="users-list-card" style="max-width: 600px; padding: 30px; margin-top: 20px;">
+            <form id="profile-settings-form">
+              <div class="input-group">
+                <label for="profile-username">Username</label>
+                <input type="text" id="profile-username" placeholder="Enter new username" required style="width: 100%; max-width: 400px;">
+              </div>
+              <div class="input-group" style="margin-top: 20px; position: relative;">
+                <label for="profile-password">New Password (Leave blank to keep current)</label>
+                <div style="position: relative; display: flex; align-items: center; width: 100%; max-width: 400px;">
+                  <input type="password" id="profile-password" placeholder="Enter new password" style="width: 100%; padding-right: 40px;">
+                  <button type="button" id="btn-toggle-profile-password" style="position: absolute; right: 10px; background: none; border: none; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; height: 100%;">
+                    <i data-lucide="eye" style="width: 18px; height: 18px;"></i>
+                  </button>
+                </div>
+                <div style="margin-top: 6px; font-size: 12px; color: var(--text-secondary); display: flex; gap: 4px; align-items: center;">
+                  <span>Current password:</span>
+                  <span id="profile-current-password-display" style="font-family: monospace; font-weight: 600; color: var(--text-primary);">None</span>
+                </div>
+              </div>
+              <div class="error-message" id="profile-error" style="margin-top: 16px;"></div>
+              <div class="success-message" id="profile-success" style="margin-top: 16px; color: var(--success); font-size: 14px; display: none;">Profile updated successfully!</div>
+              <button type="submit" class="btn btn-primary" style="margin-top: 24px;">
+                <i data-lucide="save" style="width: 16px; height: 16px;"></i>
+                <span>Save Profile</span>
+              </button>
+            </form>
+          </div>
+        </section>
+
       </div>
     </main>
   </div>
@@ -1131,12 +1173,16 @@
       <i data-lucide="trash-2"></i>
       <span>Recycle</span>
     </button>
+    <button class="mobile-nav-item" id="mobile-nav-profile">
+      <i data-lucide="user"></i>
+      <span>Profile</span>
+    </button>
     <button class="mobile-nav-item" id="mobile-nav-logout">
       <i data-lucide="log-out"></i>
       <span>Logout</span>
     </button>
   </nav>
 
-  <script src="/app.js?v=5.15"></script>
+  <script src="/app.js?v=5.16"></script>
 </body>
 </html>
