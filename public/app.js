@@ -1671,8 +1671,8 @@ function updateTelemetryCharts(cpuUsage, ramUsage) {
         datasets: [{
           label: 'CPU Load %',
           data: cpuDataHistory,
-          borderColor: '#ff4a88',
-          backgroundColor: 'rgba(255, 74, 136, 0.1)',
+          borderColor: '#00adb5',
+          backgroundColor: 'rgba(0, 173, 181, 0.1)',
           fill: true,
           tension: 0.3,
           borderWidth: 2
@@ -1702,8 +1702,8 @@ function updateTelemetryCharts(cpuUsage, ramUsage) {
         datasets: [{
           label: 'Memory Load %',
           data: ramDataHistory,
-          borderColor: '#8b5cf6',
-          backgroundColor: 'rgba(139, 92, 246, 0.1)',
+          borderColor: '#2a6fdb',
+          backgroundColor: 'rgba(42, 111, 219, 0.1)',
           fill: true,
           tension: 0.3,
           borderWidth: 2
