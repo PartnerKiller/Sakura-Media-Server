@@ -421,6 +421,7 @@ button, .btn {
   flex-direction: column;
   height: 100vh;
   overflow-y: auto;
+  background: var(--bg-main);
 }
 
 /* TOP BAR */
@@ -496,10 +497,7 @@ button, .btn {
   top: 79px;
   z-index: 9;
   background: var(--bg-main) !important;
-  margin-top: -30px;
-  margin-left: -40px;
-  margin-right: -40px;
-  padding: 20px 40px;
+  padding: 16px 0;
   border-bottom: 1px solid var(--border-subtle);
   margin-bottom: 24px;
   display: flex;
@@ -559,10 +557,7 @@ button, .btn {
 @media (max-width: 768px) {
   .explorer-header-sticky {
     top: 111px;
-    margin-top: -15px;
-    margin-left: -15px;
-    margin-right: -15px;
-    padding: 12px 15px;
+    padding: 12px 0;
     flex-direction: column;
     align-items: stretch;
     gap: 10px;
