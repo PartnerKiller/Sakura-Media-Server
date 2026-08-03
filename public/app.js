@@ -2608,6 +2608,7 @@ function initSse() {
   });
 
   eventSource.addEventListener('theme-update', (e) => {
+    if (state.user) return;
     try {
       const data = JSON.parse(e.data);
       const theme = data.theme || 'deep-ocean';
@@ -2631,6 +2632,7 @@ function initSse() {
   });
 
   eventSource.addEventListener('ui-style-update', (e) => {
+    if (state.user) return;
     try {
       const data = JSON.parse(e.data);
       const style = data.style || 'glassmorphism';
@@ -2705,7 +2707,11 @@ async function setSystemTheme(themeName) {
       body: JSON.stringify({ theme: themeName })
     });
     if (res.success) {
-      await applyTheme();
+      if (state.user) {
+        await setProfileTheme(themeName);
+      } else {
+        await applyTheme();
+      }
     }
   } catch (err) {
     alert(err.message || 'Failed to update theme');
@@ -2734,7 +2740,7 @@ async function applyUiStyle() {
       document.body.classList.add(`style-${style}`);
       
       // Highlight active UI style card if visible
-      document.querySelectorAll('.ui-style-card').forEach(card => card.classList.remove('active'));
+      document.querySelectorAll('.ui-style-card:not(.profile-ui-style-card)').forEach(card => card.classList.remove('active'));
       const activeCard = document.getElementById(`ui-style-card-${style}`);
       if (activeCard) {
         activeCard.classList.add('active');
@@ -2752,7 +2758,11 @@ async function setSystemUiStyle(styleName) {
       body: JSON.stringify({ style: styleName })
     });
     if (res.success) {
-      await applyUiStyle();
+      if (state.user) {
+        await setProfileUiStyle(styleName);
+      } else {
+        await applyUiStyle();
+      }
     }
   } catch (err) {
     alert(err.message || 'Failed to update UI style');

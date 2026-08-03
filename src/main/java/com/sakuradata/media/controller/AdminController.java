@@ -939,7 +939,7 @@ public class AdminController {
             String json = "{\"theme\":\"" + theme + "\"}";
             java.nio.file.Files.write(file.toPath(), json.getBytes());
             logAudit(request, "Changed system theme to " + theme);
-            SseController.broadcast("theme-update", Map.of("theme", theme));
+            // Do not broadcast theme change to connected users to avoid overriding personal user theme selections
             return ResponseEntity.ok(Map.of("success", true, "theme", theme));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Failed to save theme setting"));
@@ -993,7 +993,7 @@ public class AdminController {
             String json = "{\"style\":\"" + style + "\"}";
             java.nio.file.Files.write(file.toPath(), json.getBytes());
             logAudit(request, "Changed system UI Style to " + style);
-            SseController.broadcast("ui-style-update", Map.of("style", style));
+            // Do not broadcast ui style change to connected users to avoid overriding personal user ui style selections
             return ResponseEntity.ok(Map.of("success", true, "style", style));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Failed to save UI Style setting"));
