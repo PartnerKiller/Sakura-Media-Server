@@ -541,6 +541,23 @@ button, .btn {
   flex-wrap: wrap;
 }
 
+.open-folder-size-badge {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  backdrop-filter: blur(8px);
+  margin-right: auto;
+  margin-left: 12px;
+  box-shadow: var(--shadow-sm);
+  white-space: nowrap;
+}
+
 @media (max-width: 768px) {
   .explorer-header-sticky {
     top: 111px;
@@ -550,6 +567,11 @@ button, .btn {
     flex-direction: column;
     align-items: stretch;
     gap: 10px;
+  }
+  .open-folder-size-badge {
+    margin-left: 0;
+    margin-right: 0;
+    align-self: flex-start;
   }
 }
 
