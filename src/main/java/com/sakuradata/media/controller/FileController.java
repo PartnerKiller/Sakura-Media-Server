@@ -142,8 +142,22 @@ public class FileController {
             return ((String) a.get("name")).compareToIgnoreCase((String) b.get("name"));
         });
 
+        long folderSize = 0L;
+        try (java.util.stream.Stream<Path> stream = Files.walk(Paths.get(targetPath))) {
+            folderSize = stream.filter(p -> Files.isRegularFile(p))
+                               .mapToLong(p -> {
+                                   try {
+                                       return Files.size(p);
+                                   } catch (Exception e) {
+                                       return 0L;
+                                   }
+                               })
+                               .sum();
+        } catch (Exception ignored) {}
+
         return ResponseEntity.ok(Map.of(
                 "currentPath", targetPath,
+                "folderSize", folderSize,
                 "files", result
         ));
     }

@@ -676,6 +676,9 @@ async function browsePath(targetPath) {
   document.getElementById('search-input').value = ''; // clear search
   updateUploadActionsVisibility();
   
+  const sizeDisplay = document.getElementById('open-folder-size');
+  if (sizeDisplay) sizeDisplay.style.display = 'none';
+  
   if (window.location.hash.substring(1) !== targetPath) {
     window.location.hash = targetPath;
   }
@@ -685,6 +688,15 @@ async function browsePath(targetPath) {
     state.files = res.files;
     processAndRenderFiles();
     renderBreadcrumbs();
+    
+    if (sizeDisplay) {
+      const sizeValue = document.getElementById('open-folder-size-value');
+      if (sizeValue && res.folderSize !== undefined && res.folderSize !== null) {
+        sizeValue.innerText = formatBytes(res.folderSize);
+        sizeDisplay.style.display = 'flex';
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+      }
+    }
   } catch (err) {
     console.error('Failed to browse path:', err);
     document.getElementById('files-grid-container').innerHTML = `<div class="error-message">${err.message}</div>`;
