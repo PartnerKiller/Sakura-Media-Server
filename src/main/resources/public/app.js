@@ -2391,6 +2391,7 @@ function openEditUserModal(userId, username, role, downloadBandwidthLimit, uploa
 async function handleEditUser(e) {
   e.preventDefault();
   const userId = document.getElementById('edit-user-id').value;
+  const username = document.getElementById('edit-username-display').value;
   const password = document.getElementById('edit-password').value;
   const role = document.getElementById('edit-role').value;
   const downloadBandwidth = document.getElementById('edit-download-bandwidth').value;
@@ -2401,6 +2402,7 @@ async function handleEditUser(e) {
 
   try {
     const payload = { 
+      username,
       role,
       downloadBandwidthLimit: downloadBandwidth ? parseFloat(downloadBandwidth) : 0,
       uploadBandwidthLimit: uploadBandwidth ? parseFloat(uploadBandwidth) : 0

@@ -153,6 +153,14 @@ public class AdminController {
         User user = userOpt.get();
         String role = body.get("role") != null ? body.get("role").toString() : null;
         String password = body.get("password") != null ? body.get("password").toString() : null;
+        String username = body.get("username") != null ? body.get("username").toString().trim() : null;
+
+        if (username != null && !username.isEmpty() && !username.equals(user.getUsername())) {
+            if (userRepository.findByUsername(username).isPresent()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Username already exists"));
+            }
+            user.setUsername(username);
+        }
 
         if (role != null) {
             if (id == 1L && !"admin".equals(role)) {
