@@ -495,22 +495,16 @@ button, .btn {
   position: sticky;
   top: 79px;
   z-index: 9;
-  background: var(--bg-main) !important;
-  margin-top: -30px;
-  margin-left: -30px;
-  margin-right: -30px;
-  padding: 16px 30px;
+  background: var(--bg-main);
+  padding: 16px 0;
   border-bottom: 1px solid var(--border-subtle);
-  margin-bottom: 20px;
+  margin-bottom: 24px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 16px;
   flex-wrap: wrap;
   transition: background var(--transition-normal);
-  border-top-left-radius: var(--radius-lg);
-  border-top-right-radius: var(--radius-lg);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 
 .explorer-sticky-left {
@@ -563,10 +557,7 @@ button, .btn {
 @media (max-width: 768px) {
   .explorer-header-sticky {
     top: 111px;
-    margin-top: -15px;
-    margin-left: -15px;
-    margin-right: -15px;
-    padding: 15px;
+    padding: 12px 0;
     flex-direction: column;
     align-items: stretch;
     gap: 10px;
@@ -2357,20 +2348,21 @@ body.theme-golden-amber {
    ========================================================================== */
 
 /* 1. Glassmorphism */
-body.style-glassmorphism .content-panel,
+/* 1. Glassmorphism */
 body.style-glassmorphism .sidebar,
 body.style-glassmorphism .users-list-card,
-body.style-glassmorphism .explorer-card {
+body.style-glassmorphism .explorer-card,
+body.style-glassmorphism .file-card {
   backdrop-filter: blur(16px) saturate(180%) !important;
   background-color: rgba(15, 23, 42, 0.45) !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 
 /* 2. Minimalist */
-body.style-minimalist .content-panel,
 body.style-minimalist .sidebar,
 body.style-minimalist .users-list-card,
 body.style-minimalist .explorer-card,
+body.style-minimalist .file-card,
 body.style-minimalist .btn,
 body.style-minimalist .form-control {
   border-radius: 0px !important;
@@ -2383,10 +2375,10 @@ body.style-minimalist .form-control {
 body.style-retro-terminal {
   font-family: 'Courier New', Courier, monospace !important;
 }
-body.style-retro-terminal .content-panel,
 body.style-retro-terminal .sidebar,
 body.style-retro-terminal .users-list-card,
-body.style-retro-terminal .explorer-card {
+body.style-retro-terminal .explorer-card,
+body.style-retro-terminal .file-card {
   background-color: #000000 !important;
   border: 2px solid #00ff00 !important;
   box-shadow: 0 0 12px rgba(0, 255, 0, 0.3) !important;
@@ -2397,20 +2389,20 @@ body.style-retro-terminal * {
 }
 
 /* 4. Vaporwave Dream */
-body.style-vaporwave-dream .content-panel,
 body.style-vaporwave-dream .sidebar,
 body.style-vaporwave-dream .users-list-card,
-body.style-vaporwave-dream .explorer-card {
+body.style-vaporwave-dream .explorer-card,
+body.style-vaporwave-dream .file-card {
   border: 2px solid #ff00ff !important;
   box-shadow: 6px 6px 0px #00ffff !important;
   background: rgba(30, 10, 45, 0.8) !important;
 }
 
 /* 5. Cyberpunk */
-body.style-cyberpunk .content-panel,
 body.style-cyberpunk .sidebar,
 body.style-cyberpunk .users-list-card,
-body.style-cyberpunk .explorer-card {
+body.style-cyberpunk .explorer-card,
+body.style-cyberpunk .file-card {
   border-radius: 6px 0px 6px 0px !important;
   border: 2px solid var(--primary) !important;
   background: rgba(10, 10, 15, 0.9) !important;
@@ -2418,50 +2410,50 @@ body.style-cyberpunk .explorer-card {
 }
 
 /* 6. Material Design */
-body.style-material-design .content-panel,
 body.style-material-design .sidebar,
 body.style-material-design .users-list-card,
-body.style-material-design .explorer-card {
+body.style-material-design .explorer-card,
+body.style-material-design .file-card {
   border-radius: 16px !important;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
   border: none !important;
 }
 
 /* 7. Nebula Space */
-body.style-nebula-space .content-panel,
 body.style-nebula-space .sidebar,
 body.style-nebula-space .users-list-card,
-body.style-nebula-space .explorer-card {
+body.style-nebula-space .explorer-card,
+body.style-nebula-space .file-card {
   border: 1px solid rgba(139, 92, 246, 0.3) !important;
   box-shadow: 0 0 30px rgba(139, 92, 246, 0.15) !important;
   background: rgba(12, 8, 28, 0.8) !important;
 }
 
 /* 8. Steel & Chrome */
-body.style-steel-chrome .content-panel,
 body.style-steel-chrome .sidebar,
 body.style-steel-chrome .users-list-card,
-body.style-steel-chrome .explorer-card {
+body.style-steel-chrome .explorer-card,
+body.style-steel-chrome .file-card {
   background: linear-gradient(180deg, #1e2022 0%, #111215 100%) !important;
   border: 1px solid #4a4d52 !important;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.1) !important;
 }
 
 /* 9. Nordic Aurora */
-body.style-nordic-aurora .content-panel,
 body.style-nordic-aurora .sidebar,
 body.style-nordic-aurora .users-list-card,
-body.style-nordic-aurora .explorer-card {
+body.style-nordic-aurora .explorer-card,
+body.style-nordic-aurora .file-card {
   border-radius: 12px !important;
   border: 1px solid rgba(0, 245, 212, 0.2) !important;
   box-shadow: 0 4px 24px rgba(0, 245, 212, 0.05) !important;
 }
 
 /* 10. Aero Classic */
-body.style-aero-classic .content-panel,
 body.style-aero-classic .sidebar,
 body.style-aero-classic .users-list-card,
-body.style-aero-classic .explorer-card {
+body.style-aero-classic .explorer-card,
+body.style-aero-classic .file-card {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(0, 0, 0, 0.4) 100%) !important;
   border: 1px solid rgba(255, 255, 255, 0.2) !important;
   border-radius: 20px !important;
@@ -2471,67 +2463,6 @@ body.style-aero-classic .explorer-card {
 .ui-style-card.active .theme-preview {
   border-color: var(--primary) !important;
   box-shadow: var(--shadow-glow);
-}
-
-/* UI Style overrides for .explorer-header-sticky */
-body.style-glassmorphism .explorer-header-sticky {
-  background: var(--bg-card) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
-}
-body.style-minimalist .explorer-header-sticky {
-  background: #09090b !important;
-  border-bottom: 1px solid #3f3f46 !important;
-}
-body.style-retro-terminal .explorer-header-sticky {
-  background: #000000 !important;
-  border-bottom: 2px solid #00ff00 !important;
-}
-body.style-vaporwave-dream .explorer-header-sticky {
-  background: #1e0a2d !important;
-  border-bottom: 2px solid #ff00ff !important;
-}
-body.style-cyberpunk .explorer-header-sticky {
-  background: #0a0a0f !important;
-  border-bottom: 2px solid #ff4a88 !important;
-}
-body.style-material-design .explorer-header-sticky {
-  background: #1e1e24 !important;
-  border-bottom: 1px solid rgba(255,255,255,0.08) !important;
-}
-body.style-nebula-space .explorer-header-sticky {
-  background: #0c081c !important;
-  border-bottom: 1px solid rgba(139, 92, 246, 0.4) !important;
-}
-body.style-steel-chrome .explorer-header-sticky {
-  background: #181a1d !important;
-  border-bottom: 1px solid #4a4d52 !important;
-}
-body.style-nordic-aurora .explorer-header-sticky {
-  background: #0b131a !important;
-  border-bottom: 1px solid rgba(0, 245, 212, 0.2) !important;
-}
-body.style-aero-classic .explorer-header-sticky {
-  background: #111726 !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
-}
-
-/* Add internal padding to .content-panel when borders/backgrounds are applied by custom styles */
-body.style-glassmorphism .content-panel,
-body.style-retro-terminal .content-panel,
-body.style-vaporwave-dream .content-panel,
-body.style-cyberpunk .content-panel,
-body.style-material-design .content-panel,
-body.style-nebula-space .content-panel,
-body.style-steel-chrome .content-panel,
-body.style-nordic-aurora .content-panel,
-body.style-aero-classic .content-panel {
-  padding: 30px !important;
-  border-radius: var(--radius-lg) !important;
-}
-
-body.style-minimalist .content-panel {
-  padding: 30px !important;
-  border-radius: 0px !important;
 }
 
 
