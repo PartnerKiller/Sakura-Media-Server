@@ -1542,17 +1542,11 @@ video {
 /* Horizontal Sub-Tabs */
 .server-tabs-bar {
   display: flex;
-  flex-wrap: nowrap;
-  gap: 4px;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 8px;
   margin-top: 16px;
   border-bottom: 1px solid var(--border-subtle);
-  overflow-x: auto;
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE 10+ */
-}
-
-.server-tabs-bar::-webkit-scrollbar {
-  display: none; /* Chrome, Safari, Opera */
 }
 
 .server-tab-btn {
@@ -1561,24 +1555,23 @@ video {
   color: var(--text-secondary);
   font-size: 13px;
   font-weight: 500;
-  padding: 10px 16px;
+  padding: 8px 16px;
+  border-radius: 6px;
   cursor: pointer;
   white-space: nowrap;
   transition: all var(--transition-fast);
-  margin-bottom: -1px; /* Overlap parent border-bottom */
-  border-bottom: 2px solid transparent;
-  border-radius: 6px 6px 0 0;
 }
 
 .server-tab-btn:hover {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .server-tab-btn.active {
   color: var(--primary);
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(0, 173, 181, 0.08);
   border-bottom: 2px solid var(--primary);
+  border-radius: 6px 6px 0 0;
   font-weight: 600;
 }
 
