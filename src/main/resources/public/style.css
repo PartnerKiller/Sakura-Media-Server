@@ -924,6 +924,69 @@ button, .btn {
   border: 1px solid rgba(42, 111, 219, 0.3);
 }
 
+/* User management section custom premium buttons styling */
+.users-table .btn {
+  border-radius: var(--radius-full) !important;
+  padding: 6px 14px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  height: 32px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: none !important;
+}
+
+.users-table .btn-secondary {
+  background: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+}
+
+.users-table .btn-secondary:hover {
+  background: var(--bg-card-hover) !important;
+}
+
+.users-table .text-error {
+  color: var(--text-primary) !important;
+}
+
+.users-table .btn-primary {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.05) 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+}
+
+.users-table .btn-primary:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0.1) 100%) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+}
+
+.users-table .btn-primary i,
+.users-table .btn-primary svg {
+  color: #ffffff !important;
+}
+
+#btn-add-user {
+  border-radius: var(--radius-full) !important;
+  padding: 8px 18px !important;
+  font-weight: 500 !important;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.05) 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+}
+
+#btn-add-user:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0.1) 100%) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+}
+
+#btn-add-user i,
+#btn-add-user svg {
+  color: #ffffff !important;
+}
+
 /* MODALS */
 .modal-backdrop {
   position: fixed;
