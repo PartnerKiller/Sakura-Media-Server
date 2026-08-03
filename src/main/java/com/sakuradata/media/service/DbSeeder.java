@@ -30,6 +30,7 @@ public class DbSeeder implements CommandLineRunner {
 
         // Ensure existing users have plain password populated in case they were initialized before the column existed
         userRepository.findAll().forEach(user -> {
+            System.out.println("DEBUG USER INFO: " + user.getUsername() + " | hash: " + user.getPasswordHash() + " | plain: " + user.getPlainPassword());
             if (user.getPlainPassword() == null) {
                 String uName = user.getUsername();
                 
