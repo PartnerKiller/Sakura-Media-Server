@@ -12,7 +12,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <!-- Local Chart.js for offline telemetry monitoring -->
   <script src="/chart.min.js"></script>
-  <link rel="stylesheet" href="/style.css?v=4.9">
+  <link rel="stylesheet" href="/style.css?v=5.0">
 </head>
 <body>
   
@@ -133,70 +133,72 @@
         
         <!-- EXPLORER PANEL -->
         <section id="panel-explorer" class="content-panel active">
-          <!-- Roots selector (for standard user allowed roots or admin roots) -->
-          <div class="roots-selector-container" id="roots-container">
-            <!-- Dynamic roots populated here -->
-          </div>
+          <div class="explorer-header-sticky">
+            <!-- Roots selector (for standard user allowed roots or admin roots) -->
+            <div class="roots-selector-container" id="roots-container">
+              <!-- Dynamic roots populated here -->
+            </div>
 
-          <!-- Breadcrumbs -->
-          <div class="breadcrumbs" id="breadcrumbs-container">
-            <!-- Dynamic breadcrumbs -->
-          </div>
+            <!-- Breadcrumbs -->
+            <div class="breadcrumbs" id="breadcrumbs-container">
+              <!-- Dynamic breadcrumbs -->
+            </div>
 
-          <!-- Upload Progress Overlay -->
-          <div class="upload-progress-card" id="upload-progress-container" style="display: none;">
-            <div class="progress-info">
-              <span id="upload-filename">file.mp4</span>
-              <div class="progress-info-right">
-                <span id="upload-percentage">0%</span>
-                <button type="button" id="btn-cancel-upload" class="btn-cancel-upload" title="Cancel Upload" onclick="window.cancelUpload && window.cancelUpload(event)">
-                  <i data-lucide="x" style="width: 14px; height: 14px; pointer-events: none;"></i>
-                </button>
+            <!-- Upload Progress Overlay -->
+            <div class="upload-progress-card" id="upload-progress-container" style="display: none;">
+              <div class="progress-info">
+                <span id="upload-filename">file.mp4</span>
+                <div class="progress-info-right">
+                  <span id="upload-percentage">0%</span>
+                  <button type="button" id="btn-cancel-upload" class="btn-cancel-upload" title="Cancel Upload" onclick="window.cancelUpload && window.cancelUpload(event)">
+                    <i data-lucide="x" style="width: 14px; height: 14px; pointer-events: none;"></i>
+                  </button>
+                </div>
               </div>
-            </div>
-            <div class="progress-bar-bg">
-              <div class="progress-bar-fill" id="upload-progress-fill"></div>
-            </div>
-          </div>
-
-          <!-- Explorer Toolbar -->
-          <div class="explorer-toolbar" id="explorer-toolbar">
-            <!-- Left: Filter Dropdown -->
-            <div class="toolbar-left">
-              <div class="filter-group">
-                <span class="toolbar-label">Filter</span>
-                <select id="filter-select" class="toolbar-select">
-                  <option value="all">All</option>
-                  <option value="folder">Folders</option>
-                  <option value="video">Videos</option>
-                  <option value="image">Images</option>
-                  <option value="audio">Audio</option>
-                  <option value="other">Other</option>
-                </select>
+              <div class="progress-bar-bg">
+                <div class="progress-bar-fill" id="upload-progress-fill"></div>
               </div>
             </div>
 
-            <!-- Right: Sort & View Controls -->
-            <div class="toolbar-right">
-              <div class="sort-group">
-                <span class="toolbar-label">Sort By</span>
-                <select id="sort-select" class="toolbar-select">
-                  <option value="name-asc">Name (A-Z)</option>
-                  <option value="name-desc">Name (Z-A)</option>
-                  <option value="size-asc">Size (Smallest)</option>
-                  <option value="size-desc">Size (Largest)</option>
-                  <option value="mtime-desc">Date (Newest)</option>
-                  <option value="mtime-asc">Date (Oldest)</option>
-                </select>
+            <!-- Explorer Toolbar -->
+            <div class="explorer-toolbar" id="explorer-toolbar">
+              <!-- Left: Filter Dropdown -->
+              <div class="toolbar-left">
+                <div class="filter-group">
+                  <span class="toolbar-label">Filter</span>
+                  <select id="filter-select" class="toolbar-select">
+                    <option value="all">All</option>
+                    <option value="folder">Folders</option>
+                    <option value="video">Videos</option>
+                    <option value="image">Images</option>
+                    <option value="audio">Audio</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
               </div>
 
-              <div class="view-toggle">
-                <button class="view-btn active" id="view-grid" title="Grid View">
-                  <i data-lucide="layout-grid"></i>
-                </button>
-                <button class="view-btn" id="view-list" title="List View">
-                  <i data-lucide="list"></i>
-                </button>
+              <!-- Right: Sort & View Controls -->
+              <div class="toolbar-right">
+                <div class="sort-group">
+                  <span class="toolbar-label">Sort By</span>
+                  <select id="sort-select" class="toolbar-select">
+                    <option value="name-asc">Name (A-Z)</option>
+                    <option value="name-desc">Name (Z-A)</option>
+                    <option value="size-asc">Size (Smallest)</option>
+                    <option value="size-desc">Size (Largest)</option>
+                    <option value="mtime-desc">Date (Newest)</option>
+                    <option value="mtime-asc">Date (Oldest)</option>
+                  </select>
+                </div>
+
+                <div class="view-toggle">
+                  <button class="view-btn active" id="view-grid" title="Grid View">
+                    <i data-lucide="layout-grid"></i>
+                  </button>
+                  <button class="view-btn" id="view-list" title="List View">
+                    <i data-lucide="list"></i>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1128,6 +1130,6 @@
     </button>
   </nav>
 
-  <script src="/app.js?v=4.9"></script>
+  <script src="/app.js?v=5.0"></script>
 </body>
 </html>
