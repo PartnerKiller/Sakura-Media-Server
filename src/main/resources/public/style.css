@@ -2270,4 +2270,48 @@ body.style-aero-classic .explorer-card {
   box-shadow: var(--shadow-glow);
 }
 
+/* UI Style overrides for .explorer-header-sticky */
+body.style-glassmorphism .explorer-header-sticky {
+  background: rgba(15, 23, 42, 0.45) !important;
+  backdrop-filter: blur(16px) saturate(180%) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+body.style-minimalist .explorer-header-sticky {
+  background: #09090b !important;
+  border-bottom: 1px solid #3f3f46 !important;
+}
+body.style-retro-terminal .explorer-header-sticky {
+  background: #000000 !important;
+  border-bottom: 2px solid #00ff00 !important;
+}
+body.style-vaporwave-dream .explorer-header-sticky {
+  background: rgba(30, 10, 45, 0.8) !important;
+  border-bottom: 2px solid #ff00ff !important;
+}
+body.style-cyberpunk .explorer-header-sticky {
+  background: rgba(10, 10, 15, 0.9) !important;
+  border-bottom: 2px solid #ff4a88 !important;
+}
+body.style-material-design .explorer-header-sticky {
+  background: #1e1e24 !important;
+  border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+}
+body.style-nebula-space .explorer-header-sticky {
+  background: rgba(12, 8, 28, 0.8) !important;
+  border-bottom: 1px solid rgba(139, 92, 246, 0.4) !important;
+}
+body.style-steel-chrome .explorer-header-sticky {
+  background: linear-gradient(180deg, #1e2022 0%, #111215 100%) !important;
+  border-bottom: 1px solid #4a4d52 !important;
+}
+body.style-nordic-aurora .explorer-header-sticky {
+  background: #0b131a !important;
+  border-bottom: 1px solid rgba(0, 245, 212, 0.2) !important;
+}
+body.style-aero-classic .explorer-header-sticky {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(0, 0, 0, 0.4) 100%) !important;
+  backdrop-filter: blur(12px) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
 
