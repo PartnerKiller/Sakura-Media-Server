@@ -495,11 +495,11 @@ button, .btn {
   position: sticky;
   top: 79px;
   z-index: 9;
-  background: var(--bg-card);
+  background: var(--bg-main) !important;
   margin-top: -30px;
   margin-left: -30px;
   margin-right: -30px;
-  padding: 20px 30px;
+  padding: 16px 30px;
   border-bottom: 1px solid var(--border-subtle);
   margin-bottom: 20px;
   display: flex;
@@ -510,6 +510,7 @@ button, .btn {
   transition: background var(--transition-normal);
   border-top-left-radius: var(--radius-lg);
   border-top-right-radius: var(--radius-lg);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 
 .explorer-sticky-left {
@@ -549,14 +550,13 @@ button, .btn {
   align-items: center;
   gap: 6px;
   padding: 6px 14px;
-  background: var(--bg-input);
+  background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--border-subtle);
   border-radius: 20px;
   font-size: 0.85rem;
   color: var(--text-secondary);
   margin-right: auto;
   margin-left: 12px;
-  box-shadow: var(--shadow-sm);
   white-space: nowrap;
 }
 
