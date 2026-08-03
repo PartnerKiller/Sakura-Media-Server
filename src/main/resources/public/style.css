@@ -492,10 +492,9 @@ button, .btn {
 }
 
 .explorer-header-sticky {
-  position: sticky;
-  top: 79px;
-  z-index: 9;
-  background: var(--bg-main);
+  position: relative;
+  z-index: 1;
+  background: transparent;
   padding: 16px 0;
   border-bottom: 1px solid var(--border-subtle);
   margin-bottom: 24px;
@@ -555,7 +554,6 @@ button, .btn {
 
 @media (max-width: 768px) {
   .explorer-header-sticky {
-    top: 111px;
     padding: 12px 0;
     flex-direction: column;
     align-items: stretch;
