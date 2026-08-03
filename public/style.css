@@ -2492,5 +2492,24 @@ body.style-aero-classic .explorer-header-sticky {
   border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
 }
 
+/* Add internal padding to .content-panel when borders/backgrounds are applied by custom styles */
+body.style-glassmorphism .content-panel,
+body.style-retro-terminal .content-panel,
+body.style-vaporwave-dream .content-panel,
+body.style-cyberpunk .content-panel,
+body.style-material-design .content-panel,
+body.style-nebula-space .content-panel,
+body.style-steel-chrome .content-panel,
+body.style-nordic-aurora .content-panel,
+body.style-aero-classic .content-panel {
+  padding: 30px !important;
+  border-radius: var(--radius-lg) !important;
+}
+
+body.style-minimalist .content-panel {
+  padding: 30px !important;
+  border-radius: 0px !important;
+}
+
 
 
