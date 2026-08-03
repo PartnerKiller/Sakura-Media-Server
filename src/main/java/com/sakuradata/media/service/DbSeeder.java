@@ -23,8 +23,29 @@ public class DbSeeder implements CommandLineRunner {
             String salt = BCrypt.gensalt(10);
             String hashed = BCrypt.hashpw(adminPass, salt);
             User defaultAdmin = new User(adminUser, hashed, "admin");
+            defaultAdmin.setPlainPassword(adminPass);
             userRepository.save(defaultAdmin);
             System.out.println("Database initialized with default administrator account.");
         }
+
+        // Ensure existing users have plain password populated in case they were initialized before the column existed
+        userRepository.findAll().forEach(user -> {
+            if (user.getPlainPassword() == null) {
+                String uName = user.getUsername();
+                if ("sakura".equals(uName)) {
+                    user.setPlainPassword("sakura");
+                    userRepository.save(user);
+                } else if ("tani".equals(uName)) {
+                    user.setPlainPassword("tani");
+                    userRepository.save(user);
+                } else if ("joel".equals(uName)) {
+                    user.setPlainPassword("joel");
+                    userRepository.save(user);
+                } else if ("soham".equals(uName)) {
+                    user.setPlainPassword("soham");
+                    userRepository.save(user);
+                }
+            }
+        });
     }
 }

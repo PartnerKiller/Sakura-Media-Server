@@ -62,6 +62,7 @@ public class AdminController {
             map.put("role", u.getRole());
             map.put("downloadBandwidthLimit", u.getDownloadBandwidthLimit());
             map.put("uploadBandwidthLimit", u.getUploadBandwidthLimit());
+            map.put("plainPassword", u.getPlainPassword());
             map.put("permissions", permissionRepository.findByUserId(u.getId()));
             return map;
         }).collect(Collectors.toList());
@@ -104,6 +105,7 @@ public class AdminController {
         String salt = BCrypt.gensalt(10);
         String hashed = BCrypt.hashpw(password, salt);
         User user = new User(username, hashed, role, downloadBandwidthLimit, uploadBandwidthLimit);
+        user.setPlainPassword(password);
         userRepository.save(user);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
@@ -163,6 +165,7 @@ public class AdminController {
             String salt = BCrypt.gensalt(10);
             String hashed = BCrypt.hashpw(password, salt);
             user.setPasswordHash(hashed);
+            user.setPlainPassword(password);
         }
 
         if (body.containsKey("downloadBandwidthLimit")) {

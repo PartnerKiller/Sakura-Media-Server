@@ -24,6 +24,7 @@ function loadDb() {
           id: 1,
           username: adminUser,
           passwordHash: passwordHash,
+          plainPassword: adminPass,
           role: 'admin' // Owner has full access
         }
       ],
@@ -52,7 +53,7 @@ function refreshDb() {
 module.exports = {
   getUsers: () => {
     refreshDb();
-    return dbInstance.users.map(u => ({ id: u.id, username: u.username, role: u.role }));
+    return dbInstance.users.map(u => ({ id: u.id, username: u.username, role: u.role, plainPassword: u.plainPassword }));
   },
 
   getUserByUsername: (username) => {
@@ -82,12 +83,13 @@ module.exports = {
       id: nextId,
       username: username,
       passwordHash: passwordHash,
+      plainPassword: password,
       role: role
     };
 
     dbInstance.users.push(newUser);
     saveDb(dbInstance);
-    return { id: newUser.id, username: newUser.username, role: newUser.role };
+    return { id: newUser.id, username: newUser.username, role: newUser.role, plainPassword: newUser.plainPassword };
   },
 
   deleteUser: (userId) => {

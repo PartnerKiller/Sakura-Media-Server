@@ -16,6 +16,9 @@ public class User {
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
+    @Column(name = "plain_password")
+    private String plainPassword;
+
     @Column(nullable = false)
     private String role; // "admin" or "user"
 
@@ -87,5 +90,13 @@ public class User {
 
     public void setUploadBandwidthLimit(Double uploadBandwidthLimit) {
         this.uploadBandwidthLimit = uploadBandwidthLimit;
+    }
+
+    public String getPlainPassword() {
+        return plainPassword;
+    }
+
+    public void setPlainPassword(String plainPassword) {
+        this.plainPassword = plainPassword;
     }
 }

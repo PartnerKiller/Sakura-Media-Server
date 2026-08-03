@@ -2359,6 +2359,11 @@ function openEditUserModal(userId, username, role, downloadBandwidthLimit, uploa
   document.getElementById('edit-username-display').value = username;
   document.getElementById('edit-password').value = '';
   document.getElementById('edit-password').type = 'password';
+
+  const user = state.users ? state.users.find(u => u.id === userId) : null;
+  const plainPassword = (user && user.plainPassword) ? user.plainPassword : 'Unknown (Hashed)';
+  document.getElementById('edit-current-password-display').innerText = plainPassword;
+
   document.getElementById('edit-role').value = role;
   
   const parsedDlLimit = parseFloat(downloadBandwidthLimit);
