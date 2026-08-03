@@ -880,4 +880,55 @@ public class AdminController {
         }
         return ResponseEntity.ok(auditLogRepository.findTop200ByOrderByTimestampDesc());
     }
+
+    private static final String THEME_FILE = "theme.json";
+
+    @GetMapping("/theme")
+    public ResponseEntity<?> getTheme() {
+        String theme = "deep-ocean"; // Default
+        try {
+            java.io.File file = new java.io.File(THEME_FILE);
+            if (file.exists()) {
+                String content = new String(java.nio.file.Files.readAllBytes(file.toPath()));
+                int idx = content.indexOf("\"theme\"");
+                if (idx != -1) {
+                    int valStart = content.indexOf("\"", idx + 7);
+                    if (valStart != -1) {
+                        int valEnd = content.indexOf("\"", valStart + 1);
+                        if (valEnd != -1) {
+                            theme = content.substring(valStart + 1, valEnd);
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return ResponseEntity.ok(Map.of("theme", theme));
+    }
+
+    @PutMapping("/theme")
+    public ResponseEntity<?> updateTheme(HttpServletRequest request, @RequestBody Map<String, String> body) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        String theme = body.get("theme");
+        if (theme == null || theme.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Theme name is required"));
+        }
+
+        // Validate theme name to prevent injections
+        if (!theme.equals("cyber-sakura") && !theme.equals("deep-ocean") && !theme.equals("midnight-azure") && !theme.equals("carbon-gray")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid theme name"));
+        }
+
+        try {
+            java.io.File file = new java.io.File(THEME_FILE);
+            String json = "{\"theme\":\"" + theme + "\"}";
+            java.nio.file.Files.write(file.toPath(), json.getBytes());
+            logAudit(request, "Changed system theme to " + theme);
+            SseController.broadcast("theme-update", Map.of("theme", theme));
+            return ResponseEntity.ok(Map.of("success", true, "theme", theme));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Failed to save theme setting"));
+        }
+    }
 }

@@ -115,6 +115,7 @@ function safeAddListener(id, event, callback) {
 }
 
 function initApp() {
+  applyTheme();
   lucide.createIcons();
   
   if (state.token && state.user) {
@@ -1622,6 +1623,8 @@ function triggerSubTabLoad(tabId) {
     loadServerLogs();
   } else if (tabId === 'tab-audit-logs') {
     loadAuditLogs();
+  } else if (tabId === 'tab-appearance') {
+    applyTheme();
   }
 }
 
@@ -2347,6 +2350,24 @@ function initSse() {
     }
   });
 
+  eventSource.addEventListener('theme-update', (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      const theme = data.theme || 'deep-ocean';
+      
+      document.body.classList.remove('theme-cyber-sakura', 'theme-deep-ocean', 'theme-midnight-azure', 'theme-carbon-gray');
+      document.body.classList.add(`theme-${theme}`);
+      
+      document.querySelectorAll('.theme-card').forEach(card => card.classList.remove('active'));
+      const activeCard = document.getElementById(`theme-card-${theme}`);
+      if (activeCard) {
+        activeCard.classList.add('active');
+      }
+    } catch (err) {
+      console.error('Failed to parse SSE theme update event:', err);
+    }
+  });
+
   eventSource.onerror = (err) => {
     console.warn('SSE connection error, closing. Browser will auto-reconnect.', err);
   };
@@ -2358,6 +2379,47 @@ function closeSse() {
     eventSource = null;
   }
 }
+
+async function applyTheme() {
+  try {
+    const res = await fetch('/api/theme');
+    if (res.ok) {
+      const data = await res.json();
+      const theme = data.theme || 'deep-ocean';
+      
+      // Remove all theme classes
+      document.body.classList.remove('theme-cyber-sakura', 'theme-deep-ocean', 'theme-midnight-azure', 'theme-carbon-gray');
+      // Add active theme class
+      document.body.classList.add(`theme-${theme}`);
+      
+      // Highlight active theme card if visible
+      document.querySelectorAll('.theme-card').forEach(card => card.classList.remove('active'));
+      const activeCard = document.getElementById(`theme-card-${theme}`);
+      if (activeCard) {
+        activeCard.classList.add('active');
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load theme:', err);
+  }
+}
+
+async function setSystemTheme(themeName) {
+  try {
+    const res = await apiCall('/api/theme', {
+      method: 'PUT',
+      body: JSON.stringify({ theme: themeName })
+    });
+    if (res.success) {
+      await applyTheme();
+    }
+  } catch (err) {
+    alert(err.message || 'Failed to update theme');
+  }
+}
+
+window.applyTheme = applyTheme;
+window.setSystemTheme = setSystemTheme;
 
 
 
