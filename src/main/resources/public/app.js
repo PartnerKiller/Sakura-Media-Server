@@ -289,6 +289,14 @@ function initApp() {
     if (errorBanner) errorBanner.style.display = 'none';
     closeModal('modal-video-player');
   });
+
+  // Bind UI style card clicks dynamically
+  document.querySelectorAll('.ui-style-card').forEach(card => {
+    card.addEventListener('click', (e) => {
+      const styleName = e.currentTarget.id.replace('ui-style-card-', '');
+      setSystemUiStyle(styleName);
+    });
+  });
 }
 
 // AUTHENTICATION FLOWS
