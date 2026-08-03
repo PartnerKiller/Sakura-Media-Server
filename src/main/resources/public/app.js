@@ -2355,7 +2355,12 @@ function initSse() {
       const data = JSON.parse(e.data);
       const theme = data.theme || 'deep-ocean';
       
-      document.body.classList.remove('theme-cyber-sakura', 'theme-deep-ocean', 'theme-midnight-azure', 'theme-carbon-gray');
+      const allThemes = [
+        'theme-cyber-sakura', 'theme-deep-ocean', 'theme-midnight-azure', 'theme-carbon-gray',
+        'theme-aura-green', 'theme-neon-violet', 'theme-sunset-orange', 'theme-crimson-red',
+        'theme-forest-lagoon', 'theme-golden-amber'
+      ];
+      allThemes.forEach(t => document.body.classList.remove(t));
       document.body.classList.add(`theme-${theme}`);
       
       document.querySelectorAll('.theme-card').forEach(card => card.classList.remove('active'));
@@ -2388,7 +2393,12 @@ async function applyTheme() {
       const theme = data.theme || 'deep-ocean';
       
       // Remove all theme classes
-      document.body.classList.remove('theme-cyber-sakura', 'theme-deep-ocean', 'theme-midnight-azure', 'theme-carbon-gray');
+      const allThemes = [
+        'theme-cyber-sakura', 'theme-deep-ocean', 'theme-midnight-azure', 'theme-carbon-gray',
+        'theme-aura-green', 'theme-neon-violet', 'theme-sunset-orange', 'theme-crimson-red',
+        'theme-forest-lagoon', 'theme-golden-amber'
+      ];
+      allThemes.forEach(t => document.body.classList.remove(t));
       // Add active theme class
       document.body.classList.add(`theme-${theme}`);
       
