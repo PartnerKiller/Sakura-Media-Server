@@ -14,7 +14,8 @@ let state = {
   sortBy: localStorage.getItem('sortBy') || 'name-asc',
   filterType: 'all',
   activeUploadXhr: null,
-  isUploadCancelled: false
+  isUploadCancelled: false,
+  autoOpenFile: null
 };
 
 function safeBase64Encode(str) {
@@ -124,6 +125,56 @@ function initApp() {
   } else {
     showLogin();
   }
+
+  // Handle browser back/forward buttons and hash navigation
+  window.addEventListener('hashchange', () => {
+    if (!state.token || !state.user || !state.roots.length) return;
+    const hashPath = window.location.hash.substring(1) || '';
+    const decoded = hashPath ? decodeURIComponent(hashPath) : null;
+    
+    if (decoded) {
+      if (isFilePath(decoded)) {
+        const lastSlashIndex = decoded.lastIndexOf('/');
+        const parentPath = lastSlashIndex !== -1 ? decoded.substring(0, lastSlashIndex) : '';
+        const fileName = lastSlashIndex !== -1 ? decoded.substring(lastSlashIndex + 1) : decoded;
+        
+        if (parentPath === state.currentPath) {
+          const fileToOpen = state.files.find(f => f.name === fileName);
+          if (fileToOpen) {
+            const ext = fileToOpen.name.split('.').pop().toLowerCase();
+            let category = 'file';
+            if (['mp4', 'mkv', 'webm', 'avi', 'mov'].includes(ext)) category = 'video';
+            else if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) category = 'image';
+            else if (['mp3', 'wav', 'ogg', 'flac', 'm4a'].includes(ext)) category = 'audio';
+            openMedia(decoded, fileToOpen.name, category);
+          }
+        } else {
+          state.autoOpenFile = fileName;
+          const matchedRoot = findRootForPath(parentPath);
+          if (matchedRoot) {
+            state.currentRoot = matchedRoot;
+            state.currentPath = parentPath;
+            renderRoots();
+            browsePath(parentPath);
+          }
+        }
+      } else {
+        if (decoded !== state.currentPath) {
+          const matchedRoot = findRootForPath(decoded);
+          if (matchedRoot) {
+            state.currentRoot = matchedRoot;
+            state.currentPath = decoded;
+            renderRoots();
+            browsePath(decoded);
+          }
+        }
+      }
+    } else {
+      if (state.roots.length > 0 && state.currentPath !== state.roots[0].path) {
+        selectRoot(state.roots[0]);
+      }
+    }
+  });
 
   // Bind Login Form
   safeAddListener('login-form', 'submit', handleLogin);
@@ -288,6 +339,9 @@ function initApp() {
     const errorBanner = document.getElementById('video-error-banner');
     if (errorBanner) errorBanner.style.display = 'none';
     closeModal('modal-video-player');
+    if (window.location.hash.substring(1) !== state.currentPath) {
+      window.location.hash = state.currentPath;
+    }
   });
 
   // Image close
@@ -297,6 +351,9 @@ function initApp() {
       img.removeAttribute('src');
     }
     closeModal('modal-image-viewer');
+    if (window.location.hash.substring(1) !== state.currentPath) {
+      window.location.hash = state.currentPath;
+    }
   });
 
   // Bind UI style card clicks dynamically
@@ -400,6 +457,7 @@ function logout() {
   sessionStorage.removeItem('token');
   sessionStorage.removeItem('user');
   closeSse();
+  window.location.hash = '';
   showLogin();
 }
 
@@ -460,6 +518,19 @@ function switchPanel(panelName) {
 }
 
 // EXPLORER FUNCTIONALITY
+function isFilePath(path) {
+  if (!path) return false;
+  const lastSlashIndex = path.lastIndexOf('/');
+  const lastPart = lastSlashIndex !== -1 ? path.substring(lastSlashIndex + 1) : path;
+  return lastPart.includes('.') && lastPart.split('.').pop().match(/^[a-zA-Z0-9]{2,5}$/);
+}
+
+function findRootForPath(targetPath) {
+  if (!targetPath) return null;
+  const sortedRoots = [...state.roots].sort((a, b) => b.path.length - a.path.length);
+  return sortedRoots.find(r => targetPath === r.path || targetPath.startsWith(r.path + '/')) || null;
+}
+
 async function loadRoots() {
   try {
     const roots = await apiCall('/api/files/roots');
@@ -467,7 +538,39 @@ async function loadRoots() {
     renderRoots();
     
     if (roots.length > 0) {
-      selectRoot(roots[0]);
+      const hashPath = window.location.hash.substring(1) || '';
+      const decoded = hashPath ? decodeURIComponent(hashPath) : null;
+      
+      if (decoded) {
+        if (isFilePath(decoded)) {
+          const lastSlashIndex = decoded.lastIndexOf('/');
+          const parentPath = lastSlashIndex !== -1 ? decoded.substring(0, lastSlashIndex) : '';
+          const fileName = lastSlashIndex !== -1 ? decoded.substring(lastSlashIndex + 1) : decoded;
+          
+          const matchedRoot = findRootForPath(parentPath);
+          if (matchedRoot) {
+            state.currentRoot = matchedRoot;
+            state.currentPath = parentPath;
+            state.autoOpenFile = fileName;
+            renderRoots();
+            browsePath(parentPath);
+          } else {
+            selectRoot(roots[0]);
+          }
+        } else {
+          const matchedRoot = findRootForPath(decoded);
+          if (matchedRoot) {
+            state.currentRoot = matchedRoot;
+            state.currentPath = decoded;
+            renderRoots();
+            browsePath(decoded);
+          } else {
+            selectRoot(roots[0]);
+          }
+        }
+      } else {
+        selectRoot(roots[0]);
+      }
     } else {
       document.getElementById('files-grid-container').innerHTML = '';
       document.getElementById('empty-state').style.display = 'flex';
@@ -518,6 +621,10 @@ async function browsePath(targetPath) {
   state.currentPath = targetPath;
   document.getElementById('search-input').value = ''; // clear search
   updateUploadActionsVisibility();
+  
+  if (window.location.hash.substring(1) !== targetPath) {
+    window.location.hash = targetPath;
+  }
   
   try {
     const res = await apiCall(`/api/files/browse?path=${encodeURIComponent(targetPath)}`);
@@ -619,6 +726,22 @@ function processAndRenderFiles() {
   });
 
   renderFiles(files);
+
+  if (state.autoOpenFile) {
+    const fileToOpen = state.files.find(f => f.name === state.autoOpenFile);
+    const fileName = state.autoOpenFile;
+    state.autoOpenFile = null;
+    if (fileToOpen) {
+      const ext = fileToOpen.name.split('.').pop().toLowerCase();
+      let category = 'file';
+      if (['mp4', 'mkv', 'webm', 'avi', 'mov'].includes(ext)) category = 'video';
+      else if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) category = 'image';
+      else if (['mp3', 'wav', 'ogg', 'flac', 'm4a'].includes(ext)) category = 'audio';
+      
+      const filePath = `${state.currentPath}/${fileToOpen.name}`;
+      openMedia(filePath, fileName, category);
+    }
+  }
 }
 
 function renderFiles(files) {
@@ -783,6 +906,9 @@ function filterFiles() {
 
 // MEDIA HANDLERS
 function openMedia(filePath, fileName, category) {
+  if (window.location.hash.substring(1) !== filePath) {
+    window.location.hash = filePath;
+  }
   if (category === 'video') {
     document.getElementById('video-player-title').innerText = fileName;
     const player = document.getElementById('html5-video-player');
