@@ -419,11 +419,13 @@ function showDashboard() {
   updateUserProfileUI();
   applyUserThemeAndStyle();
 
-  // Toggle Admin Section Visibility
+  // Toggle Admin / User Section Visibility
   if (state.user.role === 'admin') {
     document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'flex');
+    document.querySelectorAll('.user-only').forEach(el => el.style.display = 'none');
   } else {
     document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.user-only').forEach(el => el.style.display = 'flex');
   }
 
   switchPanel('explorer');
