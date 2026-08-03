@@ -556,7 +556,8 @@ button, .btn {
 
 @media (max-width: 768px) {
   .explorer-header-sticky {
-    top: 111px;
+    position: relative !important;
+    top: 0 !important;
     padding: 12px 0;
     flex-direction: column;
     align-items: stretch;
