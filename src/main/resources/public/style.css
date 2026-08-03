@@ -498,8 +498,48 @@ button, .btn {
   background: var(--bg-main);
   margin-top: -30px;
   padding-top: 30px;
-  padding-bottom: 2px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
   transition: background var(--transition-normal);
+}
+
+.explorer-sticky-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.explorer-sticky-left .roots-selector-container {
+  margin-bottom: 0;
+  gap: 8px;
+}
+
+.explorer-sticky-left .root-badge {
+  padding: 6px 14px;
+  font-size: 12px;
+}
+
+.explorer-sticky-left .breadcrumbs {
+  margin-bottom: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  gap: 4px;
+}
+
+.explorer-sticky-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
 @media (max-width: 768px) {
@@ -507,6 +547,9 @@ button, .btn {
     top: 111px;
     margin-top: -15px;
     padding-top: 15px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
   }
 }
 
@@ -514,7 +557,6 @@ button, .btn {
 .roots-selector-container {
   display: flex;
   gap: 12px;
-  margin-bottom: 20px;
 }
 
 .root-badge {
