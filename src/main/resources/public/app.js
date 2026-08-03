@@ -225,6 +225,19 @@ function initApp() {
   // Bind Logout Button
   safeAddListener('btn-logout', 'click', logout);
 
+  // Bind Logo Click (to return to Home Explorer)
+  const sidebarHeader = document.querySelector('.sidebar-header');
+  if (sidebarHeader) {
+    sidebarHeader.style.cursor = 'pointer';
+    sidebarHeader.addEventListener('click', () => {
+      closeAllMediaViewersSilently();
+      switchPanel('explorer');
+      if (state.roots.length > 0) {
+        selectRoot(state.roots[0]);
+      }
+    });
+  }
+
   // Bind Sidebar Navigation
   safeAddListener('nav-explorer', 'click', () => switchPanel('explorer'));
   safeAddListener('nav-users', 'click', () => switchPanel('users'));
