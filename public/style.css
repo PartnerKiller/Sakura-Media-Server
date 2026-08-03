@@ -557,39 +557,41 @@ button, .btn {
 /* ROOTS SELECTOR */
 .roots-selector-container {
   display: flex;
-  gap: 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 3px;
+  gap: 3px;
 }
 
 .root-badge {
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-full);
-  padding: 8px 18px;
-  font-size: 13px;
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--radius-md) - 2px);
+  padding: 6px 14px;
+  font-size: 12px;
   color: var(--text-secondary);
   cursor: pointer;
+  transition: all var(--transition-fast);
   display: flex;
   align-items: center;
-  gap: 8px;
-  transition: all var(--transition-fast);
+  gap: 6px;
 }
 
 .root-badge i {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
 }
 
 .root-badge:hover {
-  border-color: var(--primary);
   color: var(--text-primary);
-  background: rgba(0, 173, 181, 0.05);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .root-badge.active {
-  background: linear-gradient(135deg, rgba(0, 173, 181, 0.15) 0%, rgba(42, 111, 219, 0.15) 100%);
-  border-color: var(--primary);
-  color: var(--primary);
-  font-weight: 500;
+  background: var(--primary);
+  color: var(--bg-main) !important;
+  font-weight: 600;
 }
 
 /* BREADCRUMBS */
@@ -1762,12 +1764,20 @@ video {
   border: 1px solid var(--border-subtle);
   color: var(--text-primary);
   font-family: var(--font-main);
-  font-size: 13px;
+  font-size: 12px;
   padding: 6px 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   outline: none;
   cursor: pointer;
   transition: all var(--transition-fast);
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 12px;
+  padding-right: 26px;
 }
 
 .toolbar-select:focus {
@@ -1777,15 +1787,17 @@ video {
 
 .view-toggle {
   display: flex;
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  overflow: hidden;
   background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 3px;
+  gap: 3px;
 }
 
 .view-btn {
   background: transparent;
   border: none;
+  border-radius: calc(var(--radius-md) - 2px);
   color: var(--text-secondary);
   padding: 6px 10px;
   cursor: pointer;
@@ -1801,8 +1813,9 @@ video {
 }
 
 .view-btn.active {
-  color: var(--primary);
-  background: rgba(0, 173, 181, 0.08);
+  background: var(--primary);
+  color: var(--bg-main) !important;
+  font-weight: 600;
 }
 
 /* LIST VIEW OVERRIDES */
