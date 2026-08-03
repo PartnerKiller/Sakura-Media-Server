@@ -916,7 +916,10 @@ public class AdminController {
         }
 
         // Validate theme name to prevent injections
-        if (!theme.equals("cyber-sakura") && !theme.equals("deep-ocean") && !theme.equals("midnight-azure") && !theme.equals("carbon-gray")) {
+        if (!theme.equals("cyber-sakura") && !theme.equals("deep-ocean") && !theme.equals("midnight-azure") && 
+            !theme.equals("carbon-gray") && !theme.equals("aura-green") && !theme.equals("neon-violet") && 
+            !theme.equals("sunset-orange") && !theme.equals("crimson-red") && !theme.equals("forest-lagoon") && 
+            !theme.equals("golden-amber")) {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid theme name"));
         }
 

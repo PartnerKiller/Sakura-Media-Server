@@ -12,7 +12,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <!-- Local Chart.js for offline telemetry monitoring -->
   <script src="/chart.min.js"></script>
-  <link rel="stylesheet" href="/style.css?v=4.3">
+  <link rel="stylesheet" href="/style.css?v=4.4">
 </head>
 <body>
   
@@ -670,6 +670,72 @@
                     </div>
                   </div>
 
+                  <!-- Theme 5: Aura Green -->
+                  <div class="theme-card" id="theme-card-aura-green" onclick="setSystemTheme('aura-green')">
+                    <div class="theme-preview" style="background: linear-gradient(135deg, #02040a 0%, #0d1a1e 100%); height: 100px; border-radius: var(--radius-sm); border: 2px solid transparent; position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
+                      <div style="display: flex; gap: 6px;">
+                        <span style="background: #00f5d4; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
+                        <span style="background: #00b4d8; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
+                      </div>
+                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Aura Green</span>
+                    </div>
+                  </div>
+
+                  <!-- Theme 6: Neon Violet -->
+                  <div class="theme-card" id="theme-card-neon-violet" onclick="setSystemTheme('neon-violet')">
+                    <div class="theme-preview" style="background: linear-gradient(135deg, #05020a 0%, #150d26 100%); height: 100px; border-radius: var(--radius-sm); border: 2px solid transparent; position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
+                      <div style="display: flex; gap: 6px;">
+                        <span style="background: #d946ef; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
+                        <span style="background: #8b5cf6; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
+                      </div>
+                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Neon Violet</span>
+                    </div>
+                  </div>
+
+                  <!-- Theme 7: Sunset Orange -->
+                  <div class="theme-card" id="theme-card-sunset-orange" onclick="setSystemTheme('sunset-orange')">
+                    <div class="theme-preview" style="background: linear-gradient(135deg, #070302 0%, #1f1008 100%); height: 100px; border-radius: var(--radius-sm); border: 2px solid transparent; position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
+                      <div style="display: flex; gap: 6px;">
+                        <span style="background: #f97316; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
+                        <span style="background: #f59e0b; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
+                      </div>
+                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Sunset Orange</span>
+                    </div>
+                  </div>
+
+                  <!-- Theme 8: Crimson Red -->
+                  <div class="theme-card" id="theme-card-crimson-red" onclick="setSystemTheme('crimson-red')">
+                    <div class="theme-preview" style="background: linear-gradient(135deg, #070202 0%, #1f0808 100%); height: 100px; border-radius: var(--radius-sm); border: 2px solid transparent; position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
+                      <div style="display: flex; gap: 6px;">
+                        <span style="background: #ef4444; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
+                        <span style="background: #f43f5e; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
+                      </div>
+                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Crimson Red</span>
+                    </div>
+                  </div>
+
+                  <!-- Theme 9: Forest Lagoon -->
+                  <div class="theme-card" id="theme-card-forest-lagoon" onclick="setSystemTheme('forest-lagoon')">
+                    <div class="theme-preview" style="background: linear-gradient(135deg, #010503 0%, #0d1f14 100%); height: 100px; border-radius: var(--radius-sm); border: 2px solid transparent; position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
+                      <div style="display: flex; gap: 6px;">
+                        <span style="background: #0d9488; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
+                        <span style="background: #2dd4bf; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
+                      </div>
+                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Forest Lagoon</span>
+                    </div>
+                  </div>
+
+                  <!-- Theme 10: Golden Amber -->
+                  <div class="theme-card" id="theme-card-golden-amber" onclick="setSystemTheme('golden-amber')">
+                    <div class="theme-preview" style="background: linear-gradient(135deg, #050401 0%, #1c1a06 100%); height: 100px; border-radius: var(--radius-sm); border: 2px solid transparent; position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
+                      <div style="display: flex; gap: 6px;">
+                        <span style="background: #eab308; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
+                        <span style="background: #facc15; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
+                      </div>
+                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Golden Amber</span>
+                    </div>
+                  </div>
+
                 </div>
               </div>
             </div>
@@ -980,6 +1046,6 @@
     </button>
   </nav>
 
-  <script src="/app.js?v=4.3"></script>
+  <script src="/app.js?v=4.4"></script>
 </body>
 </html>
