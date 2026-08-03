@@ -19,6 +19,12 @@ public class User {
     @Column(name = "plain_password")
     private String plainPassword;
 
+    @Column(name = "theme")
+    private String theme;
+
+    @Column(name = "ui_style")
+    private String uiStyle;
+
     @Column(nullable = false)
     private String role; // "admin" or "user"
 
@@ -98,5 +104,21 @@ public class User {
 
     public void setPlainPassword(String plainPassword) {
         this.plainPassword = plainPassword;
+    }
+
+    public String getTheme() {
+        return theme;
+    }
+
+    public void setTheme(String theme) {
+        this.theme = theme;
+    }
+
+    public String getUiStyle() {
+        return uiStyle;
+    }
+
+    public void setUiStyle(String uiStyle) {
+        this.uiStyle = uiStyle;
     }
 }

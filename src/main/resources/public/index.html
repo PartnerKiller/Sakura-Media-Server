@@ -872,10 +872,11 @@
           <div class="panel-header">
             <div>
               <h2>Profile Settings</h2>
-              <p>Manage your account username and password settings</p>
+              <p>Manage your personal account settings, theme, and UI layout design</p>
             </div>
           </div>
 
+          <!-- Account Details Card -->
           <div class="users-list-card" style="max-width: 600px; padding: 30px; margin-top: 20px;">
             <form id="profile-settings-form">
               <div class="input-group">
@@ -899,9 +900,205 @@
               <div class="success-message" id="profile-success" style="margin-top: 16px; color: var(--success); font-size: 14px; display: none;">Profile updated successfully!</div>
               <button type="submit" class="btn btn-primary" style="margin-top: 24px;">
                 <i data-lucide="save" style="width: 16px; height: 16px;"></i>
-                <span>Save Profile</span>
+                <span>Save Account Info</span>
               </button>
             </form>
+          </div>
+
+          <!-- Personal Theme Settings Card -->
+          <div class="users-list-card" style="margin-top: 24px;">
+            <div style="padding: 24px; border-bottom: 1px solid var(--border-subtle);">
+              <h3 style="margin: 0; font-family: var(--font-display); font-size: 1.25rem;">Personal Theme Settings</h3>
+              <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.9rem;">Choose a color theme that applies only to your account</p>
+            </div>
+            <div style="padding: 24px;">
+              <div class="theme-grid">
+                
+                <!-- Theme 1: Cyber Sakura -->
+                <div class="theme-card profile-theme-card" id="profile-theme-card-cyber-sakura" onclick="setProfileTheme('cyber-sakura')">
+                  <div class="theme-preview" style="background: linear-gradient(135deg, #090a0f 0%, #141622 100%);">
+                    <div class="theme-dots">
+                      <span class="theme-dot" style="background: #ff4a88;"></span>
+                      <span class="theme-dot" style="background: #8b5cf6;"></span>
+                    </div>
+                    <span class="theme-preview-title">Cyber Sakura</span>
+                  </div>
+                </div>
+
+                <!-- Theme 2: Deep Ocean -->
+                <div class="theme-card profile-theme-card" id="profile-theme-card-deep-ocean" onclick="setProfileTheme('deep-ocean')">
+                  <div class="theme-preview" style="background: linear-gradient(135deg, #05080e 0%, #0d1326 100%);">
+                    <div class="theme-dots">
+                      <span class="theme-dot" style="background: #00adb5;"></span>
+                      <span class="theme-dot" style="background: #2a6fdb;"></span>
+                    </div>
+                    <span class="theme-preview-title">Deep Ocean</span>
+                  </div>
+                </div>
+
+                <!-- Theme 3: Midnight Azure -->
+                <div class="theme-card profile-theme-card" id="profile-theme-card-midnight-azure" onclick="setProfileTheme('midnight-azure')">
+                  <div class="theme-preview" style="background: linear-gradient(135deg, #030814 0%, #07122b 100%);">
+                    <div class="theme-dots">
+                      <span class="theme-dot" style="background: #00b4d8;"></span>
+                      <span class="theme-dot" style="background: #0077b6;"></span>
+                    </div>
+                    <span class="theme-preview-title">Midnight Azure</span>
+                  </div>
+                </div>
+
+                <!-- Theme 4: Carbon Gray -->
+                <div class="theme-card profile-theme-card" id="profile-theme-card-carbon-gray" onclick="setProfileTheme('carbon-gray')">
+                  <div class="theme-preview" style="background: linear-gradient(135deg, #0c0d12 0%, #171923 100%);">
+                    <div class="theme-dots">
+                      <span class="theme-dot" style="background: #ffffff;"></span>
+                      <span class="theme-dot" style="background: #718096;"></span>
+                    </div>
+                    <span class="theme-preview-title">Carbon Gray</span>
+                  </div>
+                </div>
+
+                <!-- Theme 5: Aura Green -->
+                <div class="theme-card profile-theme-card" id="profile-theme-card-aura-green" onclick="setProfileTheme('aura-green')">
+                  <div class="theme-preview" style="background: linear-gradient(135deg, #040808 0%, #091414 100%);">
+                    <div class="theme-dots">
+                      <span class="theme-dot" style="background: #00ffcc;"></span>
+                      <span class="theme-dot" style="background: #10b981;"></span>
+                    </div>
+                    <span class="theme-preview-title">Aura Green</span>
+                  </div>
+                </div>
+
+                <!-- Theme 6: Neon Violet -->
+                <div class="theme-card profile-theme-card" id="profile-theme-card-neon-violet" onclick="setProfileTheme('neon-violet')">
+                  <div class="theme-preview" style="background: linear-gradient(135deg, #0f051d 0%, #1c0c33 100%);">
+                    <div class="theme-dots">
+                      <span class="theme-dot" style="background: #b5179e;"></span>
+                      <span class="theme-dot" style="background: #7209b7;"></span>
+                    </div>
+                    <span class="theme-preview-title">Neon Violet</span>
+                  </div>
+                </div>
+
+                <!-- Theme 7: Sunset Orange -->
+                <div class="theme-card profile-theme-card" id="profile-theme-card-sunset-orange" onclick="setProfileTheme('sunset-orange')">
+                  <div class="theme-preview" style="background: linear-gradient(135deg, #160a07 0%, #28140c 100%);">
+                    <div class="theme-dots">
+                      <span class="theme-dot" style="background: #f97316;"></span>
+                      <span class="theme-dot" style="background: #ea580c;"></span>
+                    </div>
+                    <span class="theme-preview-title">Sunset Orange</span>
+                  </div>
+                </div>
+
+                <!-- Theme 8: Crimson Red -->
+                <div class="theme-card profile-theme-card" id="profile-theme-card-crimson-red" onclick="setProfileTheme('crimson-red')">
+                  <div class="theme-preview" style="background: linear-gradient(135deg, #130407 0%, #25090f 100%);">
+                    <div class="theme-dots">
+                      <span class="theme-dot" style="background: #ef4444;"></span>
+                      <span class="theme-dot" style="background: #991b1b;"></span>
+                    </div>
+                    <span class="theme-preview-title">Crimson Red</span>
+                  </div>
+                </div>
+
+                <!-- Theme 9: Forest Lagoon -->
+                <div class="theme-card profile-theme-card" id="profile-theme-card-forest-lagoon" onclick="setProfileTheme('forest-lagoon')">
+                  <div class="theme-preview" style="background: linear-gradient(135deg, #020b08 0%, #061913 100%);">
+                    <div class="theme-dots">
+                      <span class="theme-dot" style="background: #10b981;"></span>
+                      <span class="theme-dot" style="background: #047857;"></span>
+                    </div>
+                    <span class="theme-preview-title">Forest Lagoon</span>
+                  </div>
+                </div>
+
+                <!-- Theme 10: Golden Amber -->
+                <div class="theme-card profile-theme-card" id="profile-theme-card-golden-amber" onclick="setProfileTheme('golden-amber')">
+                  <div class="theme-preview" style="background: linear-gradient(135deg, #161002 0%, #2c2005 100%);">
+                    <div class="theme-dots">
+                      <span class="theme-dot" style="background: #fbbf24;"></span>
+                      <span class="theme-dot" style="background: #d97706;"></span>
+                    </div>
+                    <span class="theme-preview-title">Golden Amber</span>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+          <!-- Personal UI Layout Settings Card -->
+          <div class="users-list-card" style="margin-top: 24px;">
+            <div style="padding: 24px; border-bottom: 1px solid var(--border-subtle);">
+              <h3 style="margin: 0; font-family: var(--font-display); font-size: 1.25rem;">Personal UI Layout Settings</h3>
+              <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.9rem;">Choose a card border style and layout transparency setting that applies only to your account</p>
+            </div>
+            <div style="padding: 24px;">
+              <div class="ui-style-grid">
+                
+                <div class="ui-style-card profile-ui-style-card" id="profile-ui-style-card-glassmorphism" onclick="setProfileUiStyle('glassmorphism')">
+                  <div class="theme-preview" style="background: rgba(255, 255, 255, 0.03); border-radius: 12px; backdrop-filter: blur(10px); border-color: rgba(255, 255, 255, 0.08);">
+                    <span class="theme-preview-title">Glassmorphism</span>
+                  </div>
+                </div>
+
+                <div class="ui-style-card profile-ui-style-card" id="profile-ui-style-card-minimalist" onclick="setProfileUiStyle('minimalist')">
+                  <div class="theme-preview" style="background: transparent; border-radius: 0px; border-color: transparent;">
+                    <span class="theme-preview-title" style="font-weight: 400; font-family: sans-serif;">Minimalist</span>
+                  </div>
+                </div>
+
+                <div class="ui-style-card profile-ui-style-card" id="profile-ui-style-card-retro-terminal" onclick="setProfileUiStyle('retro-terminal')">
+                  <div class="theme-preview" style="background: #000000; border-radius: 4px; border-color: #00ff00; border-width: 2px;">
+                    <span class="theme-preview-title" style="color: #00ff00; font-family: monospace; font-weight: bold; letter-spacing: 1px;">Retro Terminal</span>
+                  </div>
+                </div>
+
+                <div class="ui-style-card profile-ui-style-card" id="profile-ui-style-card-vaporwave-dream" onclick="setProfileUiStyle('vaporwave-dream')">
+                  <div class="theme-preview" style="background: #140526; border-radius: 16px; border-color: #ff007f; box-shadow: 0 0 10px rgba(255, 0, 127, 0.4);">
+                    <span class="theme-preview-title" style="background: linear-gradient(45deg, #ff007f, #00f0ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 800;">Vaporwave Dream</span>
+                  </div>
+                </div>
+
+                <div class="ui-style-card profile-ui-style-card" id="profile-ui-style-card-cyberpunk" onclick="setProfileUiStyle('cyberpunk')">
+                  <div class="theme-preview" style="background: #0a0a0f; border-radius: 0px; border-color: #f7f709; border-width: 3px; border-style: double;">
+                    <span class="theme-preview-title" style="color: #f7f709; text-transform: uppercase; font-weight: 900; letter-spacing: 2px;">Cyberpunk</span>
+                  </div>
+                </div>
+
+                <div class="ui-style-card profile-ui-style-card" id="profile-ui-style-card-material-design" onclick="setProfileUiStyle('material-design')">
+                  <div class="theme-preview" style="background: #1e1e1e; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); border-color: transparent;">
+                    <span class="theme-preview-title" style="color: #bb86fc; font-weight: 500; font-family: Roboto, sans-serif;">Material Design</span>
+                  </div>
+                </div>
+
+                <div class="ui-style-card profile-ui-style-card" id="profile-ui-style-card-nebula-space" onclick="setProfileUiStyle('nebula-space')">
+                  <div class="theme-preview" style="background: linear-gradient(180deg, #0d0628 0%, #03001e 100%); border-radius: 24px; border-color: #7f00ff;">
+                    <span class="theme-preview-title" style="color: #e5e5e5; font-weight: bold; letter-spacing: 0.5px;">Nebula Space</span>
+                  </div>
+                </div>
+
+                <div class="ui-style-card profile-ui-style-card" id="profile-ui-style-card-steel-chrome" onclick="setProfileUiStyle('steel-chrome')">
+                  <div class="theme-preview" style="background: linear-gradient(135deg, #1a1c23 0%, #0c0d12 100%); border-radius: 14px; border-color: #4a5568; border-width: 2px;">
+                    <span class="theme-preview-title" style="color: #e2e8f0; font-weight: 700;">Steel & Chrome</span>
+                  </div>
+                </div>
+
+                <div class="ui-style-card profile-ui-style-card" id="profile-ui-style-card-nordic-aurora" onclick="setProfileUiStyle('nordic-aurora')">
+                  <div class="theme-preview" style="background: #1c2331; border-radius: 10px; border-color: #88c0d0; border-width: 1px;">
+                    <span class="theme-preview-title" style="color: #8fbcbb; font-family: 'Outfit', sans-serif;">Nordic Aurora</span>
+                  </div>
+                </div>
+
+                <div class="ui-style-card profile-ui-style-card" id="profile-ui-style-card-aero-classic" onclick="setProfileUiStyle('aero-classic')">
+                  <div class="theme-preview" style="background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(0, 0, 0, 0.4) 100%); border-radius: 20px; border-color: rgba(255, 255, 255, 0.2);">
+                    <span class="theme-preview-title">Aero Classic</span>
+                  </div>
+                </div>
+
+              </div>
+            </div>
           </div>
         </section>
 
@@ -1183,6 +1380,6 @@
     </button>
   </nav>
 
-  <script src="/app.js?v=5.16"></script>
+  <script src="/app.js?v=5.17"></script>
 </body>
 </html>

@@ -63,6 +63,8 @@ public class AuthController {
         userInfo.put("id", user.getId());
         userInfo.put("username", user.getUsername());
         userInfo.put("role", user.getRole());
+        userInfo.put("theme", user.getTheme());
+        userInfo.put("uiStyle", user.getUiStyle());
         response.put("user", userInfo);
 
         return ResponseEntity.ok(response);
@@ -77,6 +79,8 @@ public class AuthController {
 
         String username = body.get("username") != null ? body.get("username").trim() : null;
         String password = body.get("password") != null ? body.get("password") : null;
+        String theme = body.get("theme") != null ? body.get("theme").trim() : null;
+        String uiStyle = body.get("uiStyle") != null ? body.get("uiStyle").trim() : (body.get("ui_style") != null ? body.get("ui_style").trim() : null);
 
         if (username != null && !username.isEmpty() && !username.equals(user.getUsername())) {
             if (userRepository.findByUsername(username).isPresent()) {
@@ -90,6 +94,14 @@ public class AuthController {
             String hashed = BCrypt.hashpw(password, salt);
             user.setPasswordHash(hashed);
             user.setPlainPassword(password);
+        }
+
+        if (theme != null && !theme.isEmpty()) {
+            user.setTheme(theme);
+        }
+
+        if (uiStyle != null && !uiStyle.isEmpty()) {
+            user.setUiStyle(uiStyle);
         }
 
         userRepository.save(user);
@@ -109,6 +121,8 @@ public class AuthController {
         response.put("token", token);
         response.put("username", user.getUsername());
         response.put("plainPassword", user.getPlainPassword());
+        response.put("theme", user.getTheme());
+        response.put("uiStyle", user.getUiStyle());
 
         return ResponseEntity.ok(response);
     }

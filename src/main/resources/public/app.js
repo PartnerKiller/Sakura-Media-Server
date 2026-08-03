@@ -417,6 +417,7 @@ function showDashboard() {
   
   // Update user profile info in sidebar
   updateUserProfileUI();
+  applyUserThemeAndStyle();
 
   // Toggle Admin Section Visibility
   if (state.user.role === 'admin') {
@@ -2653,6 +2654,10 @@ function closeSse() {
 }
 
 async function applyTheme() {
+  if (state.user) {
+    applyUserThemeAndStyle();
+    return;
+  }
   try {
     const res = await fetch('/api/theme');
     if (res.ok) {
@@ -2696,6 +2701,10 @@ async function setSystemTheme(themeName) {
 }
 
 async function applyUiStyle() {
+  if (state.user) {
+    applyUserThemeAndStyle();
+    return;
+  }
   try {
     const res = await fetch('/api/ui-style');
     if (res.ok) {
@@ -2804,6 +2813,119 @@ window.applyUiStyle = applyUiStyle;
 window.setSystemUiStyle = setSystemUiStyle;
 window.updateUserProfileUI = updateUserProfileUI;
 window.handleUpdateProfile = handleUpdateProfile;
+
+function applyUserThemeAndStyle() {
+  let theme = 'carbon-gray';
+  let style = 'steel-chrome';
+  
+  if (state.user) {
+    theme = state.user.theme || 'carbon-gray';
+    style = state.user.uiStyle || 'steel-chrome';
+  }
+
+  theme = theme.trim();
+  style = style.trim();
+
+  // Apply Theme
+  const allThemes = [
+    'theme-cyber-sakura', 'theme-deep-ocean', 'theme-midnight-azure', 'theme-carbon-gray',
+    'theme-aura-green', 'theme-neon-violet', 'theme-sunset-orange', 'theme-crimson-red',
+    'theme-forest-lagoon', 'theme-golden-amber'
+  ];
+  allThemes.forEach(t => document.body.classList.remove(t));
+  document.body.classList.add(`theme-${theme}`);
+  
+  // Highlight profile theme card if visible
+  document.querySelectorAll('.profile-theme-card').forEach(card => card.classList.remove('active'));
+  const activeThemeCard = document.getElementById(`profile-theme-card-${theme}`);
+  if (activeThemeCard) {
+    activeThemeCard.classList.add('active');
+  }
+
+  // Apply UI Style
+  const allStyles = [
+    'style-glassmorphism', 'style-minimalist', 'style-retro-terminal', 'style-vaporwave-dream',
+    'style-cyberpunk', 'style-material-design', 'style-nebula-space', 'style-steel-chrome',
+    'style-nordic-aurora', 'style-aero-classic'
+  ];
+  allStyles.forEach(s => document.body.classList.remove(s));
+  document.body.classList.add(`style-${style}`);
+  
+  // Highlight profile UI style card if visible
+  document.querySelectorAll('.profile-ui-style-card').forEach(card => card.classList.remove('active'));
+  const activeStyleCard = document.getElementById(`profile-ui-style-card-${style}`);
+  if (activeStyleCard) {
+    activeStyleCard.classList.add('active');
+  }
+}
+
+async function setProfileTheme(themeName) {
+  if (!state.user) return;
+  try {
+    const res = await apiCall('/api/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify({
+        username: state.user.username,
+        theme: themeName
+      })
+    });
+    
+    state.token = res.token;
+    state.user.username = res.username;
+    state.user.theme = res.theme;
+    state.user.uiStyle = res.uiStyle;
+    
+    // Save to storage
+    const rememberMe = localStorage.getItem('token') !== null;
+    if (rememberMe) {
+      localStorage.setItem('token', res.token);
+      localStorage.setItem('user', JSON.stringify(state.user));
+    } else {
+      sessionStorage.setItem('token', res.token);
+      sessionStorage.setItem('user', JSON.stringify(state.user));
+    }
+    
+    applyUserThemeAndStyle();
+  } catch (err) {
+    console.error('Failed to update profile theme:', err);
+  }
+}
+
+async function setProfileUiStyle(styleName) {
+  if (!state.user) return;
+  try {
+    const res = await apiCall('/api/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify({
+        username: state.user.username,
+        uiStyle: styleName
+      })
+    });
+    
+    state.token = res.token;
+    state.user.username = res.username;
+    state.user.theme = res.theme;
+    state.user.uiStyle = res.uiStyle;
+    
+    // Save to storage
+    const rememberMe = localStorage.getItem('token') !== null;
+    if (rememberMe) {
+      localStorage.setItem('token', res.token);
+      localStorage.setItem('user', JSON.stringify(state.user));
+    } else {
+      sessionStorage.setItem('token', res.token);
+      sessionStorage.setItem('user', JSON.stringify(state.user));
+    }
+    
+    applyUserThemeAndStyle();
+  } catch (err) {
+    console.error('Failed to update profile UI style:', err);
+  }
+}
+
+window.applyUserThemeAndStyle = applyUserThemeAndStyle;
+window.setProfileTheme = setProfileTheme;
+window.setProfileUiStyle = setProfileUiStyle;
 
 
 

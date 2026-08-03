@@ -31,6 +31,17 @@ public class DbSeeder implements CommandLineRunner {
         // Ensure existing users have plain password populated in case they were initialized before the column existed
         userRepository.findAll().forEach(user -> {
             System.out.println("DEBUG USER INFO: " + user.getUsername() + " | hash: " + user.getPasswordHash() + " | plain: " + user.getPlainPassword());
+            boolean updated = false;
+            
+            if (user.getTheme() == null) {
+                user.setTheme("carbon-gray");
+                updated = true;
+            }
+            if (user.getUiStyle() == null) {
+                user.setUiStyle("steel-chrome");
+                updated = true;
+            }
+
             if (user.getPlainPassword() == null) {
                 String uName = user.getUsername();
                 
@@ -59,11 +70,15 @@ public class DbSeeder implements CommandLineRunner {
                     try {
                         if (BCrypt.checkpw(guess, user.getPasswordHash())) {
                             user.setPlainPassword(guess);
-                            userRepository.save(user);
+                            updated = true;
                             break;
                         }
                     } catch (Exception ignored) {}
                 }
+            }
+            
+            if (updated) {
+                userRepository.save(user);
             }
         });
     }
