@@ -32,18 +32,36 @@ public class DbSeeder implements CommandLineRunner {
         userRepository.findAll().forEach(user -> {
             if (user.getPlainPassword() == null) {
                 String uName = user.getUsername();
-                if ("sakura".equals(uName)) {
-                    user.setPlainPassword("sakura");
-                    userRepository.save(user);
-                } else if ("tani".equals(uName)) {
-                    user.setPlainPassword("tani");
-                    userRepository.save(user);
-                } else if ("joel".equals(uName)) {
-                    user.setPlainPassword("joel");
-                    userRepository.save(user);
-                } else if ("soham".equals(uName)) {
-                    user.setPlainPassword("soham");
-                    userRepository.save(user);
+                
+                // Common test password candidates to verify against BCrypt hash
+                String[] guesses = {
+                    uName,
+                    uName + "123",
+                    uName + "1234",
+                    uName + "12345",
+                    "password",
+                    "admin",
+                    "sakura",
+                    "sayan",
+                    "tani",
+                    "joel",
+                    "soham",
+                    "123456",
+                    "1234",
+                    "12345",
+                    "root",
+                    "media",
+                    "sakura123"
+                };
+                
+                for (String guess : guesses) {
+                    try {
+                        if (BCrypt.checkpw(guess, user.getPasswordHash())) {
+                            user.setPlainPassword(guess);
+                            userRepository.save(user);
+                            break;
+                        }
+                    } catch (Exception ignored) {}
                 }
             }
         });
