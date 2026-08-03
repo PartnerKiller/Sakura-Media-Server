@@ -748,6 +748,12 @@ button, .btn {
   background: var(--success);
 }
 
+.btn-card-action.btn-rename:hover {
+  background: var(--primary);
+  color: var(--bg-main);
+  border-color: transparent;
+}
+
 .empty-state {
   display: flex;
   flex-direction: column;

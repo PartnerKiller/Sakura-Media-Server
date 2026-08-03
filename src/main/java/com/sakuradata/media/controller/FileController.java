@@ -538,6 +538,57 @@ public class FileController {
         }
     }
 
+    @PostMapping("/rename")
+    public ResponseEntity<?> renameFile(HttpServletRequest request, 
+                                        @RequestParam String path, 
+                                        @RequestParam String newName) {
+        User user = (User) request.getAttribute("user");
+        if (path == null || path.trim().isEmpty() || newName == null || newName.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Path and newName are required"));
+        }
+
+        // Clean newName to prevent path traversal
+        if (newName.contains("/") || newName.contains("\\") || newName.contains("..")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid characters in new name"));
+        }
+
+        String targetPath = Paths.get(path).toAbsolutePath().normalize().toString().replace("\\", "/");
+        if (!hasPermission(user, targetPath, "read")) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Permission denied"));
+        }
+
+        File file = new File(targetPath);
+        if (!file.exists()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "File or folder not found"));
+        }
+
+        File parentDir = file.getParentFile();
+        File destFile = new File(parentDir, newName);
+
+        if (destFile.exists()) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "A file or folder with the new name already exists"));
+        }
+
+        try {
+            boolean success = file.renameTo(destFile);
+            if (!success) {
+                Files.move(file.toPath(), destFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                success = true;
+            }
+            if (success) {
+                // Broadcast change event for parent path
+                String parentPath = parentDir.getAbsolutePath().replace("\\", "/");
+                SseController.broadcast("fs-change", Map.of("userId", user.getId(), "parentPath", parentPath));
+
+                return ResponseEntity.ok(Map.of("success", true, "newPath", destFile.getAbsolutePath().replace("\\", "/")));
+            } else {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Failed to rename"));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+
     private void deleteRecursively(File file) throws IOException {
         if (file.isDirectory()) {
             File[] entries = file.listFiles();

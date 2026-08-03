@@ -694,6 +694,9 @@ function renderFiles(files) {
             <i data-lucide="download"></i>
           </button>
         `}
+        <button class="btn-card-action btn-rename" onclick="handleRenameFile(event, '${filePath.replace(/'/g, "\\'")}', '${file.name.replace(/'/g, "\\'")}')" title="Rename">
+          <i data-lucide="edit-3"></i>
+        </button>
         <button class="btn-card-action" onclick="handleDeleteFile(event, '${filePath.replace(/'/g, "\\'")}')" title="Delete">
           <i data-lucide="trash-2"></i>
         </button>
@@ -924,6 +927,33 @@ async function handleDeleteFile(e, filePath) {
     alert(`Failed to delete: ${err.message}`);
   }
 }
+
+async function handleRenameFile(e, filePath, oldName) {
+  e.stopPropagation(); // prevent card click
+  const newName = prompt(`Enter new name for "${oldName}":`, oldName);
+  if (newName === null) return; // user cancelled
+  
+  const trimmed = newName.trim();
+  if (!trimmed) {
+    alert("Name cannot be empty");
+    return;
+  }
+  if (trimmed === oldName) return; // no change
+
+  try {
+    const res = await apiCall(`/api/files/rename?path=${encodeURIComponent(filePath)}&newName=${encodeURIComponent(trimmed)}`, {
+      method: 'POST'
+    });
+    if (res.success) {
+      browsePath(state.currentPath);
+    } else {
+      alert(`Failed to rename: ${res.error || 'Unknown error'}`);
+    }
+  } catch (err) {
+    alert(`Failed to rename: ${err.message}`);
+  }
+}
+window.handleRenameFile = handleRenameFile;
 
 function handleDownloadFile(e, filePath) {
   e.stopPropagation(); // prevent card click
