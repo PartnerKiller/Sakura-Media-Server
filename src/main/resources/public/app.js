@@ -671,12 +671,12 @@ function renderFiles(files) {
     const formattedDate = file.mtime ? formatDate(file.mtime) : '';
 
     let iconHtml = `<i data-lucide="${icon}"></i>`;
-    if (category === 'image') {
+    if (category === 'image' && state.viewMode === 'grid') {
       iconHtml = `<img src="${srcUrl}" style="width: 100%; height: 100%; object-fit: cover; border-radius: var(--radius-md);" alt="${file.name}">`;
     }
 
     card.innerHTML = `
-      <div class="file-icon-wrapper" ${category === 'image' ? 'style="overflow: hidden; padding: 0;"' : ''}>
+      <div class="file-icon-wrapper" ${category === 'image' && state.viewMode === 'grid' ? 'style="overflow: hidden; padding: 0;"' : ''}>
         ${iconHtml}
       </div>
       <div class="file-card-info">
