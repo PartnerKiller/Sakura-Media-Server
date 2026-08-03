@@ -664,14 +664,20 @@ function renderFiles(files) {
     card.classList.add(category);
     
     const filePath = `${state.currentPath}/${file.name}`;
+    const srcUrl = `/api/files/stream?path=${encodeURIComponent(filePath)}&token=${state.token}`;
     
     // Size formatting helper
     const formattedSize = file.isFile ? formatBytes(file.size) : '';
     const formattedDate = file.mtime ? formatDate(file.mtime) : '';
 
+    let iconHtml = `<i data-lucide="${icon}"></i>`;
+    if (category === 'image') {
+      iconHtml = `<img src="${srcUrl}" style="width: 100%; height: 100%; object-fit: cover; border-radius: var(--radius-md);" alt="${file.name}">`;
+    }
+
     card.innerHTML = `
-      <div class="file-icon-wrapper">
-        <i data-lucide="${icon}"></i>
+      <div class="file-icon-wrapper" ${category === 'image' ? 'style="overflow: hidden; padding: 0;"' : ''}>
+        ${iconHtml}
       </div>
       <div class="file-card-info">
         <div class="file-name" title="${file.name}">${file.name}</div>
