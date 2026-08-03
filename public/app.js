@@ -471,6 +471,8 @@ function logout() {
 
 // PANEL NAVIGATION
 function switchPanel(panelName) {
+  closeAllMediaViewersSilently();
+
   // Clear any active metrics timer when switching panels
   if (state.serverMetricsTimer) {
     clearInterval(state.serverMetricsTimer);
