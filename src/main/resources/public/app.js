@@ -115,6 +115,31 @@ function safeAddListener(id, event, callback) {
   }
 }
 
+function closeAllMediaViewersSilently() {
+  const player = document.getElementById('html5-video-player');
+  if (player) {
+    player.pause();
+    player.removeAttribute('src');
+    player.load();
+    player.onerror = null;
+    player.onplaying = null;
+    player.ontimeupdate = null;
+  }
+  if (state.videoWatchdog) {
+    clearTimeout(state.videoWatchdog);
+    state.videoWatchdog = null;
+  }
+  const errorBanner = document.getElementById('video-error-banner');
+  if (errorBanner) errorBanner.style.display = 'none';
+  closeModal('modal-video-player');
+
+  const img = document.getElementById('viewer-img');
+  if (img) {
+    img.removeAttribute('src');
+  }
+  closeModal('modal-image-viewer');
+}
+
 function initApp() {
   applyTheme();
   applyUiStyle();
@@ -168,11 +193,13 @@ function initApp() {
             browsePath(decoded);
           }
         }
+        closeAllMediaViewersSilently();
       }
     } else {
       if (state.roots.length > 0 && state.currentPath !== state.roots[0].path) {
         selectRoot(state.roots[0]);
       }
+      closeAllMediaViewersSilently();
     }
   });
 
@@ -323,22 +350,7 @@ function initApp() {
 
   // Video close
   safeAddListener('btn-close-video', 'click', () => {
-    const player = document.getElementById('html5-video-player');
-    if (player) {
-      player.pause();
-      player.removeAttribute('src');
-      player.load();
-      player.onerror = null;
-      player.onplaying = null;
-      player.ontimeupdate = null;
-    }
-    if (state.videoWatchdog) {
-      clearTimeout(state.videoWatchdog);
-      state.videoWatchdog = null;
-    }
-    const errorBanner = document.getElementById('video-error-banner');
-    if (errorBanner) errorBanner.style.display = 'none';
-    closeModal('modal-video-player');
+    closeAllMediaViewersSilently();
     if (window.location.hash.substring(1) !== state.currentPath) {
       window.location.hash = state.currentPath;
     }
@@ -346,11 +358,7 @@ function initApp() {
 
   // Image close
   safeAddListener('btn-close-image', 'click', () => {
-    const img = document.getElementById('viewer-img');
-    if (img) {
-      img.removeAttribute('src');
-    }
-    closeModal('modal-image-viewer');
+    closeAllMediaViewersSilently();
     if (window.location.hash.substring(1) !== state.currentPath) {
       window.location.hash = state.currentPath;
     }
