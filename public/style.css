@@ -2212,6 +2212,60 @@ body.theme-golden-amber {
   box-shadow: var(--shadow-glow);
 }
 
+/* THEME & UI STYLE GRID CONTROLS */
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+  max-width: 1000px;
+}
+
+.theme-preview {
+  height: 100px;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--border-subtle);
+  position: relative;
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 14px;
+  transition: all var(--transition-fast) ease-in-out;
+}
+
+.theme-preview:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+.theme-card.active .theme-preview,
+.ui-style-card.active .theme-preview {
+  border-color: var(--primary) !important;
+  box-shadow: var(--shadow-glow);
+}
+
+.theme-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.theme-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-full);
+  display: inline-block;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.theme-preview-title {
+  font-size: 12px;
+  color: var(--text-primary);
+  font-weight: 600;
+  pointer-events: none;
+}
+
 /* ==========================================================================
    10 CUSTOM UI LAYOUT STYLES
    ========================================================================== */

@@ -12,7 +12,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <!-- Local Chart.js for offline telemetry monitoring -->
   <script src="/chart.min.js"></script>
-  <link rel="stylesheet" href="/style.css?v=5.6">
+  <link rel="stylesheet" href="/style.css?v=5.7">
 </head>
 <body>
   
@@ -629,115 +629,115 @@
                 <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.9rem;">Change the color scheme of the entire media server interface globally</p>
               </div>
               <div style="padding: 24px;">
-                <div class="theme-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px;">
+                <div class="theme-grid">
                   
                   <!-- Theme 1: Cyber Sakura -->
                   <div class="theme-card" id="theme-card-cyber-sakura" onclick="setSystemTheme('cyber-sakura')">
-                    <div class="theme-preview" style="background: linear-gradient(135deg, #090a0f 0%, #141622 100%); height: 100px; border-radius: var(--radius-sm); border: 2px solid transparent; position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
-                      <div style="display: flex; gap: 6px;">
-                        <span style="background: #ff4a88; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
-                        <span style="background: #8b5cf6; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
+                    <div class="theme-preview" style="background: linear-gradient(135deg, #090a0f 0%, #141622 100%);">
+                      <div class="theme-dots">
+                        <span class="theme-dot" style="background: #ff4a88;"></span>
+                        <span class="theme-dot" style="background: #8b5cf6;"></span>
                       </div>
-                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Cyber Sakura</span>
+                      <span class="theme-preview-title">Cyber Sakura</span>
                     </div>
                   </div>
 
                   <!-- Theme 2: Deep Ocean -->
                   <div class="theme-card" id="theme-card-deep-ocean" onclick="setSystemTheme('deep-ocean')">
-                    <div class="theme-preview" style="background: linear-gradient(135deg, #05080e 0%, #0d1326 100%); height: 100px; border-radius: var(--radius-sm); border: 2px solid transparent; position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
-                      <div style="display: flex; gap: 6px;">
-                        <span style="background: #00adb5; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
-                        <span style="background: #2a6fdb; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
+                    <div class="theme-preview" style="background: linear-gradient(135deg, #05080e 0%, #0d1326 100%);">
+                      <div class="theme-dots">
+                        <span class="theme-dot" style="background: #00adb5;"></span>
+                        <span class="theme-dot" style="background: #2a6fdb;"></span>
                       </div>
-                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Deep Ocean</span>
+                      <span class="theme-preview-title">Deep Ocean</span>
                     </div>
                   </div>
 
                   <!-- Theme 3: Midnight Azure -->
                   <div class="theme-card" id="theme-card-midnight-azure" onclick="setSystemTheme('midnight-azure')">
-                    <div class="theme-preview" style="background: linear-gradient(135deg, #020617 0%, #0f172a 100%); height: 100px; border-radius: var(--radius-sm); border: 2px solid transparent; position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
-                      <div style="display: flex; gap: 6px;">
-                        <span style="background: #38bdf8; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
-                        <span style="background: #0284c7; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
+                    <div class="theme-preview" style="background: linear-gradient(135deg, #020617 0%, #0f172a 100%);">
+                      <div class="theme-dots">
+                        <span class="theme-dot" style="background: #38bdf8;"></span>
+                        <span class="theme-dot" style="background: #0284c7;"></span>
                       </div>
-                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Midnight Azure</span>
+                      <span class="theme-preview-title">Midnight Azure</span>
                     </div>
                   </div>
 
                   <!-- Theme 4: Carbon Gray -->
                   <div class="theme-card" id="theme-card-carbon-gray" onclick="setSystemTheme('carbon-gray')">
-                    <div class="theme-preview" style="background: linear-gradient(135deg, #09090b 0%, #18181b 100%); height: 100px; border-radius: var(--radius-sm); border: 2px solid transparent; position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
-                      <div style="display: flex; gap: 6px;">
-                        <span style="background: #e4e4e7; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
-                        <span style="background: #a1a1aa; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
+                    <div class="theme-preview" style="background: linear-gradient(135deg, #09090b 0%, #18181b 100%);">
+                      <div class="theme-dots">
+                        <span class="theme-dot" style="background: #e4e4e7;"></span>
+                        <span class="theme-dot" style="background: #a1a1aa;"></span>
                       </div>
-                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Carbon Gray</span>
+                      <span class="theme-preview-title">Carbon Gray</span>
                     </div>
                   </div>
 
                   <!-- Theme 5: Aura Green -->
                   <div class="theme-card" id="theme-card-aura-green" onclick="setSystemTheme('aura-green')">
-                    <div class="theme-preview" style="background: linear-gradient(135deg, #02040a 0%, #0d1a1e 100%); height: 100px; border-radius: var(--radius-sm); border: 2px solid transparent; position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
-                      <div style="display: flex; gap: 6px;">
-                        <span style="background: #00f5d4; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
-                        <span style="background: #00b4d8; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
+                    <div class="theme-preview" style="background: linear-gradient(135deg, #02040a 0%, #0d1a1e 100%);">
+                      <div class="theme-dots">
+                        <span class="theme-dot" style="background: #00f5d4;"></span>
+                        <span class="theme-dot" style="background: #00b4d8;"></span>
                       </div>
-                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Aura Green</span>
+                      <span class="theme-preview-title">Aura Green</span>
                     </div>
                   </div>
 
                   <!-- Theme 6: Neon Violet -->
                   <div class="theme-card" id="theme-card-neon-violet" onclick="setSystemTheme('neon-violet')">
-                    <div class="theme-preview" style="background: linear-gradient(135deg, #05020a 0%, #150d26 100%); height: 100px; border-radius: var(--radius-sm); border: 2px solid transparent; position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
-                      <div style="display: flex; gap: 6px;">
-                        <span style="background: #d946ef; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
-                        <span style="background: #8b5cf6; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
+                    <div class="theme-preview" style="background: linear-gradient(135deg, #05020a 0%, #150d26 100%);">
+                      <div class="theme-dots">
+                        <span class="theme-dot" style="background: #d946ef;"></span>
+                        <span class="theme-dot" style="background: #8b5cf6;"></span>
                       </div>
-                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Neon Violet</span>
+                      <span class="theme-preview-title">Neon Violet</span>
                     </div>
                   </div>
 
                   <!-- Theme 7: Sunset Orange -->
                   <div class="theme-card" id="theme-card-sunset-orange" onclick="setSystemTheme('sunset-orange')">
-                    <div class="theme-preview" style="background: linear-gradient(135deg, #070302 0%, #1f1008 100%); height: 100px; border-radius: var(--radius-sm); border: 2px solid transparent; position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
-                      <div style="display: flex; gap: 6px;">
-                        <span style="background: #f97316; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
-                        <span style="background: #f59e0b; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
+                    <div class="theme-preview" style="background: linear-gradient(135deg, #070302 0%, #1f1008 100%);">
+                      <div class="theme-dots">
+                        <span class="theme-dot" style="background: #f97316;"></span>
+                        <span class="theme-dot" style="background: #f59e0b;"></span>
                       </div>
-                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Sunset Orange</span>
+                      <span class="theme-preview-title">Sunset Orange</span>
                     </div>
                   </div>
 
                   <!-- Theme 8: Crimson Red -->
                   <div class="theme-card" id="theme-card-crimson-red" onclick="setSystemTheme('crimson-red')">
-                    <div class="theme-preview" style="background: linear-gradient(135deg, #070202 0%, #1f0808 100%); height: 100px; border-radius: var(--radius-sm); border: 2px solid transparent; position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
-                      <div style="display: flex; gap: 6px;">
-                        <span style="background: #ef4444; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
-                        <span style="background: #f43f5e; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
+                    <div class="theme-preview" style="background: linear-gradient(135deg, #070202 0%, #1f0808 100%);">
+                      <div class="theme-dots">
+                        <span class="theme-dot" style="background: #ef4444;"></span>
+                        <span class="theme-dot" style="background: #f43f5e;"></span>
                       </div>
-                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Crimson Red</span>
+                      <span class="theme-preview-title">Crimson Red</span>
                     </div>
                   </div>
 
                   <!-- Theme 9: Forest Lagoon -->
                   <div class="theme-card" id="theme-card-forest-lagoon" onclick="setSystemTheme('forest-lagoon')">
-                    <div class="theme-preview" style="background: linear-gradient(135deg, #010503 0%, #0d1f14 100%); height: 100px; border-radius: var(--radius-sm); border: 2px solid transparent; position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
-                      <div style="display: flex; gap: 6px;">
-                        <span style="background: #0d9488; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
-                        <span style="background: #2dd4bf; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
+                    <div class="theme-preview" style="background: linear-gradient(135deg, #010503 0%, #0d1f14 100%);">
+                      <div class="theme-dots">
+                        <span class="theme-dot" style="background: #0d9488;"></span>
+                        <span class="theme-dot" style="background: #2dd4bf;"></span>
                       </div>
-                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Forest Lagoon</span>
+                      <span class="theme-preview-title">Forest Lagoon</span>
                     </div>
                   </div>
 
                   <!-- Theme 10: Golden Amber -->
                   <div class="theme-card" id="theme-card-golden-amber" onclick="setSystemTheme('golden-amber')">
-                    <div class="theme-preview" style="background: linear-gradient(135deg, #050401 0%, #1c1a06 100%); height: 100px; border-radius: var(--radius-sm); border: 2px solid transparent; position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
-                      <div style="display: flex; gap: 6px;">
-                        <span style="background: #eab308; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
-                        <span style="background: #facc15; width: 16px; height: 16px; border-radius: 50%; display: inline-block;"></span>
+                    <div class="theme-preview" style="background: linear-gradient(135deg, #050401 0%, #1c1a06 100%);">
+                      <div class="theme-dots">
+                        <span class="theme-dot" style="background: #eab308;"></span>
+                        <span class="theme-dot" style="background: #facc15;"></span>
                       </div>
-                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Golden Amber</span>
+                      <span class="theme-preview-title">Golden Amber</span>
                     </div>
                   </div>
 
@@ -751,75 +751,75 @@
                 <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.9rem;">Change the border style, panel transparency, and overall layout design of the user interface</p>
               </div>
               <div style="padding: 24px;">
-                <div class="theme-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px;">
+                <div class="theme-grid">
                   
                   <!-- UI 1: Glassmorphism -->
                   <div class="ui-style-card" id="ui-style-card-glassmorphism" onclick="setSystemUiStyle('glassmorphism')">
-                    <div class="theme-preview" style="background: rgba(15, 23, 42, 0.45); backdrop-filter: blur(16px); height: 100px; border-radius: var(--radius-sm); border: 2px solid transparent; position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
-                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Glassmorphism</span>
+                    <div class="theme-preview" style="background: rgba(15, 23, 42, 0.45); backdrop-filter: blur(16px);">
+                      <span class="theme-preview-title">Glassmorphism</span>
                     </div>
                   </div>
 
                   <!-- UI 2: Minimalist -->
                   <div class="ui-style-card" id="ui-style-card-minimalist" onclick="setSystemUiStyle('minimalist')">
-                    <div class="theme-preview" style="background: #09090b; height: 100px; border-radius: 0px; border: 1px solid #3f3f46; position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
-                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Minimalist</span>
+                    <div class="theme-preview" style="background: #09090b; border-radius: 0px; border-color: #3f3f46;">
+                      <span class="theme-preview-title">Minimalist</span>
                     </div>
                   </div>
 
                   <!-- UI 3: Retro Terminal -->
                   <div class="ui-style-card" id="ui-style-card-retro-terminal" onclick="setSystemUiStyle('retro-terminal')">
-                    <div class="theme-preview" style="background: #000000; height: 100px; border-radius: 0px; border: 2px solid #00ff00; position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
-                      <span style="font-size: 0.75rem; color: #00ff00; font-family: monospace; font-weight: 500;">Retro Terminal</span>
+                    <div class="theme-preview" style="background: #000000; border-radius: 0px; border-color: #00ff00;">
+                      <span class="theme-preview-title" style="color: #00ff00; font-family: monospace;">Retro Terminal</span>
                     </div>
                   </div>
 
                   <!-- UI 4: Vaporwave Dream -->
                   <div class="ui-style-card" id="ui-style-card-vaporwave-dream" onclick="setSystemUiStyle('vaporwave-dream')">
-                    <div class="theme-preview" style="background: rgba(30, 10, 45, 0.8); height: 100px; border-radius: var(--radius-sm); border: 2px solid #ff00ff; box-shadow: 4px 4px 0px #00ffff; position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
-                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Vaporwave Dream</span>
+                    <div class="theme-preview" style="background: rgba(30, 10, 45, 0.8); border-color: #ff00ff; box-shadow: 4px 4px 0px #00ffff;">
+                      <span class="theme-preview-title">Vaporwave Dream</span>
                     </div>
                   </div>
 
                   <!-- UI 5: Cyberpunk -->
                   <div class="ui-style-card" id="ui-style-card-cyberpunk" onclick="setSystemUiStyle('cyberpunk')">
-                    <div class="theme-preview" style="background: rgba(10, 10, 15, 0.9); height: 100px; border-radius: 6px 0px 6px 0px; border: 2px solid #ff4a88; position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
-                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Cyberpunk</span>
+                    <div class="theme-preview" style="background: rgba(10, 10, 15, 0.9); border-radius: 6px 0px 6px 0px; border-color: #ff4a88;">
+                      <span class="theme-preview-title">Cyberpunk</span>
                     </div>
                   </div>
 
                   <!-- UI 6: Material Design -->
                   <div class="ui-style-card" id="ui-style-card-material-design" onclick="setSystemUiStyle('material-design')">
-                    <div class="theme-preview" style="background: #1e1e24; height: 100px; border-radius: 16px; border: 2px solid transparent; box-shadow: 0 8px 16px rgba(0,0,0,0.3); position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
-                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Material Design</span>
+                    <div class="theme-preview" style="background: #1e1e24; border-radius: 16px; box-shadow: 0 8px 16px rgba(0,0,0,0.3);">
+                      <span class="theme-preview-title">Material Design</span>
                     </div>
                   </div>
 
                   <!-- UI 7: Nebula Space -->
                   <div class="ui-style-card" id="ui-style-card-nebula-space" onclick="setSystemUiStyle('nebula-space')">
-                    <div class="theme-preview" style="background: rgba(12, 8, 28, 0.8); height: 100px; border-radius: var(--radius-sm); border: 1px solid rgba(139, 92, 246, 0.4); position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
-                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Nebula Space</span>
+                    <div class="theme-preview" style="background: rgba(12, 8, 28, 0.8); border-color: rgba(139, 92, 246, 0.4);">
+                      <span class="theme-preview-title">Nebula Space</span>
                     </div>
                   </div>
 
                   <!-- UI 8: Steel & Chrome -->
                   <div class="ui-style-card" id="ui-style-card-steel-chrome" onclick="setSystemUiStyle('steel-chrome')">
-                    <div class="theme-preview" style="background: linear-gradient(180deg, #1e2022 0%, #111215 100%); height: 100px; border-radius: var(--radius-sm); border: 1px solid #4a4d52; position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
-                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Steel & Chrome</span>
+                    <div class="theme-preview" style="background: linear-gradient(180deg, #1e2022 0%, #111215 100%); border-color: #4a4d52;">
+                      <span class="theme-preview-title">Steel & Chrome</span>
                     </div>
                   </div>
 
                   <!-- UI 9: Nordic Aurora -->
                   <div class="ui-style-card" id="ui-style-card-nordic-aurora" onclick="setSystemUiStyle('nordic-aurora')">
-                    <div class="theme-preview" style="background: #0b131a; height: 100px; border-radius: 12px; border: 1px solid rgba(0, 245, 212, 0.2); position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
-                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Nordic Aurora</span>
+                    <div class="theme-preview" style="background: #0b131a; border-radius: 12px; border-color: rgba(0, 245, 212, 0.2);">
+                      <span class="theme-preview-title">Nordic Aurora</span>
                     </div>
                   </div>
 
                   <!-- UI 10: Aero Classic -->
                   <div class="ui-style-card" id="ui-style-card-aero-classic" onclick="setSystemUiStyle('aero-classic')">
-                    <div class="theme-preview" style="background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(0, 0, 0, 0.4) 100%); height: 100px; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.2); position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
-                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Aero Classic</span>
+                    <div class="theme-preview" style="background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(0, 0, 0, 0.4) 100%); border-radius: 20px; border-color: rgba(255, 255, 255, 0.2);">
+                      <span class="theme-preview-title">Aero Classic</span>
                     </div>
                   </div>
 
@@ -1133,6 +1133,6 @@
     </button>
   </nav>
 
-  <script src="/app.js?v=5.6"></script>
+  <script src="/app.js?v=5.7"></script>
 </body>
 </html>
