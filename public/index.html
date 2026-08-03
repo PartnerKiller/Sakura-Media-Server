@@ -277,7 +277,7 @@
           <div class="panel-header">
             <div>
               <h2>Server Management</h2>
-              <p>Monitor system health, Docker stacks, UFW rules, cron schedules, and packages</p>
+              <p>Monitor system health, services, audit logs, and server appearance</p>
             </div>
             <div class="server-header-actions">
               <button id="btn-restart-server-service" class="btn btn-secondary">
@@ -294,15 +294,7 @@
           <!-- Horizontal Sub-Tabs Bar -->
           <div class="server-tabs-bar">
             <button class="server-tab-btn active" data-tab="tab-metrics">Status & Graphs</button>
-            <button class="server-tab-btn" data-tab="tab-docker">Docker</button>
             <button class="server-tab-btn" data-tab="tab-services">Services</button>
-            <button class="server-tab-btn" data-tab="tab-processes">Processes</button>
-            <button class="server-tab-btn" data-tab="tab-network">Network & VPN</button>
-            <button class="server-tab-btn" data-tab="tab-storage">Storage</button>
-            <button class="server-tab-btn" data-tab="tab-firewall">Firewall</button>
-            <button class="server-tab-btn" data-tab="tab-cron">Scheduler</button>
-            <button class="server-tab-btn" data-tab="tab-packages">Packages (APT)</button>
-            <button class="server-tab-btn" data-tab="tab-system-logs">System Logs</button>
             <button class="server-tab-btn" data-tab="tab-audit-logs">Audit Logs</button>
             <button class="server-tab-btn" data-tab="tab-appearance">Appearance</button>
           </div>
@@ -333,37 +325,7 @@
             </div>
           </div>
 
-          <!-- 2. DOCKER CONTAINERS -->
-          <div id="tab-docker" class="server-tab-content">
-            <div class="users-list-card" style="margin-top: 16px;">
-              <div class="admin-section-title-container" style="padding: 16px 24px; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center;">
-                <h3 class="admin-section-title" style="margin: 0;">Docker Containers Stack</h3>
-                <button id="btn-refresh-docker" class="btn btn-secondary">
-                  <i data-lucide="refresh-cw"></i>
-                </button>
-              </div>
-              <div class="table-responsive">
-                <table class="users-table">
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Image</th>
-                      <th>Ports</th>
-                      <th>CPU %</th>
-                      <th>Memory</th>
-                      <th>State</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody id="docker-table-body">
-                    <tr><td colspan="7" class="p-4 text-center">Loading containers...</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <!-- 3. SYSTEMD SERVICES -->
+          <!-- 2. SYSTEMD SERVICES -->
           <div id="tab-services" class="server-tab-content">
             <div class="users-list-card" style="margin-top: 16px;">
               <div class="admin-section-title-container" style="padding: 16px 24px; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center;">
@@ -388,219 +350,6 @@
                     <tr><td colspan="6" class="p-4 text-center">Loading systemd services...</td></tr>
                   </tbody>
                 </table>
-              </div>
-            </div>
-          </div>
-
-          <!-- 4. ACTIVE PROCESSES -->
-          <div id="tab-processes" class="server-tab-content">
-            <div class="users-list-card" style="margin-top: 16px;">
-              <div class="admin-section-title-container" style="padding: 16px 24px; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center;">
-                <h3 class="admin-section-title" style="margin: 0;">Active Media Processes (ffmpeg)</h3>
-                <button id="btn-refresh-processes" class="btn btn-secondary">
-                  <i data-lucide="refresh-cw"></i>
-                </button>
-              </div>
-              <div class="table-responsive">
-                <table class="users-table">
-                  <thead>
-                    <tr>
-                      <th>PID</th>
-                      <th>CPU %</th>
-                      <th>Memory %</th>
-                      <th>Uptime</th>
-                      <th>Command</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody id="processes-table-body">
-                    <tr><td colspan="6" class="p-4 text-center">Loading active processes...</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <!-- 5. NETWORK & VPN -->
-          <div id="tab-network" class="server-tab-content">
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 16px;">
-              <div class="users-list-card" style="padding: 20px;">
-                <h3 class="admin-section-title" style="margin-top:0;">Local Network IP Bindings</h3>
-                <div id="net-interfaces-container" style="font-size: 13px; line-height: 2;">
-                  Loading routing table...
-                </div>
-              </div>
-              <div class="users-list-card" style="padding: 20px;">
-                <h3 class="admin-section-title" style="margin-top:0;">VPN & Mesh Status</h3>
-                <div id="vpn-status-container" style="font-size: 13px; line-height: 2;">
-                  Loading active connections...
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 6. STORAGE PARTITIONS -->
-          <div id="tab-storage" class="server-tab-content">
-            <div class="storage-analysis-section" style="margin-top: 16px;">
-              <h3 class="admin-section-title">Mount Disks partitions</h3>
-              <div id="storage-analysis-container-server" class="storage-analysis-grid storage-analysis-target">
-                <!-- Dynamically loaded -->
-              </div>
-            </div>
-          </div>
-
-          <!-- 7. UFW FIREWALL RULES -->
-          <div id="tab-firewall" class="server-tab-content">
-            <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 20px; margin-top: 16px;">
-              <!-- Add Rule Card -->
-              <div class="users-list-card" style="padding: 20px;">
-                <h3 class="admin-section-title" style="margin-top:0;">Add Firewall Rule</h3>
-                <form id="firewall-rule-form" style="display: flex; flex-col; flex-direction: column; gap: 12px; margin-top: 16px;">
-                  <div class="input-group">
-                    <label>Port</label>
-                    <input type="number" id="fw-port" required placeholder="e.g. 8080">
-                  </div>
-                  <div class="input-group">
-                    <label>Protocol</label>
-                    <select id="fw-proto">
-                      <option value="tcp">TCP</option>
-                      <option value="udp">UDP</option>
-                      <option value="both">Both</option>
-                    </select>
-                  </div>
-                  <div class="input-group">
-                    <label>Action</label>
-                    <select id="fw-action">
-                      <option value="allow">Allow</option>
-                      <option value="deny">Deny</option>
-                    </select>
-                  </div>
-                  <button type="submit" class="btn-primary" style="margin-top: 12px;">Apply Rule</button>
-                </form>
-              </div>
-              <!-- Rules List Table -->
-              <div class="users-list-card">
-                <div class="admin-section-title-container" style="padding: 16px 24px; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center;">
-                  <h3 class="admin-section-title" style="margin: 0;">UFW Active Configuration</h3>
-                  <button id="btn-refresh-firewall" class="btn btn-secondary">
-                    <i data-lucide="refresh-cw"></i>
-                  </button>
-                </div>
-                <table class="users-table">
-                  <thead>
-                    <tr>
-                      <th>Port</th>
-                      <th>Protocol</th>
-                      <th>Action</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody id="firewall-table-body">
-                    <tr><td colspan="4" class="p-4 text-center">Loading firewall rules...</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <!-- 8. CRON SCHEDULER -->
-          <div id="tab-cron" class="server-tab-content">
-            <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 20px; margin-top: 16px;">
-              <!-- Add Cron Form -->
-              <div class="users-list-card" style="padding: 20px;">
-                <h3 class="admin-section-title" style="margin-top:0;">Schedule Script Task</h3>
-                <form id="cron-job-form" style="display: flex; flex-direction: column; gap: 12px; margin-top: 16px;">
-                  <div class="input-group">
-                    <label>Task Name</label>
-                    <input type="text" id="cron-name" required placeholder="Backup databases">
-                  </div>
-                  <div class="input-group">
-                    <label>Cron Expression</label>
-                    <input type="text" id="cron-expr" required placeholder="0 0 * * *">
-                  </div>
-                  <div class="input-group">
-                    <label>Command</label>
-                    <input type="text" id="cron-cmd" required placeholder="sh /home/sakura/backup.sh">
-                  </div>
-                  <div class="input-group">
-                    <label>Type</label>
-                    <select id="cron-type">
-                      <option value="shell">Shell script</option>
-                      <option value="python">Python execution</option>
-                      <option value="docker">Docker container run</option>
-                    </select>
-                  </div>
-                  <button type="submit" class="btn-primary" style="margin-top: 12px;">Save Task</button>
-                </form>
-              </div>
-              <!-- Cron Jobs list table -->
-              <div class="users-list-card">
-                <div class="admin-section-title-container" style="padding: 16px 24px; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center;">
-                  <h3 class="admin-section-title" style="margin: 0;">Scheduled Jobs Checklist</h3>
-                  <button id="btn-refresh-cron" class="btn btn-secondary">
-                    <i data-lucide="refresh-cw"></i>
-                  </button>
-                </div>
-                <table class="users-table">
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Expression</th>
-                      <th>Command</th>
-                      <th>Type</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody id="cron-table-body">
-                    <tr><td colspan="5" class="p-4 text-center">Loading scheduled tasks...</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <!-- 9. PACKAGE MANAGER -->
-          <div id="tab-packages" class="server-tab-content">
-            <div class="users-list-card" style="margin-top:16px;">
-              <div class="admin-section-title-container" style="padding: 16px 24px; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-                <h3 class="admin-section-title" style="margin: 0;">APT Upgradable Packages</h3>
-                <div style="display: flex; gap: 8px;">
-                  <button id="btn-refresh-apt" class="btn btn-secondary" title="Refresh List">
-                    <i data-lucide="refresh-cw"></i>
-                  </button>
-                  <input type="text" id="apt-search-input" placeholder="Search package name..." style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: 4px; padding: 6px 12px; color: var(--text-main); font-size: 12px;">
-                  <button id="btn-apt-search" class="btn-secondary">Search</button>
-                  <button id="btn-apt-upgrade-all" class="btn-primary">Upgrade All</button>
-                </div>
-              </div>
-              <table class="users-table">
-                <thead>
-                  <tr>
-                    <th>Package Name</th>
-                    <th>Registry details</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody id="packages-table-body">
-                  <tr><td colspan="4" class="p-4 text-center">Loading upgradable lists...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- 10. SYSTEM LOGS -->
-          <div id="tab-system-logs" class="server-tab-content">
-            <div class="storage-analysis-section" style="margin-top: 16px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                <h3 class="admin-section-title" style="margin: 0;">Application logs (journalctl)</h3>
-                <button id="btn-refresh-logs" class="btn btn-secondary">
-                  <i data-lucide="refresh-cw"></i>
-                  <span>Refresh Logs</span>
-                </button>
-              </div>
-              <div class="log-console-container">
-                <pre id="log-console-output">Loading application logs...</pre>
               </div>
             </div>
           </div>
@@ -1387,6 +1136,6 @@
     </button>
   </nav>
 
-  <script src="/app.js?v=5.21"></script>
+  <script src="/app.js?v=5.22"></script>
 </body>
 </html>
