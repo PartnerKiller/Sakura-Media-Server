@@ -116,6 +116,7 @@ function safeAddListener(id, event, callback) {
 
 function initApp() {
   applyTheme();
+  applyUiStyle();
   lucide.createIcons();
   
   if (state.token && state.user) {
@@ -1625,6 +1626,7 @@ function triggerSubTabLoad(tabId) {
     loadAuditLogs();
   } else if (tabId === 'tab-appearance') {
     applyTheme();
+    applyUiStyle();
   }
 }
 
@@ -2373,6 +2375,29 @@ function initSse() {
     }
   });
 
+  eventSource.addEventListener('ui-style-update', (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      const style = data.style || 'glassmorphism';
+      
+      const allStyles = [
+        'style-glassmorphism', 'style-minimalist', 'style-retro-terminal', 'style-vaporwave-dream',
+        'style-cyberpunk', 'style-material-design', 'style-nebula-space', 'style-steel-chrome',
+        'style-nordic-aurora', 'style-aero-classic'
+      ];
+      allStyles.forEach(s => document.body.classList.remove(s));
+      document.body.classList.add(`style-${style}`);
+      
+      document.querySelectorAll('.ui-style-card').forEach(card => card.classList.remove('active'));
+      const activeCard = document.getElementById(`ui-style-card-${style}`);
+      if (activeCard) {
+        activeCard.classList.add('active');
+      }
+    } catch (err) {
+      console.error('Failed to parse SSE ui-style update event:', err);
+    }
+  });
+
   eventSource.onerror = (err) => {
     console.warn('SSE connection error, closing. Browser will auto-reconnect.', err);
   };
@@ -2428,8 +2453,53 @@ async function setSystemTheme(themeName) {
   }
 }
 
+async function applyUiStyle() {
+  try {
+    const res = await fetch('/api/ui-style');
+    if (res.ok) {
+      const data = await res.json();
+      const style = data.style || 'glassmorphism';
+      
+      // Remove all UI style classes
+      const allStyles = [
+        'style-glassmorphism', 'style-minimalist', 'style-retro-terminal', 'style-vaporwave-dream',
+        'style-cyberpunk', 'style-material-design', 'style-nebula-space', 'style-steel-chrome',
+        'style-nordic-aurora', 'style-aero-classic'
+      ];
+      allStyles.forEach(s => document.body.classList.remove(s));
+      // Add active style class
+      document.body.classList.add(`style-${style}`);
+      
+      // Highlight active UI style card if visible
+      document.querySelectorAll('.ui-style-card').forEach(card => card.classList.remove('active'));
+      const activeCard = document.getElementById(`ui-style-card-${style}`);
+      if (activeCard) {
+        activeCard.classList.add('active');
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load UI style:', err);
+  }
+}
+
+async function setSystemUiStyle(styleName) {
+  try {
+    const res = await apiCall('/api/ui-style', {
+      method: 'PUT',
+      body: JSON.stringify({ style: styleName })
+    });
+    if (res.success) {
+      await applyUiStyle();
+    }
+  } catch (err) {
+    alert(err.message || 'Failed to update UI style');
+  }
+}
+
 window.applyTheme = applyTheme;
 window.setSystemTheme = setSystemTheme;
+window.applyUiStyle = applyUiStyle;
+window.setSystemUiStyle = setSystemUiStyle;
 
 
 

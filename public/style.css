@@ -2130,5 +2130,126 @@ body.theme-golden-amber {
   box-shadow: var(--shadow-glow);
 }
 
+/* ==========================================================================
+   10 CUSTOM UI LAYOUT STYLES
+   ========================================================================== */
+
+/* 1. Glassmorphism */
+body.style-glassmorphism .content-panel,
+body.style-glassmorphism .sidebar,
+body.style-glassmorphism .users-list-card,
+body.style-glassmorphism .explorer-card {
+  backdrop-filter: blur(16px) saturate(180%) !important;
+  background-color: rgba(15, 23, 42, 0.45) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* 2. Minimalist */
+body.style-minimalist .content-panel,
+body.style-minimalist .sidebar,
+body.style-minimalist .users-list-card,
+body.style-minimalist .explorer-card,
+body.style-minimalist .btn,
+body.style-minimalist .form-control {
+  border-radius: 0px !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  border: 1px solid var(--border-subtle) !important;
+}
+
+/* 3. Retro Terminal */
+body.style-retro-terminal {
+  font-family: 'Courier New', Courier, monospace !important;
+}
+body.style-retro-terminal .content-panel,
+body.style-retro-terminal .sidebar,
+body.style-retro-terminal .users-list-card,
+body.style-retro-terminal .explorer-card {
+  background-color: #000000 !important;
+  border: 2px solid #00ff00 !important;
+  box-shadow: 0 0 12px rgba(0, 255, 0, 0.3) !important;
+}
+body.style-retro-terminal * {
+  text-shadow: 0 0 4px rgba(0, 255, 0, 0.6);
+  border-radius: 0px !important;
+}
+
+/* 4. Vaporwave Dream */
+body.style-vaporwave-dream .content-panel,
+body.style-vaporwave-dream .sidebar,
+body.style-vaporwave-dream .users-list-card,
+body.style-vaporwave-dream .explorer-card {
+  border: 2px solid #ff00ff !important;
+  box-shadow: 6px 6px 0px #00ffff !important;
+  background: rgba(30, 10, 45, 0.8) !important;
+}
+
+/* 5. Cyberpunk */
+body.style-cyberpunk .content-panel,
+body.style-cyberpunk .sidebar,
+body.style-cyberpunk .users-list-card,
+body.style-cyberpunk .explorer-card {
+  border-radius: 6px 0px 6px 0px !important;
+  border: 2px solid var(--primary) !important;
+  background: rgba(10, 10, 15, 0.9) !important;
+  box-shadow: 0 0 15px rgba(255, 74, 136, 0.15) !important;
+}
+
+/* 6. Material Design */
+body.style-material-design .content-panel,
+body.style-material-design .sidebar,
+body.style-material-design .users-list-card,
+body.style-material-design .explorer-card {
+  border-radius: 16px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
+  border: none !important;
+}
+
+/* 7. Nebula Space */
+body.style-nebula-space .content-panel,
+body.style-nebula-space .sidebar,
+body.style-nebula-space .users-list-card,
+body.style-nebula-space .explorer-card {
+  border: 1px solid rgba(139, 92, 246, 0.3) !important;
+  box-shadow: 0 0 30px rgba(139, 92, 246, 0.15) !important;
+  background: rgba(12, 8, 28, 0.8) !important;
+}
+
+/* 8. Steel & Chrome */
+body.style-steel-chrome .content-panel,
+body.style-steel-chrome .sidebar,
+body.style-steel-chrome .users-list-card,
+body.style-steel-chrome .explorer-card {
+  background: linear-gradient(180deg, #1e2022 0%, #111215 100%) !important;
+  border: 1px solid #4a4d52 !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.1) !important;
+}
+
+/* 9. Nordic Aurora */
+body.style-nordic-aurora .content-panel,
+body.style-nordic-aurora .sidebar,
+body.style-nordic-aurora .users-list-card,
+body.style-nordic-aurora .explorer-card {
+  border-radius: 12px !important;
+  border: 1px solid rgba(0, 245, 212, 0.2) !important;
+  box-shadow: 0 4px 24px rgba(0, 245, 212, 0.05) !important;
+}
+
+/* 10. Aero Classic */
+body.style-aero-classic .content-panel,
+body.style-aero-classic .sidebar,
+body.style-aero-classic .users-list-card,
+body.style-aero-classic .explorer-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(0, 0, 0, 0.4) 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3) !important;
+}
+
+.ui-style-card.active .theme-preview {
+  border-color: var(--primary) !important;
+  box-shadow: var(--shadow-glow);
+}
+
 
 

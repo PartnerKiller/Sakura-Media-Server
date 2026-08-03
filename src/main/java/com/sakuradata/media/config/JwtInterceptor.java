@@ -48,7 +48,7 @@ public class JwtInterceptor implements HandlerInterceptor {
 
         String path = request.getRequestURI();
         if (path.startsWith("/api/auth/login") || 
-            (path.equals("/api/theme") && "GET".equalsIgnoreCase(request.getMethod())) || 
+            ((path.equals("/api/theme") || path.equals("/api/ui-style")) && "GET".equalsIgnoreCase(request.getMethod())) || 
             path.startsWith("/h2-console") || 
             !path.startsWith("/api/")) {
             return true;

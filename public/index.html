@@ -739,6 +739,88 @@
                 </div>
               </div>
             </div>
+
+            <div class="users-list-card" style="margin-top: 24px;">
+              <div style="padding: 24px; border-bottom: 1px solid var(--border-subtle);">
+                <h3 style="margin: 0; font-family: var(--font-display); font-size: 1.25rem;">Server UI Layout Settings</h3>
+                <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.9rem;">Change the border style, panel transparency, and overall layout design of the user interface</p>
+              </div>
+              <div style="padding: 24px;">
+                <div class="theme-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px;">
+                  
+                  <!-- UI 1: Glassmorphism -->
+                  <div class="ui-style-card" id="ui-style-card-glassmorphism" onclick="setSystemUiStyle('glassmorphism')">
+                    <div class="theme-preview" style="background: rgba(15, 23, 42, 0.45); backdrop-filter: blur(16px); height: 100px; border-radius: var(--radius-sm); border: 2px solid transparent; position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
+                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Glassmorphism</span>
+                    </div>
+                  </div>
+
+                  <!-- UI 2: Minimalist -->
+                  <div class="ui-style-card" id="ui-style-card-minimalist" onclick="setSystemUiStyle('minimalist')">
+                    <div class="theme-preview" style="background: #09090b; height: 100px; border-radius: 0px; border: 1px solid #3f3f46; position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
+                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Minimalist</span>
+                    </div>
+                  </div>
+
+                  <!-- UI 3: Retro Terminal -->
+                  <div class="ui-style-card" id="ui-style-card-retro-terminal" onclick="setSystemUiStyle('retro-terminal')">
+                    <div class="theme-preview" style="background: #000000; height: 100px; border-radius: 0px; border: 2px solid #00ff00; position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
+                      <span style="font-size: 0.75rem; color: #00ff00; font-family: monospace; font-weight: 500;">Retro Terminal</span>
+                    </div>
+                  </div>
+
+                  <!-- UI 4: Vaporwave Dream -->
+                  <div class="ui-style-card" id="ui-style-card-vaporwave-dream" onclick="setSystemUiStyle('vaporwave-dream')">
+                    <div class="theme-preview" style="background: rgba(30, 10, 45, 0.8); height: 100px; border-radius: var(--radius-sm); border: 2px solid #ff00ff; box-shadow: 4px 4px 0px #00ffff; position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
+                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Vaporwave Dream</span>
+                    </div>
+                  </div>
+
+                  <!-- UI 5: Cyberpunk -->
+                  <div class="ui-style-card" id="ui-style-card-cyberpunk" onclick="setSystemUiStyle('cyberpunk')">
+                    <div class="theme-preview" style="background: rgba(10, 10, 15, 0.9); height: 100px; border-radius: 6px 0px 6px 0px; border: 2px solid #ff4a88; position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
+                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Cyberpunk</span>
+                    </div>
+                  </div>
+
+                  <!-- UI 6: Material Design -->
+                  <div class="ui-style-card" id="ui-style-card-material-design" onclick="setSystemUiStyle('material-design')">
+                    <div class="theme-preview" style="background: #1e1e24; height: 100px; border-radius: 16px; border: 2px solid transparent; box-shadow: 0 8px 16px rgba(0,0,0,0.3); position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
+                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Material Design</span>
+                    </div>
+                  </div>
+
+                  <!-- UI 7: Nebula Space -->
+                  <div class="ui-style-card" id="ui-style-card-nebula-space" onclick="setSystemUiStyle('nebula-space')">
+                    <div class="theme-preview" style="background: rgba(12, 8, 28, 0.8); height: 100px; border-radius: var(--radius-sm); border: 1px solid rgba(139, 92, 246, 0.4); position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
+                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Nebula Space</span>
+                    </div>
+                  </div>
+
+                  <!-- UI 8: Steel & Chrome -->
+                  <div class="ui-style-card" id="ui-style-card-steel-chrome" onclick="setSystemUiStyle('steel-chrome')">
+                    <div class="theme-preview" style="background: linear-gradient(180deg, #1e2022 0%, #111215 100%); height: 100px; border-radius: var(--radius-sm); border: 1px solid #4a4d52; position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
+                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Steel & Chrome</span>
+                    </div>
+                  </div>
+
+                  <!-- UI 9: Nordic Aurora -->
+                  <div class="ui-style-card" id="ui-style-card-nordic-aurora" onclick="setSystemUiStyle('nordic-aurora')">
+                    <div class="theme-preview" style="background: #0b131a; height: 100px; border-radius: 12px; border: 1px solid rgba(0, 245, 212, 0.2); position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
+                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Nordic Aurora</span>
+                    </div>
+                  </div>
+
+                  <!-- UI 10: Aero Classic -->
+                  <div class="ui-style-card" id="ui-style-card-aero-classic" onclick="setSystemUiStyle('aero-classic')">
+                    <div class="theme-preview" style="background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(0, 0, 0, 0.4) 100%); height: 100px; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.2); position: relative; cursor: pointer; transition: var(--transition-normal); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;">
+                      <span style="font-size: 0.75rem; color: #fff; font-weight: 500;">Aero Classic</span>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
           </div>
 
         </section>

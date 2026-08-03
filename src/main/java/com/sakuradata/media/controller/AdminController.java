@@ -934,4 +934,58 @@ public class AdminController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Failed to save theme setting"));
         }
     }
+
+    private static final String UI_STYLE_FILE = "ui_style.json";
+
+    @GetMapping("/ui-style")
+    public ResponseEntity<?> getUiStyle() {
+        String style = "glassmorphism"; // Default
+        try {
+            java.io.File file = new java.io.File(UI_STYLE_FILE);
+            if (file.exists()) {
+                String content = new String(java.nio.file.Files.readAllBytes(file.toPath()));
+                int idx = content.indexOf("\"style\"");
+                if (idx != -1) {
+                    int valStart = content.indexOf("\"", idx + 7);
+                    if (valStart != -1) {
+                        int valEnd = content.indexOf("\"", valStart + 1);
+                        if (valEnd != -1) {
+                            style = content.substring(valStart + 1, valEnd);
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return ResponseEntity.ok(Map.of("style", style));
+    }
+
+    @PutMapping("/ui-style")
+    public ResponseEntity<?> updateUiStyle(HttpServletRequest request, @RequestBody Map<String, String> body) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        String style = body.get("style");
+        if (style == null || style.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "UI Style name is required"));
+        }
+
+        // Validate style names to prevent injection
+        if (!style.equals("glassmorphism") && !style.equals("minimalist") && !style.equals("retro-terminal") && 
+            !style.equals("vaporwave-dream") && !style.equals("cyberpunk") && !style.equals("material-design") && 
+            !style.equals("nebula-space") && !style.equals("steel-chrome") && !style.equals("nordic-aurora") && 
+            !style.equals("aero-classic")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid UI Style name"));
+        }
+
+        try {
+            java.io.File file = new java.io.File(UI_STYLE_FILE);
+            String json = "{\"style\":\"" + style + "\"}";
+            java.nio.file.Files.write(file.toPath(), json.getBytes());
+            logAudit(request, "Changed system UI Style to " + style);
+            SseController.broadcast("ui-style-update", Map.of("style", style));
+            return ResponseEntity.ok(Map.of("success", true, "style", style));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Failed to save UI Style setting"));
+        }
+    }
 }
