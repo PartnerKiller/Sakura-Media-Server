@@ -1518,7 +1518,7 @@ video {
 
   /* MOBILE BOTTOM NAV BAR STYLE */
   .mobile-nav, .mobile-nav-bar {
-    display: flex !important;
+    display: none;
     position: fixed;
     bottom: 0;
     left: 0;
@@ -1532,6 +1532,11 @@ video {
     align-items: center;
     z-index: 99;
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.6);
+  }
+
+  body.logged-in .mobile-nav,
+  body.logged-in .mobile-nav-bar {
+    display: flex;
   }
 
   .mobile-nav-item {

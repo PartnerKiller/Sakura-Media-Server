@@ -406,12 +406,14 @@ function initApp() {
 
 // AUTHENTICATION FLOWS
 function showLogin() {
+  document.body.classList.remove('logged-in');
   document.getElementById('login-container').classList.add('active');
   document.getElementById('dashboard-container').classList.remove('active');
   document.getElementById('login-error').innerText = '';
 }
 
 function showDashboard() {
+  document.body.classList.add('logged-in');
   document.getElementById('login-container').classList.remove('active');
   document.getElementById('dashboard-container').classList.add('active');
   
