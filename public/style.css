@@ -1537,7 +1537,7 @@ video {
 
   body.logged-in .mobile-nav,
   body.logged-in .mobile-nav-bar {
-    display: flex;
+    display: flex !important;
   }
 
   .mobile-nav-item {
