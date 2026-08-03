@@ -723,54 +723,57 @@ function renderFiles(files) {
 
 function renderBreadcrumbs() {
   const container = document.getElementById('breadcrumbs-container');
+  const rootSeparator = document.getElementById('breadcrumb-root-separator');
+  if (!container) return;
   container.innerHTML = '';
   
-  if (!state.currentRoot) return;
+  if (!state.currentRoot) {
+    if (rootSeparator) rootSeparator.style.display = 'none';
+    return;
+  }
 
-  // Make paths relative to root for breadcrumb display
   const rootPath = state.currentRoot.path;
-  const rootName = state.currentRoot.name;
   
-  // Create first root element
-  const rootItem = document.createElement('span');
-  rootItem.className = 'breadcrumb-item';
-  rootItem.innerText = rootName;
-  rootItem.addEventListener('click', () => browsePath(rootPath));
-  container.appendChild(rootItem);
+  if (state.currentPath === rootPath) {
+    if (rootSeparator) rootSeparator.style.display = 'none';
+    return;
+  }
 
-  if (state.currentPath !== rootPath) {
-    // Get subpath relative to root path
-    const relativePart = state.currentPath.substring(rootPath.length);
-    const parts = relativePart.split('/').filter(p => p !== '');
-    
-    let accumulatedPath = rootPath;
-    
-    parts.forEach((part, index) => {
-      // Separator
+  if (rootSeparator) rootSeparator.style.display = 'flex';
+
+  // Get subpath relative to root path
+  const relativePart = state.currentPath.substring(rootPath.length);
+  const parts = relativePart.split('/').filter(p => p !== '');
+  
+  let accumulatedPath = rootPath;
+  
+  parts.forEach((part, index) => {
+    if (index > 0) {
+      // Separator between subfolders
       const separator = document.createElement('span');
       separator.className = 'breadcrumb-separator';
       separator.innerHTML = '<i data-lucide="chevron-right"></i>';
       container.appendChild(separator);
+    }
 
-      accumulatedPath += '/' + part;
-      
-      const item = document.createElement('span');
-      item.className = 'breadcrumb-item';
-      if (index === parts.length - 1) {
-        item.classList.add('active');
+    accumulatedPath += '/' + part;
+    
+    const item = document.createElement('span');
+    item.className = 'breadcrumb-item';
+    if (index === parts.length - 1) {
+      item.classList.add('active');
+    }
+    item.innerText = part;
+    
+    const clickPath = accumulatedPath; // lock closure value
+    item.addEventListener('click', () => {
+      if (index < parts.length - 1) {
+        browsePath(clickPath);
       }
-      item.innerText = part;
-      
-      const clickPath = accumulatedPath; // lock closure value
-      item.addEventListener('click', () => {
-        if (index < parts.length - 1) {
-          browsePath(clickPath);
-        }
-      });
-      
-      container.appendChild(item);
     });
-  }
+    
+    container.appendChild(item);
+  });
   lucide.createIcons();
 }
 
