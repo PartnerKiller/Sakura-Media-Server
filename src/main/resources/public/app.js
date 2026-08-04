@@ -1514,7 +1514,7 @@ function renderUsers() {
           </div>
           <span style="font-weight: 500;">${escapeHtml(u.username)}</span>
         </div>
-      </td>`
+      </td>
       <td><span class="role-badge ${u.role}">${u.role}</span></td>
       <td>${u.role === 'admin' ? 'All (Full access)' : permCount + ' path rule(s)'}</td>
       <td>${formatBandwidth(u.downloadBandwidthLimit)}</td>
