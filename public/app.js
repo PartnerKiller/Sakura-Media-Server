@@ -1455,7 +1455,8 @@ function renderStorageAnalysis(stats) {
 
   const homeHtml = createCard(stats.home);
   const storageHtml = createCard(stats.storage);
-  const html = homeHtml + storageHtml;
+  const hddHtml = createCard(stats.hdd);
+  const html = homeHtml + storageHtml + hddHtml;
 
   containers.forEach(container => {
     container.innerHTML = html;

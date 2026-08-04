@@ -329,8 +329,8 @@ public class AdminController {
             String path = (String) rule.get("path");
             if (path == null) continue;
             String resolved = Paths.get(path).toAbsolutePath().normalize().toString().replace("\\", "/");
-            if (!resolved.startsWith("/home/sakura") && !resolved.startsWith("/media/storage")) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Path must be under /home/sakura or /media/storage: " + path));
+            if (!resolved.startsWith("/home/sakura") && !resolved.startsWith("/media/storage") && !resolved.startsWith("/media/hdd")) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Path must be under /home/sakura, /media/storage or /media/hdd: " + path));
             }
         }
 
@@ -372,9 +372,11 @@ public class AdminController {
         try {
             File homeFile = new File("/home/sakura");
             File storageFile = new File("/media/storage");
+            File hddFile = new File("/media/hdd");
 
             Map<String, Object> homeStats = null;
             Map<String, Object> storageStats = null;
+            Map<String, Object> hddStats = null;
 
             if (homeFile.exists()) {
                 long total = homeFile.getTotalSpace();
@@ -404,6 +406,20 @@ public class AdminController {
                 storageStats.put("mountedOn", "/media/storage");
             }
 
+            if (hddFile.exists()) {
+                long total = hddFile.getTotalSpace();
+                long usable = hddFile.getUsableSpace();
+                long used = total - usable;
+                double percent = total > 0 ? (double) used / total * 100 : 0.0;
+                hddStats = new HashMap<>();
+                hddStats.put("filesystem", "hdd");
+                hddStats.put("total", total);
+                hddStats.put("used", used);
+                hddStats.put("available", usable);
+                hddStats.put("usePercent", String.format(Locale.US, "%.0f%%", percent));
+                hddStats.put("mountedOn", "/media/hdd");
+            }
+
             Map<String, Object> response = new HashMap<>();
             if (homeStats != null) {
                 homeStats.put("name", "Home (sakura)");
@@ -414,6 +430,11 @@ public class AdminController {
                 storageStats.put("name", "Storage");
                 storageStats.put("path", "/media/storage");
                 response.put("storage", storageStats);
+            }
+            if (hddStats != null) {
+                hddStats.put("name", "HDD");
+                hddStats.put("path", "/media/hdd");
+                response.put("hdd", hddStats);
             }
 
             return ResponseEntity.ok(response);
