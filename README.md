@@ -24,6 +24,8 @@ Designed to easily stream media files and manage server resources with friends u
 
 ### 🛡️ User & Security Management
 - **Token-Based Sessions**: Robust JWT-based authentication system with environment-driven secret key support.
+- **Custom Profile Pictures**: Upload, update, and delete custom avatar images (JPG, PNG, GIF up to 5MB) with dynamic, auto-generated colorful SVG initials fallback.
+- **Admin Avatar Management**: Administrators can upload, change, or remove profile pictures for any user directly from the user management panel.
 - **Granular Permissions Manager**: Create, list, and modify targeted path access rules (Read and Write) mapped to specific users. Normal user read permissions automatically grant upload capabilities.
 - **Modern Login Security**: Password eye-toggle, autofill theme overrides, and session duration toggling ("Remember Me" checkbox).
 
