@@ -458,26 +458,39 @@ function showDashboard() {
 }
 
 async function handleLogin(e) {
-  e.preventDefault();
+  if (e) {
+    try { e.preventDefault(); } catch (err) {}
+  }
+  if (state.isLoggingIn) return;
+  state.isLoggingIn = true;
+
   const usernameEl = document.getElementById('username');
   const passwordEl = document.getElementById('password');
   const errorEl = document.getElementById('login-error');
 
-  errorEl.innerText = '';
+  if (errorEl) errorEl.innerText = '';
   
   try {
+    const username = usernameEl ? usernameEl.value.trim() : '';
+    const password = passwordEl ? passwordEl.value : '';
+
+    if (!username || !password) {
+      if (errorEl) errorEl.innerText = 'Username and password required';
+      return;
+    }
+
     const res = await apiCall('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({
-        username: usernameEl.value,
-        password: passwordEl.value
+        username: username,
+        password: password
       })
     });
 
     state.token = res.token;
     state.user = res.user;
     
-    const rememberMe = document.getElementById('remember-me').checked;
+    const rememberMe = document.getElementById('remember-me') ? document.getElementById('remember-me').checked : true;
     if (rememberMe) {
       localStorage.setItem('token', res.token);
       localStorage.setItem('user', JSON.stringify(res.user));
@@ -491,12 +504,12 @@ async function handleLogin(e) {
     }
     
     // Clear login inputs
-    usernameEl.value = '';
-    passwordEl.value = '';
+    if (usernameEl) usernameEl.value = '';
+    if (passwordEl) passwordEl.value = '';
     
     // Reset toggle to password mode
     const pwdInput = document.getElementById('password');
-    pwdInput.type = 'password';
+    if (pwdInput) pwdInput.type = 'password';
     const toggleBtn = document.getElementById('btn-toggle-login-password');
     if (toggleBtn) {
       toggleBtn.innerHTML = '<i data-lucide="eye"></i>';
@@ -505,7 +518,9 @@ async function handleLogin(e) {
     
     showDashboard();
   } catch (err) {
-    errorEl.innerText = err.message || 'Login failed';
+    if (errorEl) errorEl.innerText = err.message || 'Login failed';
+  } finally {
+    state.isLoggingIn = false;
   }
 }
 window.handleLogin = handleLogin;
