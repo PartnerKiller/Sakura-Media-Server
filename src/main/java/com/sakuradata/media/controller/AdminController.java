@@ -329,8 +329,8 @@ public class AdminController {
             String path = (String) rule.get("path");
             if (path == null) continue;
             String resolved = Paths.get(path).toAbsolutePath().normalize().toString().replace("\\", "/");
-            if (!resolved.startsWith("/home/sakura") && !resolved.startsWith("/media/storage") && !resolved.startsWith("/media/hdd")) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Path must be under /home/sakura, /media/storage or /media/hdd: " + path));
+            if (!resolved.startsWith("/home/sakura") && !resolved.startsWith("/media/storage") && !resolved.startsWith("/media/hdd") && !resolved.startsWith("/media/gdrive")) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Path must be under /home/sakura, /media/storage, /media/hdd or /media/gdrive: " + path));
             }
         }
 
@@ -373,7 +373,7 @@ public class AdminController {
             File homeFile = new File("/home/sakura");
             File storageFile = new File("/media/storage");
             File hddFile = new File("/media/hdd");
-            File gdriveFile = new File("/home/sakura/gdrive");
+            File gdriveFile = new File("/media/gdrive");
 
             Map<String, Object> homeStats = null;
             Map<String, Object> storageStats = null;
@@ -433,7 +433,7 @@ public class AdminController {
                 gdriveStats.put("used", used);
                 gdriveStats.put("available", usable);
                 gdriveStats.put("usePercent", String.format(Locale.US, "%.0f%%", percent));
-                gdriveStats.put("mountedOn", "/home/sakura/gdrive");
+                gdriveStats.put("mountedOn", "/media/gdrive");
             }
 
             Map<String, Object> response = new HashMap<>();
@@ -454,7 +454,7 @@ public class AdminController {
             }
             if (gdriveStats != null) {
                 gdriveStats.put("name", "Google Drive");
-                gdriveStats.put("path", "/home/sakura/gdrive");
+                gdriveStats.put("path", "/media/gdrive");
                 response.put("gdrive", gdriveStats);
             }
 

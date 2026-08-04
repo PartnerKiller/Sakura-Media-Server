@@ -27,7 +27,7 @@ public class FileController {
     private static final String SAKURA_ROOT = "/home/sakura";
     private static final String STORAGE_ROOT = "/media/storage";
     private static final String HDD_ROOT = "/media/hdd";
-    private static final String GDRIVE_ROOT = "/home/sakura/gdrive";
+    private static final String GDRIVE_ROOT = "/media/gdrive";
     private static final String TEMP_CHUNKS_DIR = "./temp-chunks";
 
     @Autowired
