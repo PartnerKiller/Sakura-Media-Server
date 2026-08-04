@@ -13,6 +13,8 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.MediaType;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
@@ -998,5 +1000,50 @@ public class AdminController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Failed to save UI Style setting"));
         }
+    }
+
+    @GetMapping("/users/avatar/{username}")
+    public ResponseEntity<?> serveAvatar(@PathVariable String username) {
+        java.util.Optional<User> userOpt = userRepository.findByUsername(username);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        User user = userOpt.get();
+        if (user.getProfilePicture() != null) {
+            java.io.File avatarFile = new java.io.File("./data/avatars/" + user.getProfilePicture());
+            if (avatarFile.exists()) {
+                try {
+                    byte[] bytes = java.nio.file.Files.readAllBytes(avatarFile.toPath());
+                    String contentType = java.nio.file.Files.probeContentType(avatarFile.toPath());
+                    if (contentType == null) {
+                        contentType = "image/png";
+                    }
+                    return ResponseEntity.ok()
+                            .contentType(MediaType.parseMediaType(contentType))
+                            .body(bytes);
+                } catch (IOException ignored) {}
+            }
+        }
+
+        // Fallback: Generate premium SVG avatar with user's initial and color hash
+        String initial = username.isEmpty() ? "?" : username.substring(0, 1).toUpperCase();
+        int hash = username.hashCode();
+        String[] colors = {
+            "#e06666", "#f6b26b", "#ffd966", "#93c47d", "#76a5af", 
+            "#6fa8dc", "#8e7cc3", "#c27ba0", "#a64d79", "#674ea7", 
+            "#3d85c6", "#45818e", "#3f51b5", "#009688", "#4caf50"
+        };
+        String bgColor = colors[Math.abs(hash) % colors.length];
+        
+        String svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\" viewBox=\"0 0 100 100\">" +
+                "<rect width=\"100\" height=\"100\" rx=\"50\" fill=\"" + bgColor + "\"/>" +
+                "<text x=\"50%\" y=\"55%\" dominant-baseline=\"middle\" text-anchor=\"middle\" " +
+                "font-family=\"system-ui, -apple-system, sans-serif\" font-size=\"45\" font-weight=\"bold\" fill=\"#ffffff\">" +
+                initial + "</text></svg>";
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("image/svg+xml"))
+                .body(svg.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 }

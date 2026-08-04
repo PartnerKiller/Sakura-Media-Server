@@ -256,6 +256,8 @@ function initApp() {
 
   // Bind Profile Settings
   safeAddListener('profile-settings-form', 'submit', handleUpdateProfile);
+  safeAddListener('profile-avatar-input', 'change', handleAvatarUpload);
+  safeAddListener('btn-remove-avatar', 'click', handleAvatarDelete);
   safeAddListener('btn-toggle-profile-password', 'click', () => {
     const passwordInput = document.getElementById('profile-password');
     const eyeIconBtn = document.getElementById('btn-toggle-profile-password');
@@ -1468,7 +1470,14 @@ function renderUsers() {
                      </button>`;
 
     tr.innerHTML = `
-      <td>${u.username}</td>
+      <td>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="width: 28px; height: 28px; border-radius: 50%; overflow: hidden; background: var(--bg-surface); border: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: center;">
+            <img src="/api/users/avatar/${u.username}?v=${Date.now()}" alt="" style="width: 100%; height: 100%; object-fit: cover;">
+          </div>
+          <span style="font-weight: 500;">${u.username}</span>
+        </div>
+      </td>
       <td><span class="role-badge ${u.role}">${u.role}</span></td>
       <td>${u.role === 'admin' ? 'All (Full access)' : permCount + ' path rule(s)'}</td>
       <td>${formatBandwidth(u.downloadBandwidthLimit)}</td>
@@ -2793,9 +2802,84 @@ async function setSystemUiStyle(styleName) {
 
 function updateUserProfileUI() {
   if (state.user) {
-    document.getElementById('user-avatar').innerText = state.user.username[0].toUpperCase();
-    document.getElementById('user-display-name').innerText = state.user.username;
+    const username = state.user.username;
+    const avatarUrl = `/api/users/avatar/${username}?v=${Date.now()}`;
+    
+    const avatarEl = document.getElementById('user-avatar');
+    if (avatarEl) {
+      avatarEl.innerHTML = `<img src="${avatarUrl}" alt="${username}">`;
+    }
+
+    document.getElementById('user-display-name').innerText = username;
     document.getElementById('user-display-role').innerText = state.user.role === 'admin' ? 'Owner / Admin' : 'User';
+
+    // Update settings preview
+    const previewImg = document.getElementById('profile-avatar-preview');
+    if (previewImg) {
+      previewImg.src = avatarUrl;
+      previewImg.style.display = 'block';
+    }
+    const placeholderDiv = document.getElementById('profile-avatar-placeholder');
+    if (placeholderDiv) {
+      placeholderDiv.style.display = 'none';
+    }
+  }
+}
+
+async function handleAvatarUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const errorEl = document.getElementById('profile-error');
+  const successEl = document.getElementById('profile-success');
+  errorEl.innerText = '';
+  successEl.style.display = 'none';
+
+  if (file.size > 5 * 1024 * 1024) {
+    errorEl.innerText = 'File size exceeds 5MB limit';
+    e.target.value = '';
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const res = await apiCall('/api/auth/profile/avatar', {
+      method: 'POST',
+      body: formData
+    });
+
+    successEl.innerText = 'Profile picture updated successfully!';
+    successEl.style.display = 'block';
+    updateUserProfileUI();
+  } catch (err) {
+    errorEl.innerText = err.message || 'Failed to upload profile picture';
+  } finally {
+    e.target.value = '';
+  }
+}
+
+async function handleAvatarDelete() {
+  const errorEl = document.getElementById('profile-error');
+  const successEl = document.getElementById('profile-success');
+  errorEl.innerText = '';
+  successEl.style.display = 'none';
+
+  if (!confirm('Are you sure you want to remove your profile picture?')) {
+    return;
+  }
+
+  try {
+    await apiCall('/api/auth/profile/avatar', {
+      method: 'DELETE'
+    });
+
+    successEl.innerText = 'Profile picture removed successfully!';
+    successEl.style.display = 'block';
+    updateUserProfileUI();
+  } catch (err) {
+    errorEl.innerText = err.message || 'Failed to remove profile picture';
   }
 }
 

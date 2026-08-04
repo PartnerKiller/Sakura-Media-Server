@@ -25,6 +25,9 @@ public class User {
     @Column(name = "ui_style")
     private String uiStyle;
 
+    @Column(name = "profile_picture")
+    private String profilePicture;
+
     @Column(nullable = false)
     private String role; // "admin" or "user"
 
@@ -120,5 +123,13 @@ public class User {
 
     public void setUiStyle(String uiStyle) {
         this.uiStyle = uiStyle;
+    }
+
+    public String getProfilePicture() {
+        return profilePicture;
+    }
+
+    public void setProfilePicture(String profilePicture) {
+        this.profilePicture = profilePicture;
     }
 }

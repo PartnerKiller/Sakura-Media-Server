@@ -11,6 +11,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.web.multipart.MultipartFile;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.UUID;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -125,5 +133,80 @@ public class AuthController {
         response.put("uiStyle", user.getUiStyle());
 
         return ResponseEntity.ok(response);
+    }
+
+    private static final String AVATARS_DIR = "./data/avatars";
+
+    @PostMapping("/profile/avatar")
+    public ResponseEntity<?> uploadAvatar(HttpServletRequest request, @RequestParam("file") MultipartFile file) {
+        User user = (User) request.getAttribute("user");
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Unauthorized"));
+        }
+
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "File is empty"));
+        }
+
+        if (file.getSize() > 5 * 1024 * 1024) { // 5MB limit
+            return ResponseEntity.badRequest().body(Map.of("error", "File size exceeds 5MB limit"));
+        }
+
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Only image files are allowed"));
+        }
+
+        try {
+            File dir = new File(AVATARS_DIR);
+            if (!dir.exists()) {
+                dir.mkdirs();
+            }
+
+            // Extract extension
+            String origName = file.getOriginalFilename();
+            String ext = ".png";
+            if (origName != null && origName.lastIndexOf('.') > 0) {
+                ext = origName.substring(origName.lastIndexOf('.'));
+            }
+
+            // Create unique filename
+            String fileName = "avatar_" + user.getId() + "_" + UUID.randomUUID().toString() + ext;
+            Path targetPath = Paths.get(AVATARS_DIR).resolve(fileName);
+
+            // Clean up old avatar if exists
+            if (user.getProfilePicture() != null) {
+                try {
+                    Files.deleteIfExists(Paths.get(AVATARS_DIR).resolve(user.getProfilePicture()));
+                } catch (Exception ignored) {}
+            }
+
+            Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
+
+            user.setProfilePicture(fileName);
+            userRepository.save(user);
+
+            return ResponseEntity.ok(Map.of("profilePicture", "/api/users/avatar/" + user.getUsername()));
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Failed to save file"));
+        }
+    }
+
+    @DeleteMapping("/profile/avatar")
+    public ResponseEntity<?> deleteAvatar(HttpServletRequest request) {
+        User user = (User) request.getAttribute("user");
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Unauthorized"));
+        }
+
+        if (user.getProfilePicture() != null) {
+            try {
+                Files.deleteIfExists(Paths.get(AVATARS_DIR).resolve(user.getProfilePicture()));
+            } catch (Exception ignored) {}
+            user.setProfilePicture(null);
+            userRepository.save(user);
+        }
+
+        return ResponseEntity.ok(Map.of("success", true));
     }
 }

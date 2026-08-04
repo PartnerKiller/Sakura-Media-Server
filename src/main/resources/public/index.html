@@ -12,7 +12,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <!-- Local Chart.js for offline telemetry monitoring -->
   <script src="/chart.min.js"></script>
-  <link rel="stylesheet" href="/style.css?v=5.36">
+  <link rel="stylesheet" href="/style.css?v=5.37">
 </head>
 <body>
   
@@ -635,6 +635,28 @@
           <!-- Account Details Card -->
           <div class="users-list-card" style="max-width: 600px; padding: 30px; margin-top: 20px;">
             <form id="profile-settings-form">
+              <!-- Profile Picture Upload Zone -->
+              <div class="profile-avatar-section" style="display: flex; align-items: center; gap: 20px; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--border-subtle);">
+                <div class="avatar-preview-container" style="position: relative; width: 80px; height: 80px; border-radius: 50%; overflow: hidden; background: var(--bg-surface); border: 2px solid var(--border-subtle); display: flex; align-items: center; justify-content: center;">
+                  <img id="profile-avatar-preview" src="" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover; display: none;">
+                  <div id="profile-avatar-placeholder" style="font-size: 32px; font-weight: bold; color: var(--text-secondary); font-family: var(--font-display);">S</div>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                  <span style="font-weight: 500; font-size: 14px;">Profile Picture</span>
+                  <div style="display: flex; gap: 10px; align-items: center;">
+                    <label class="btn btn-secondary" style="cursor: pointer; padding: 6px 12px; font-size: 12px; display: flex; align-items: center; gap: 6px; margin-bottom: 0;">
+                      <i data-lucide="upload" style="width: 14px; height: 14px;"></i>
+                      <span>Upload Photo</span>
+                      <input type="file" id="profile-avatar-input" accept="image/png, image/jpeg, image/gif" style="display: none;">
+                    </label>
+                    <button type="button" id="btn-remove-avatar" class="btn btn-danger" style="padding: 6px 12px; font-size: 12px; display: flex; align-items: center; gap: 6px;">
+                      <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                      <span>Remove</span>
+                    </button>
+                  </div>
+                  <span style="font-size: 11px; color: var(--text-secondary);">Supports JPG, PNG or GIF. Max size 5MB.</span>
+                </div>
+              </div>
               <div class="input-group">
                 <label for="profile-username">Username</label>
                 <input type="text" id="profile-username" placeholder="Enter new username" required style="width: 100%; max-width: 400px;">
@@ -1136,6 +1158,6 @@
     </button>
   </nav>
 
-  <script src="/app.js?v=5.36"></script>
+  <script src="/app.js?v=5.37"></script>
 </body>
 </html>
