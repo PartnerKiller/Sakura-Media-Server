@@ -1211,6 +1211,7 @@ async function uploadFileInChunks(file, basePath, relPath, onProgress) {
     throw new Error('Upload cancelled');
   }
 
+  const startTime = Date.now();
   const uploadId = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
   const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
 
@@ -1247,7 +1248,20 @@ async function uploadFileInChunks(file, basePath, relPath, onProgress) {
           const chunkLoaded = e.loaded;
           const chunkTotal = e.total;
           const totalLoaded = start + (chunkLoaded / chunkTotal) * (end - start);
-          onProgress(totalLoaded / file.size);
+          
+          const elapsed = (Date.now() - startTime) / 1000;
+          let speedString = '';
+          if (elapsed > 0.1) {
+            const bps = totalLoaded / elapsed;
+            if (bps > 1024 * 1024) {
+              speedString = `${(bps / (1024 * 1024)).toFixed(1)} MB/s`;
+            } else if (bps > 1024) {
+              speedString = `${(bps / 1024).toFixed(1)} KB/s`;
+            } else {
+              speedString = `${bps.toFixed(0)} B/s`;
+            }
+          }
+          onProgress(totalLoaded / file.size, speedString);
         }
       };
 
@@ -1304,10 +1318,12 @@ async function handleFolderUpload() {
   const filenameEl = document.getElementById('upload-filename');
   const percentEl = document.getElementById('upload-percentage');
   const fillEl = document.getElementById('upload-progress-fill');
+  const speedEl = document.getElementById('upload-speed');
 
   filenameEl.innerText = `Preparing folder upload... (0/${totalFiles} files)`;
   percentEl.innerText = '0%';
   fillEl.style.width = '0%';
+  if (speedEl) speedEl.innerText = '';
   progressContainer.style.display = 'block';
   lucide.createIcons();
 
@@ -1317,12 +1333,13 @@ async function handleFolderUpload() {
     const relPath = file.webkitRelativePath || file.name;
     
     try {
-      await uploadFileInChunks(file, state.currentPath, relPath, (fileRatio) => {
+      await uploadFileInChunks(file, state.currentPath, relPath, (fileRatio, speedString) => {
         if (state.isUploadCancelled) return;
         const overallPercent = Math.round(((i + fileRatio) / totalFiles) * 100);
         filenameEl.innerText = `Uploading: ${relPath} (${i + 1}/${totalFiles})`;
         percentEl.innerText = `${overallPercent}%`;
         fillEl.style.width = `${overallPercent}%`;
+        if (speedEl) speedEl.innerText = speedString || '';
       });
     } catch (err) {
       if (state.isUploadCancelled || !err || err.message === 'Upload cancelled' || (err.message && err.message.includes('cancelled'))) {
@@ -1333,6 +1350,7 @@ async function handleFolderUpload() {
     }
   }
 
+  if (speedEl) speedEl.innerText = '';
   progressContainer.style.display = 'none';
   folderInput.value = ''; // Reset picker input
   state.activeUploadXhr = null;
@@ -1354,10 +1372,12 @@ async function handleFileUpload() {
   const filenameEl = document.getElementById('upload-filename');
   const percentEl = document.getElementById('upload-percentage');
   const fillEl = document.getElementById('upload-progress-fill');
+  const speedEl = document.getElementById('upload-speed');
 
   filenameEl.innerText = totalFiles === 1 ? files[0].name : `Preparing upload... (0/${totalFiles} files)`;
   percentEl.innerText = '0%';
   fillEl.style.width = '0%';
+  if (speedEl) speedEl.innerText = '';
   progressContainer.style.display = 'block';
   lucide.createIcons();
 
@@ -1365,12 +1385,13 @@ async function handleFileUpload() {
     if (state.isUploadCancelled) break;
     const file = files[i];
     try {
-      await uploadFileInChunks(file, state.currentPath, '', (fileRatio) => {
+      await uploadFileInChunks(file, state.currentPath, '', (fileRatio, speedString) => {
         if (state.isUploadCancelled) return;
         const overallPercent = Math.round(((i + fileRatio) / totalFiles) * 100);
         filenameEl.innerText = totalFiles === 1 ? file.name : `Uploading: ${file.name} (${i + 1}/${totalFiles})`;
         percentEl.innerText = `${overallPercent}%`;
         fillEl.style.width = `${overallPercent}%`;
+        if (speedEl) speedEl.innerText = speedString || '';
       });
     } catch (err) {
       if (state.isUploadCancelled || !err || err.message === 'Upload cancelled' || (err.message && err.message.includes('cancelled'))) {
@@ -1382,6 +1403,7 @@ async function handleFileUpload() {
     }
   }
 
+  if (speedEl) speedEl.innerText = '';
   progressContainer.style.display = 'none';
   fileInput.value = '';
   state.activeUploadXhr = null;
