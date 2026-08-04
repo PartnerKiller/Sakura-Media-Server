@@ -334,6 +334,8 @@ function initApp() {
   // Edit User Form & Visibility Toggle
   safeAddListener('edit-user-form', 'submit', handleEditUser);
   safeAddListener('btn-toggle-edit-password', 'click', toggleEditPasswordVisibility);
+  safeAddListener('edit-avatar-input', 'change', handleAdminAvatarUpload);
+  safeAddListener('btn-edit-remove-avatar', 'click', handleAdminAvatarDelete);
 
   // Permission management bindings
   safeAddListener('btn-add-rule', 'click', handleAddPermissionRule);
@@ -2416,6 +2418,11 @@ function openEditUserModal(userId, username, role, downloadBandwidthLimit, uploa
   document.getElementById('edit-password').value = '';
   document.getElementById('edit-password').type = 'password';
 
+  const avatarPreview = document.getElementById('edit-avatar-preview');
+  if (avatarPreview) {
+    avatarPreview.src = `/api/users/avatar/${username}?v=${Date.now()}`;
+  }
+
   const user = state.users ? state.users.find(u => u.id === userId) : null;
   const plainPassword = (user && user.plainPassword) ? user.plainPassword : 'Unknown (Hashed)';
   document.getElementById('edit-current-password-display').innerText = plainPassword;
@@ -2442,6 +2449,77 @@ function openEditUserModal(userId, username, role, downloadBandwidthLimit, uploa
   }
 
   openModal('modal-edit-user');
+}
+
+async function handleAdminAvatarUpload(e) {
+  const userId = document.getElementById('edit-user-id').value;
+  const username = document.getElementById('edit-username-title').innerText;
+  const file = e.target.files[0];
+  if (!file || !userId) return;
+
+  const errorEl = document.getElementById('edit-user-error');
+  if (errorEl) errorEl.innerText = '';
+
+  if (file.size > 5 * 1024 * 1024) {
+    if (errorEl) errorEl.innerText = 'File size exceeds 5MB limit';
+    e.target.value = '';
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const res = await apiCall(`/api/users/${userId}/avatar`, {
+      method: 'POST',
+      body: formData
+    });
+
+    const avatarPreview = document.getElementById('edit-avatar-preview');
+    if (avatarPreview) {
+      avatarPreview.src = `/api/users/avatar/${username}?v=${Date.now()}`;
+    }
+    
+    await loadUsers();
+    if (state.user && state.user.id == userId) {
+      updateUserProfileUI();
+    }
+  } catch (err) {
+    if (errorEl) errorEl.innerText = err.message || 'Failed to upload user avatar';
+  } finally {
+    e.target.value = '';
+  }
+}
+
+async function handleAdminAvatarDelete() {
+  const userId = document.getElementById('edit-user-id').value;
+  const username = document.getElementById('edit-username-title').innerText;
+  if (!userId) return;
+
+  const errorEl = document.getElementById('edit-user-error');
+  if (errorEl) errorEl.innerText = '';
+
+  if (!confirm(`Are you sure you want to remove ${username}'s profile picture?`)) {
+    return;
+  }
+
+  try {
+    await apiCall(`/api/users/${userId}/avatar`, {
+      method: 'DELETE'
+    });
+
+    const avatarPreview = document.getElementById('edit-avatar-preview');
+    if (avatarPreview) {
+      avatarPreview.src = `/api/users/avatar/${username}?v=${Date.now()}`;
+    }
+
+    await loadUsers();
+    if (state.user && state.user.id == userId) {
+      updateUserProfileUI();
+    }
+  } catch (err) {
+    if (errorEl) errorEl.innerText = err.message || 'Failed to remove user avatar';
+  }
 }
 
 async function handleEditUser(e) {

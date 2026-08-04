@@ -14,9 +14,12 @@ import java.io.File;
 import java.io.InputStreamReader;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -209,6 +212,92 @@ public class AdminController {
                 "downloadBandwidthLimit", user.getDownloadBandwidthLimit() != null ? user.getDownloadBandwidthLimit() : 0,
                 "uploadBandwidthLimit", user.getUploadBandwidthLimit() != null ? user.getUploadBandwidthLimit() : 0
         ));
+    }
+
+    private static final String AVATARS_DIR = "./data/avatars";
+
+    @PostMapping("/users/{id}/avatar")
+    public ResponseEntity<?> uploadUserAvatar(HttpServletRequest request, @PathVariable Long id, @RequestParam("file") MultipartFile file) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+
+        Optional<User> userOpt = userRepository.findById(id);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "User not found"));
+        }
+
+        User user = userOpt.get();
+
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "File is empty"));
+        }
+
+        if (file.getSize() > 5 * 1024 * 1024) { // 5MB limit
+            return ResponseEntity.badRequest().body(Map.of("error", "File size exceeds 5MB limit"));
+        }
+
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Only image files are allowed"));
+        }
+
+        try {
+            File dir = new File(AVATARS_DIR);
+            if (!dir.exists()) {
+                dir.mkdirs();
+            }
+
+            String origName = file.getOriginalFilename();
+            String ext = ".png";
+            if (origName != null && origName.lastIndexOf('.') > 0) {
+                ext = origName.substring(origName.lastIndexOf('.'));
+            }
+
+            String fileName = "avatar_" + user.getId() + "_" + UUID.randomUUID().toString() + ext;
+            Path targetPath = Paths.get(AVATARS_DIR).resolve(fileName);
+
+            if (user.getProfilePicture() != null) {
+                try {
+                    Files.deleteIfExists(Paths.get(AVATARS_DIR).resolve(user.getProfilePicture()));
+                } catch (Exception ignored) {}
+            }
+
+            Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
+
+            user.setProfilePicture(fileName);
+            userRepository.save(user);
+
+            logAudit(request, "Updated profile picture for user " + user.getUsername());
+
+            return ResponseEntity.ok(Map.of("profilePicture", "/api/users/avatar/" + user.getUsername()));
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Failed to save avatar file"));
+        }
+    }
+
+    @DeleteMapping("/users/{id}/avatar")
+    public ResponseEntity<?> deleteUserAvatar(HttpServletRequest request, @PathVariable Long id) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+
+        Optional<User> userOpt = userRepository.findById(id);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "User not found"));
+        }
+
+        User user = userOpt.get();
+        if (user.getProfilePicture() != null) {
+            try {
+                Files.deleteIfExists(Paths.get(AVATARS_DIR).resolve(user.getProfilePicture()));
+            } catch (Exception ignored) {}
+            user.setProfilePicture(null);
+            userRepository.save(user);
+            logAudit(request, "Removed profile picture for user " + user.getUsername());
+        }
+
+        return ResponseEntity.ok(Map.of("success", true));
     }
 
     @PutMapping("/users/{id}/permissions")

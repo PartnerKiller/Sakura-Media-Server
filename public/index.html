@@ -12,7 +12,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <!-- Local Chart.js for offline telemetry monitoring -->
   <script src="/chart.min.js"></script>
-  <link rel="stylesheet" href="/style.css?v=5.37">
+  <link rel="stylesheet" href="/style.css?v=5.38">
 </head>
 <body>
   
@@ -942,6 +942,26 @@
       <form id="edit-user-form">
         <input type="hidden" id="edit-user-id">
         <div class="modal-body">
+          <!-- Profile Picture Section for Admin -->
+          <div class="edit-avatar-section" style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border-subtle);">
+            <div style="width: 60px; height: 60px; border-radius: 50%; overflow: hidden; background: var(--bg-surface); border: 2px solid var(--border-subtle); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <img id="edit-avatar-preview" src="" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover;">
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <span style="font-weight: 500; font-size: 13px;">User Profile Picture</span>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <label class="btn btn-secondary" style="cursor: pointer; padding: 5px 10px; font-size: 11px; display: flex; align-items: center; gap: 4px; margin-bottom: 0;">
+                  <i data-lucide="upload" style="width: 12px; height: 12px;"></i>
+                  <span>Change Photo</span>
+                  <input type="file" id="edit-avatar-input" accept="image/png, image/jpeg, image/gif" style="display: none;">
+                </label>
+                <button type="button" id="btn-edit-remove-avatar" class="btn btn-danger" style="padding: 5px 10px; font-size: 11px; display: flex; align-items: center; gap: 4px;">
+                  <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
+                  <span>Remove</span>
+                </button>
+              </div>
+            </div>
+          </div>
           <div class="input-group">
             <label for="edit-username-display">Username</label>
             <input type="text" id="edit-username-display" placeholder="Enter username">
@@ -1158,6 +1178,6 @@
     </button>
   </nav>
 
-  <script src="/app.js?v=5.37"></script>
+  <script src="/app.js?v=5.38"></script>
 </body>
 </html>
