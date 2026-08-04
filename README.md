@@ -15,6 +15,7 @@ Designed to easily stream media files and manage server resources with friends u
 - **Format Filtering**: Isolate items instantly by category (Folders, Videos, Images, Audio, or Other formats).
 - **Sort Controls**: Sort items dynamically by Name (A-Z / Z-A), Size (Smallest / Largest), and Date Modified (Newest / Oldest) with directory pinning.
 - **Dynamic Breadcrumbs**: Smooth folder-hierarchy navigation relative to authorized root directories.
+- **Multi-Root Storage Boundaries**: Authorized file system roots are dynamically allocated per user (e.g., Home root, Storage root, and HDD root) with strict boundary traversal checks.
 - **Folder Downloads**: Pack and download entire directories as ZIP archives on the fly.
 
 ### 🎬 Media Playback
@@ -40,6 +41,12 @@ Designed to easily stream media files and manage server resources with friends u
 - **Log Telemetry**: Real-time inspection of System Logs and Audit Logs (user activity streams).
 - **Native Storage Telemetry**: Multi-partition storage capacity analysis using native Java File system APIs to prevent resource leaks.
 
+### 🎨 Visual Customization & Themes
+- **Dynamic System Themes**: Choose from 10 premium, customized color schemes (e.g., *Cyber Sakura*, *Deep Ocean*, *Midnight Azure*, *Carbon Gray*, *Aura Green*, *Neon Violet*, *Sunset Orange*, *Crimson Red*, *Forest Lagoon*, *Golden Amber*).
+- **Presentation Styles**: Instantly transform the web interface with 10 distinctive layout styles (e.g., *Glassmorphism*, *Minimalist*, *Retro Terminal* scanlines, *Vaporwave Dream*, *Cyberpunk*, *Material Design*, *Nebula Space*, *Steel Chrome*, *Nordic Aurora*, *Aero Classic*).
+- **Persistent User Profiles**: Custom styles can be selected globally by administrators or customized on a per-user profile basis.
+- **Active Indicator Overlays**: Highlight active themes and styles with a modern glowing border and interactive checkmark icon.
+
 ---
 
 ## 🛠️ Technology Stack
@@ -58,6 +65,7 @@ Designed to easily stream media files and manage server resources with friends u
 sakura-media-server/
 ├── pom.xml                     # Maven project configuration
 ├── db.js / server.js           # Development mocks and environment helpers
+├── data/                       # Local storage for application files (e.g., user avatars)
 ├── media-server.service        # Systemd service deployment configuration template
 ├── public/                     # Static web assets (compiled assets deployment)
 │   ├── index.html              # Core SPA interface
