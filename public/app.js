@@ -1,7 +1,25 @@
+function getStoredToken() {
+  try {
+    return localStorage.getItem('token') || sessionStorage.getItem('token') || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function getStoredUser() {
+  try {
+    const raw = localStorage.getItem('user') || sessionStorage.getItem('user');
+    if (!raw || raw === 'undefined') return null;
+    return JSON.parse(raw);
+  } catch (e) {
+    return null;
+  }
+}
+
 // GLOBAL STATE
 let state = {
-  token: localStorage.getItem('token') || sessionStorage.getItem('token'),
-  user: JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user')),
+  token: getStoredToken(),
+  user: getStoredUser(),
   currentRoot: null,       // object { name, path }
   currentPath: '',         // absolute path on server
   roots: [],               // list of accessible root objects
@@ -89,7 +107,7 @@ async function apiCall(endpoint, options = {}) {
     headers
   });
 
-  if (response.status === 401 || response.status === 403) {
+  if ((response.status === 401 || response.status === 403) && !endpoint.startsWith('/api/auth/login')) {
     // Session expired or unauthorized
     logout();
     throw new Error('Unauthorized or Session expired');
@@ -490,6 +508,7 @@ async function handleLogin(e) {
     errorEl.innerText = err.message || 'Login failed';
   }
 }
+window.handleLogin = handleLogin;
 
 function logout() {
   if (state.serverMetricsTimer) {
