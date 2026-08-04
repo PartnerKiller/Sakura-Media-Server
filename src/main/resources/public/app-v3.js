@@ -1204,104 +1204,88 @@ function handleDownloadFolder(e, filePath) {
 }
 window.handleDownloadFolder = handleDownloadFolder;
 
-const CHUNK_SIZE = 8 * 1024 * 1024; // 8MB chunks (fits comfortably within Cloudflare limit)
-
 async function uploadFileInChunks(file, basePath, relPath, onProgress) {
   if (state.isUploadCancelled) {
     throw new Error('Upload cancelled');
   }
 
   const startTime = Date.now();
-  const uploadId = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
-  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
 
-  for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+  await new Promise((resolve, reject) => {
     if (state.isUploadCancelled) {
-      throw new Error('Upload cancelled');
+      reject(new Error('Upload cancelled'));
+      return;
     }
 
-    const start = chunkIndex * CHUNK_SIZE;
-    const end = Math.min(start + CHUNK_SIZE, file.size);
-    const chunkBlob = file.slice(start, end);
-    const chunkFile = new File([chunkBlob], file.name);
+    const formData = new FormData();
+    formData.append('file', file);
 
-    await new Promise((resolve, reject) => {
-      if (state.isUploadCancelled) {
+    const xhr = new XMLHttpRequest();
+    state.activeUploadXhr = xhr;
+
+    const uploadUrl = `/api/files/upload?path=${encodeURIComponent(basePath)}&relativePath=${encodeURIComponent(relPath || '')}&filename=${encodeURIComponent(file.name)}`;
+    
+    xhr.open('POST', uploadUrl, true);
+    xhr.setRequestHeader('Authorization', `Bearer ${state.token}`);
+
+    xhr.upload.onprogress = (e) => {
+      if (state.isUploadCancelled) return;
+      if (e.lengthComputable && onProgress) {
+        const loaded = e.loaded;
+        const total = e.total;
+        
+        const elapsed = (Date.now() - startTime) / 1000;
+        let speedString = '';
+        if (elapsed > 0.1) {
+          const bps = loaded / elapsed;
+          if (bps > 1024 * 1024) {
+            speedString = `${(bps / (1024 * 1024)).toFixed(1)} MB/s`;
+          } else if (bps > 1024) {
+            speedString = `${(bps / 1024).toFixed(1)} KB/s`;
+          } else {
+            speedString = `${bps.toFixed(0)} B/s`;
+          }
+        }
+        onProgress(loaded / total, speedString);
+      }
+    };
+
+    let settled = false;
+    const handleDone = (errMessage) => {
+      if (settled) return;
+      settled = true;
+      state.activeUploadXhr = null;
+      if (state.isUploadCancelled || (errMessage && errMessage.includes('cancelled'))) {
         reject(new Error('Upload cancelled'));
+      } else if (errMessage) {
+        reject(new Error(errMessage));
+      } else {
+        resolve();
+      }
+    };
+
+    xhr.onload = () => {
+      if (state.isUploadCancelled) {
+        handleDone('Upload cancelled');
         return;
       }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        handleDone(null);
+      } else {
+        let errMsg = 'Failed to upload file';
+        try {
+          const res = JSON.parse(xhr.responseText);
+          errMsg = res.error || errMsg;
+        } catch (e) {}
+        handleDone(errMsg);
+      }
+    };
 
-      const formData = new FormData();
-      formData.append('file', chunkFile);
+    xhr.onerror = () => handleDone('Network error');
+    xhr.onabort = () => handleDone('Upload cancelled');
 
-      const xhr = new XMLHttpRequest();
-      state.activeUploadXhr = xhr;
-
-      const uploadUrl = `/api/files/upload-chunk?uploadId=${uploadId}&chunkIndex=${chunkIndex}&totalChunks=${totalChunks}&path=${encodeURIComponent(basePath)}&relativePath=${encodeURIComponent(relPath || '')}&filename=${encodeURIComponent(file.name)}`;
-      
-      xhr.open('POST', uploadUrl, true);
-      xhr.setRequestHeader('Authorization', `Bearer ${state.token}`);
-
-      xhr.upload.onprogress = (e) => {
-        if (state.isUploadCancelled) return;
-        if (e.lengthComputable && onProgress) {
-          const chunkLoaded = e.loaded;
-          const chunkTotal = e.total;
-          const totalLoaded = start + (chunkLoaded / chunkTotal) * (end - start);
-          
-          const elapsed = (Date.now() - startTime) / 1000;
-          let speedString = '';
-          if (elapsed > 0.1) {
-            const bps = totalLoaded / elapsed;
-            if (bps > 1024 * 1024) {
-              speedString = `${(bps / (1024 * 1024)).toFixed(1)} MB/s`;
-            } else if (bps > 1024) {
-              speedString = `${(bps / 1024).toFixed(1)} KB/s`;
-            } else {
-              speedString = `${bps.toFixed(0)} B/s`;
-            }
-          }
-          onProgress(totalLoaded / file.size, speedString);
-        }
-      };
-
-      let settled = false;
-      const handleDone = (errMessage) => {
-        if (settled) return;
-        settled = true;
-        state.activeUploadXhr = null;
-        if (state.isUploadCancelled || (errMessage && errMessage.includes('cancelled'))) {
-          reject(new Error('Upload cancelled'));
-        } else if (errMessage) {
-          reject(new Error(errMessage));
-        } else {
-          resolve();
-        }
-      };
-
-      xhr.onload = () => {
-        if (state.isUploadCancelled) {
-          handleDone('Upload cancelled');
-          return;
-        }
-        if (xhr.status >= 200 && xhr.status < 300) {
-          handleDone(null);
-        } else {
-          let errMsg = `Failed to upload chunk ${chunkIndex}`;
-          try {
-            const res = JSON.parse(xhr.responseText);
-            errMsg = res.error || errMsg;
-          } catch (e) {}
-          handleDone(errMsg);
-        }
-      };
-
-      xhr.onerror = () => handleDone('Network error');
-      xhr.onabort = () => handleDone('Upload cancelled');
-
-      xhr.send(formData);
-    });
-  }
+    xhr.send(formData);
+  });
 }
 
 async function handleFolderUpload() {

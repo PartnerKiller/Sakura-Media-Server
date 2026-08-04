@@ -501,6 +501,61 @@ public class FileController {
         }
     }
 
+    @PostMapping("/upload")
+    public ResponseEntity<?> uploadFile(
+            HttpServletRequest request,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "relativePath", required = false) String relativePath,
+            @RequestParam(value = "filename", required = false) String filename,
+            @RequestParam("path") String targetDirectory) {
+
+        User user = (User) request.getAttribute("user");
+
+        String finalRelPath = relativePath;
+        if (finalRelPath == null || finalRelPath.trim().isEmpty()) {
+            finalRelPath = filename;
+        }
+        if (finalRelPath == null || finalRelPath.trim().isEmpty()) {
+            finalRelPath = file.getOriginalFilename();
+        }
+        if (finalRelPath == null || finalRelPath.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "relativePath or filename parameter is required"));
+        }
+
+        // Clean relativePath boundaries
+        String cleanRelativePath = finalRelPath.replace("\\", "/");
+        if (cleanRelativePath.startsWith("/")) {
+            cleanRelativePath = cleanRelativePath.substring(1);
+        }
+
+        String finalFileDestination = Paths.get(targetDirectory, cleanRelativePath).toAbsolutePath().normalize().toString().replace("\\", "/");
+        String finalDirDestination = Paths.get(finalFileDestination).getParent().toString().replace("\\", "/");
+
+        if (!hasPermission(user, finalDirDestination, "write")) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Permission denied"));
+        }
+
+        try {
+            Path finalPath = Paths.get(finalFileDestination);
+            Files.createDirectories(finalPath.getParent());
+
+            java.io.InputStream inputStream = file.getInputStream();
+            if (user != null && user.getUploadBandwidthLimit() != null && user.getUploadBandwidthLimit() > 0) {
+                inputStream = new com.sakuradata.media.util.ThrottledInputStream(inputStream, (long) (user.getUploadBandwidthLimit() * 1024 * 1024));
+            }
+
+            Files.copy(inputStream, finalPath, StandardCopyOption.REPLACE_EXISTING);
+
+            String parentPath = finalPath.getParent().toAbsolutePath().normalize().toString().replace("\\", "/");
+            SseController.broadcast("fs-change", Map.of("userId", user.getId(), "parentPath", parentPath));
+
+            return ResponseEntity.ok(Map.of("success", true));
+        } catch (IOException e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to upload file: " + e.getMessage()));
+        }
+    }
+
     @DeleteMapping("/delete")
     public ResponseEntity<?> deleteFile(HttpServletRequest request, @RequestParam String path) {
         User user = (User) request.getAttribute("user");
