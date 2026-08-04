@@ -60,7 +60,7 @@ public class RecycleBinController {
             recycleItemRepository.delete(item);
 
             // Broadcast change event for destination parent path
-            String parentPath = dest.getParentFile().getAbsolutePath().replace("\\", "/");
+            String parentPath = dest.getParentFile() != null ? dest.getParentFile().getAbsolutePath().replace("\\", "/") : "";
             SseController.broadcast("fs-change", Map.of("userId", user.getId(), "parentPath", parentPath));
 
             return ResponseEntity.ok(Map.of("success", true));

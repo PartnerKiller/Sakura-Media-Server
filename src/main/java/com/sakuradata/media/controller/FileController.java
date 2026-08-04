@@ -398,6 +398,10 @@ public class FileController {
             return ResponseEntity.badRequest().body(Map.of("error", "Path and name are required"));
         }
 
+        if (name.contains("/") || name.contains("\\") || name.contains("..")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid characters in new folder name"));
+        }
+
         String targetDir = Paths.get(pathParam).toAbsolutePath().normalize().toString().replace("\\", "/");
         if (!hasPermission(user, targetDir, "write")) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Permission denied"));
@@ -474,10 +478,11 @@ public class FileController {
                 }
 
                 // Delete chunks folder recursively
-                Files.walk(chunkFolder)
-                        .sorted(Comparator.reverseOrder())
-                        .map(Path::toFile)
-                        .forEach(File::delete);
+                try (java.util.stream.Stream<Path> stream = Files.walk(chunkFolder)) {
+                    stream.sorted(Comparator.reverseOrder())
+                            .map(Path::toFile)
+                            .forEach(File::delete);
+                }
 
                 String parentPath = finalPath.getParent().toAbsolutePath().normalize().toString().replace("\\", "/");
                 SseController.broadcast("fs-change", Map.of("userId", user.getId(), "parentPath", parentPath));
@@ -540,7 +545,7 @@ public class FileController {
                 recycleItemRepository.save(item);
 
                 // Broadcast change event for parent path
-                String parentPath = file.getParentFile().getAbsolutePath().replace("\\", "/");
+                String parentPath = file.getParentFile() != null ? file.getParentFile().getAbsolutePath().replace("\\", "/") : "";
                 SseController.broadcast("fs-change", Map.of("userId", user.getId(), "parentPath", parentPath));
 
                 return ResponseEntity.ok(Map.of("success", true, "recycled", true));
@@ -567,7 +572,7 @@ public class FileController {
         }
 
         String targetPath = Paths.get(path).toAbsolutePath().normalize().toString().replace("\\", "/");
-        if (!hasPermission(user, targetPath, "read")) {
+        if (!hasPermission(user, targetPath, "write")) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Permission denied"));
         }
 

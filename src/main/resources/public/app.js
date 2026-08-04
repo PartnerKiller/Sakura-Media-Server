@@ -1493,14 +1493,15 @@ function renderUsers() {
          </button>` 
       : '';
       
+    const escapedUsername = escapeJsStr(u.username);
     const configurePermsBtn = u.role !== 'admin'
-      ? `<button class="btn btn-primary" onclick="openPermissionsModal(${u.id}, '${u.username}')">
+      ? `<button class="btn btn-primary" onclick="openPermissionsModal(${u.id}, '${escapedUsername}')">
            <i data-lucide="key" style="width:16px; height:16px;"></i>
            <span>Permissions</span>
          </button>`
       : '<span class="text-muted" style="font-size: 13px;">Administrator</span>';
 
-    const editBtn = `<button class="btn btn-secondary" onclick="openEditUserModal(${u.id}, '${u.username}', '${u.role}', ${u.downloadBandwidthLimit || 0}, ${u.uploadBandwidthLimit || 0})">
+    const editBtn = `<button class="btn btn-secondary" onclick="openEditUserModal(${u.id}, '${escapedUsername}', '${u.role}', ${u.downloadBandwidthLimit || 0}, ${u.uploadBandwidthLimit || 0})">
                        <i data-lucide="edit" style="width:16px; height:16px;"></i>
                        <span>Edit</span>
                      </button>`;
@@ -1511,9 +1512,9 @@ function renderUsers() {
           <div style="width: 28px; height: 28px; border-radius: 50%; overflow: hidden; background: var(--bg-surface); border: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: center;">
             <img src="/api/users/avatar/${u.username}?v=${Date.now()}" alt="" style="width: 100%; height: 100%; object-fit: cover;">
           </div>
-          <span style="font-weight: 500;">${u.username}</span>
+          <span style="font-weight: 500;">${escapeHtml(u.username)}</span>
         </div>
-      </td>
+      </td>`
       <td><span class="role-badge ${u.role}">${u.role}</span></td>
       <td>${u.role === 'admin' ? 'All (Full access)' : permCount + ' path rule(s)'}</td>
       <td>${formatBandwidth(u.downloadBandwidthLimit)}</td>
@@ -2627,6 +2628,11 @@ function formatTime(seconds) {
 function escapeHtml(str) {
   if (!str) return '';
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+function escapeJsStr(str) {
+  if (!str) return '';
+  return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
 }
 
 // RECYCLE BIN FUNCTIONALITY

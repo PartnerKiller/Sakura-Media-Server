@@ -137,6 +137,13 @@ public class AdminController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "User not found"));
         }
 
+        User user = userOpt.get();
+        if (user.getProfilePicture() != null) {
+            try {
+                Files.deleteIfExists(Paths.get(AVATARS_DIR).resolve(user.getProfilePicture()));
+            } catch (Exception ignored) {}
+        }
+
         // Remove user permissions first (explicit transaction block in JPA repository is automatic on delete)
         permissionRepository.deleteByUserId(id);
         userRepository.deleteById(id);
@@ -1123,7 +1130,7 @@ public class AdminController {
             "#6fa8dc", "#8e7cc3", "#c27ba0", "#a64d79", "#674ea7", 
             "#3d85c6", "#45818e", "#3f51b5", "#009688", "#4caf50"
         };
-        String bgColor = colors[Math.abs(hash) % colors.length];
+        String bgColor = colors[(hash & Integer.MAX_VALUE) % colors.length];
         
         String svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\" viewBox=\"0 0 100 100\">" +
                 "<rect width=\"100\" height=\"100\" rx=\"50\" fill=\"" + bgColor + "\"/>" +
