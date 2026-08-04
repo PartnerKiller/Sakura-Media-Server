@@ -373,10 +373,12 @@ public class AdminController {
             File homeFile = new File("/home/sakura");
             File storageFile = new File("/media/storage");
             File hddFile = new File("/media/hdd");
+            File gdriveFile = new File("/home/sakura/gdrive");
 
             Map<String, Object> homeStats = null;
             Map<String, Object> storageStats = null;
             Map<String, Object> hddStats = null;
+            Map<String, Object> gdriveStats = null;
 
             if (homeFile.exists()) {
                 long total = homeFile.getTotalSpace();
@@ -420,6 +422,20 @@ public class AdminController {
                 hddStats.put("mountedOn", "/media/hdd");
             }
 
+            if (gdriveFile.exists()) {
+                long total = gdriveFile.getTotalSpace();
+                long usable = gdriveFile.getUsableSpace();
+                long used = total - usable;
+                double percent = total > 0 ? (double) used / total * 100 : 0.0;
+                gdriveStats = new HashMap<>();
+                gdriveStats.put("filesystem", "gdrive");
+                gdriveStats.put("total", total);
+                gdriveStats.put("used", used);
+                gdriveStats.put("available", usable);
+                gdriveStats.put("usePercent", String.format(Locale.US, "%.0f%%", percent));
+                gdriveStats.put("mountedOn", "/home/sakura/gdrive");
+            }
+
             Map<String, Object> response = new HashMap<>();
             if (homeStats != null) {
                 homeStats.put("name", "Home (sakura)");
@@ -435,6 +451,11 @@ public class AdminController {
                 hddStats.put("name", "HDD");
                 hddStats.put("path", "/media/hdd");
                 response.put("hdd", hddStats);
+            }
+            if (gdriveStats != null) {
+                gdriveStats.put("name", "Google Drive");
+                gdriveStats.put("path", "/home/sakura/gdrive");
+                response.put("gdrive", gdriveStats);
             }
 
             return ResponseEntity.ok(response);

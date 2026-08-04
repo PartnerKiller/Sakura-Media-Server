@@ -27,6 +27,7 @@ public class FileController {
     private static final String SAKURA_ROOT = "/home/sakura";
     private static final String STORAGE_ROOT = "/media/storage";
     private static final String HDD_ROOT = "/media/hdd";
+    private static final String GDRIVE_ROOT = "/home/sakura/gdrive";
     private static final String TEMP_CHUNKS_DIR = "./temp-chunks";
 
     @Autowired
@@ -55,6 +56,7 @@ public class FileController {
             roots.add(Map.of("name", "Home root", "path", SAKURA_ROOT, "allowWrite", true));
             roots.add(Map.of("name", "Storage root", "path", STORAGE_ROOT, "allowWrite", true));
             roots.add(Map.of("name", "HDD root", "path", HDD_ROOT, "allowWrite", true));
+            roots.add(Map.of("name", "Google Drive", "path", GDRIVE_ROOT, "allowWrite", true));
         } else {
             List<Permission> perms = permissionRepository.findByUserId(user.getId());
             for (Permission p : perms) {
@@ -333,7 +335,7 @@ public class FileController {
         }
 
         String targetPath = Paths.get(path).toAbsolutePath().normalize().toString().replace("\\", "/");
-        if (targetPath.equals(SAKURA_ROOT) || targetPath.equals(STORAGE_ROOT) || targetPath.equals(HDD_ROOT)) {
+        if (targetPath.equals(SAKURA_ROOT) || targetPath.equals(STORAGE_ROOT) || targetPath.equals(HDD_ROOT) || targetPath.equals(GDRIVE_ROOT)) {
             response.sendError(403, "Cannot download root directories directly");
             return;
         }
