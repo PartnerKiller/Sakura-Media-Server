@@ -123,37 +123,35 @@ public class FileController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Directory not found"));
         }
 
-        File[] files = folder.listFiles();
         List<Map<String, Object>> result = new ArrayList<>();
         long folderSize = 0L;
 
-        if (files != null && files.length > 0) {
-            java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newFixedThreadPool(Math.min(files.length, 32));
-            List<java.util.concurrent.Future<Map<String, Object>>> futures = new ArrayList<>();
-            for (File file : files) {
-                futures.add(executor.submit(() -> {
-                    Map<String, Object> fileMap = new HashMap<>();
-                    fileMap.put("name", file.getName());
-                    boolean isFile = file.isFile();
-                    fileMap.put("isFile", isFile);
-                    fileMap.put("size", isFile ? file.length() : 0L);
-                    fileMap.put("mtime", file.lastModified());
-                    return fileMap;
-                }));
-            }
-
-            for (java.util.concurrent.Future<Map<String, Object>> future : futures) {
+        try (java.nio.file.DirectoryStream<java.nio.file.Path> stream = java.nio.file.Files.newDirectoryStream(folder.toPath())) {
+            for (java.nio.file.Path entry : stream) {
+                Map<String, Object> fileMap = new HashMap<>();
+                fileMap.put("name", entry.getFileName().toString());
                 try {
-                    Map<String, Object> fileMap = future.get();
-                    result.add(fileMap);
-                    if ((boolean) fileMap.get("isFile")) {
-                        folderSize += (long) fileMap.get("size");
+                    java.nio.file.attribute.BasicFileAttributes attrs = java.nio.file.Files.readAttributes(entry, java.nio.file.attribute.BasicFileAttributes.class);
+                    boolean isFile = attrs.isRegularFile();
+                    fileMap.put("isFile", isFile);
+                    long size = isFile ? attrs.size() : 0L;
+                    fileMap.put("size", size);
+                    fileMap.put("mtime", attrs.lastModifiedTime().toMillis());
+                    
+                    if (isFile) {
+                        folderSize += size;
                     }
                 } catch (Exception e) {
-                    // Ignore
+                    // Fallback
+                    fileMap.put("isFile", false);
+                    fileMap.put("size", 0L);
+                    fileMap.put("mtime", 0L);
                 }
+                result.add(fileMap);
             }
-            executor.shutdown();
+        } catch (java.io.IOException e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Failed to read directory: " + e.getMessage()));
         }
 
         // Sort folders first, then files alphabetically
