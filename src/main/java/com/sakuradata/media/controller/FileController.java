@@ -147,17 +147,13 @@ public class FileController {
         });
 
         long folderSize = 0L;
-        try (java.util.stream.Stream<Path> stream = Files.walk(Paths.get(targetPath))) {
-            folderSize = stream.filter(p -> Files.isRegularFile(p))
-                               .mapToLong(p -> {
-                                   try {
-                                       return Files.size(p);
-                                   } catch (Exception e) {
-                                       return 0L;
-                                   }
-                               })
-                               .sum();
-        } catch (Exception ignored) {}
+        if (files != null) {
+            for (File file : files) {
+                if (file.isFile()) {
+                    folderSize += file.length();
+                }
+            }
+        }
 
         return ResponseEntity.ok(Map.of(
                 "currentPath", targetPath,
