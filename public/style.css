@@ -1433,21 +1433,47 @@ video {
 
   .topbar-actions {
     width: 100%;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-    gap: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
   }
 
   .topbar-actions button {
+    flex: 1;
     justify-content: center;
     font-size: 11px;
-    padding: 10px 8px;
+    padding: 10px 4px;
     gap: 4px;
+    white-space: nowrap;
+    min-width: 0;
   }
 
   .topbar-actions button i {
     width: 14px;
     height: 14px;
+  }
+
+  @media (max-width: 480px) {
+    .topbar-actions {
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .topbar-actions button {
+      flex: none;
+      width: 40px;
+      height: 40px;
+      border-radius: 50% !important;
+      padding: 0;
+    }
+    .topbar-actions button span {
+      display: none !important;
+    }
+    .topbar-actions button i {
+      width: 18px;
+      height: 18px;
+      margin: 0;
+    }
   }
 
   .roots-selector-container {
@@ -1490,6 +1516,51 @@ video {
   .panel-container {
     padding: 15px;
     padding-bottom: 80px; /* Space for bottom nav bar */
+  }
+
+  .files-grid.list-view .file-card-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding-right: 10px;
+  }
+
+  .files-grid.list-view .file-name {
+    width: 100%;
+    margin-bottom: 0;
+  }
+
+  .files-grid.list-view .file-meta-size,
+  .files-grid.list-view .file-meta-date {
+    text-align: left;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .files-grid.list-view .file-meta-size {
+    display: inline-block;
+  }
+
+  .files-grid.list-view .file-meta-size::after {
+    content: " • ";
+    margin: 0 4px;
+  }
+
+  .files-grid.list-view .file-meta-date {
+    display: inline-block;
+  }
+
+  .files-grid.list-view .file-actions {
+    gap: 4px;
+  }
+  .files-grid.list-view .btn-card-action {
+    padding: 6px;
+    width: 30px;
+    height: 30px;
+  }
+  .files-grid.list-view .btn-card-action i {
+    width: 14px;
+    height: 14px;
   }
 
   .main-content {
