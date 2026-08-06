@@ -15,6 +15,8 @@ import java.io.InputStreamReader;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.http.MediaType;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.context.event.EventListener;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -367,6 +369,20 @@ public class AdminController {
         return ResponseEntity.ok(Map.of("success", true, "permissions", newPermissions));
     }
 
+    @EventListener(ApplicationReadyEvent.class)
+    public void initStorageStats() {
+        new Thread(() -> {
+            try {
+                Thread.sleep(3000); // Settle down
+                Map<String, Object> stats = fetchStorageStats();
+                synchronized (AdminController.class) {
+                    cachedStorageStats = stats;
+                    lastStorageStatsUpdate = System.currentTimeMillis();
+                }
+            } catch (Exception ignored) {}
+        }).start();
+    }
+
     @GetMapping("/admin/storage-analysis")
     public ResponseEntity<?> getStorageAnalysis(HttpServletRequest request) {
         if (!isAdmin(request)) {
@@ -386,7 +402,7 @@ public class AdminController {
 
         if (needsRefresh) {
             if (localCached == null) {
-                // First load: fetch synchronously to ensure we have data to return
+                // First load fallback: fetch synchronously
                 Map<String, Object> stats = fetchStorageStats();
                 synchronized (AdminController.class) {
                     cachedStorageStats = stats;
@@ -394,7 +410,7 @@ public class AdminController {
                 }
                 return ResponseEntity.ok(stats);
             } else {
-                // Stale-while-revalidate: return cache instantly, trigger background update
+                // Stale-while-revalidate background update
                 new Thread(() -> {
                     try {
                         Map<String, Object> stats = fetchStorageStats();
@@ -427,7 +443,7 @@ public class AdminController {
         Map<String, Object> response = new HashMap<>();
 
         try {
-            Map<String, Object> homeStats = homeFuture.get(1500, java.util.concurrent.TimeUnit.MILLISECONDS);
+            Map<String, Object> homeStats = homeFuture.get(3000, java.util.concurrent.TimeUnit.MILLISECONDS);
             if (homeStats != null) {
                 homeStats.put("name", "Home (sakura)");
                 homeStats.put("path", "/home/sakura");
@@ -438,7 +454,7 @@ public class AdminController {
         }
 
         try {
-            Map<String, Object> storageStats = storageFuture.get(1500, java.util.concurrent.TimeUnit.MILLISECONDS);
+            Map<String, Object> storageStats = storageFuture.get(3000, java.util.concurrent.TimeUnit.MILLISECONDS);
             if (storageStats != null) {
                 storageStats.put("name", "Storage");
                 storageStats.put("path", "/media/storage");
@@ -449,7 +465,7 @@ public class AdminController {
         }
 
         try {
-            Map<String, Object> hddStats = hddFuture.get(1500, java.util.concurrent.TimeUnit.MILLISECONDS);
+            Map<String, Object> hddStats = hddFuture.get(3000, java.util.concurrent.TimeUnit.MILLISECONDS);
             if (hddStats != null) {
                 hddStats.put("name", "HDD");
                 hddStats.put("path", "/media/hdd");
@@ -460,7 +476,7 @@ public class AdminController {
         }
 
         try {
-            Map<String, Object> gdriveStats = gdriveFuture.get(1500, java.util.concurrent.TimeUnit.MILLISECONDS);
+            Map<String, Object> gdriveStats = gdriveFuture.get(15000, java.util.concurrent.TimeUnit.MILLISECONDS);
             if (gdriveStats != null) {
                 gdriveStats.put("name", "Google Drive");
                 gdriveStats.put("path", "/media/gdrive");
