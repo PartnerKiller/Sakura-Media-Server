@@ -11,7 +11,7 @@
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="/chart.min.js"></script>
-  <link rel="stylesheet" href="/style.css?v=5.49">
+  <link rel="stylesheet" href="/style.css?v=5.50">
 </head>
 <body>
   
@@ -1191,9 +1191,21 @@
           <i data-lucide="x"></i>
         </button>
       </div>
-      <div class="modal-body" style="padding: 15px;">
-        <div id="picker-breadcrumbs" class="breadcrumbs" style="margin-bottom: 12px; font-size: 12px; padding: 6px 12px; background: rgba(255,255,255,0.02); border-radius: 4px; display: flex; flex-wrap: wrap; gap: 4px;"></div>
-        <div id="picker-list" style="max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 8px; background: rgba(0,0,0,0.15);">
+      <div class="modal-body" style="padding: 15px; display: flex; flex-direction: column; gap: 10px;">
+        <!-- Drive Selector Dropdown -->
+        <div class="input-group" style="margin-bottom: 0;">
+          <label style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 4px; display: block;">Select Drive</label>
+          <select id="picker-drive-select" class="toolbar-select" style="width: 100%; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 8px 12px; background: var(--bg-panel); color: var(--text-primary); font-size: 13px; font-weight: 500;">
+            <!-- Roots options -->
+          </select>
+        </div>
+        
+        <div>
+          <label style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 4px; display: block;">Current Location</label>
+          <div id="picker-breadcrumbs" class="breadcrumbs" style="font-size: 12px; padding: 6px 12px; background: rgba(255,255,255,0.02); border-radius: 4px; display: flex; flex-wrap: wrap; gap: 4px;"></div>
+        </div>
+
+        <div id="picker-list" style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 8px; background: rgba(0,0,0,0.15);">
           <!-- Dynamic picker items populated here -->
         </div>
       </div>
@@ -1207,6 +1219,6 @@
     </div>
   </div>
 
-  <script src="/app-v4.js?v=4.02"></script>
+  <script src="/app-v4.js?v=4.03"></script>
 </body>
 </html>

@@ -35,7 +35,7 @@ let state = {
   isUploadCancelled: false,
   autoOpenFile: null,
   pickerCurrentPath: '',
-  pickerSelectedPath: ''
+  pickerSelectedPaths: []
 };
 
 function safeBase64Encode(str) {
@@ -432,6 +432,9 @@ function initApp() {
   safeAddListener('btn-close-picker', 'click', closePickerModal);
   safeAddListener('btn-cancel-picker', 'click', closePickerModal);
   safeAddListener('btn-confirm-picker', 'click', confirmPickerSelection);
+  safeAddListener('picker-drive-select', 'change', (e) => {
+    loadPickerDirectory(e.target.value);
+  });
 }
 
 // AUTHENTICATION FLOWS
@@ -1761,17 +1764,24 @@ function handleAddPermissionRule() {
   const pathVal = pathEl.value.trim();
   if (!pathVal) return;
 
-  // Check if path is duplicate
-  if (state.activePermissionsList.some(r => r.path === pathVal)) {
-    alert('Access rule for this path already exists.');
-    return;
-  }
+  const paths = pathVal.split(',').map(p => p.trim()).filter(p => p.length > 0);
+  let duplicateCount = 0;
 
-  state.activePermissionsList.push({
-    path: pathVal,
-    allowRead: true, // read is implicitly true for folders you have permission to
-    allowWrite: writeEl.checked
+  paths.forEach(p => {
+    if (state.activePermissionsList.some(r => r.path === p)) {
+      duplicateCount++;
+      return;
+    }
+    state.activePermissionsList.push({
+      path: p,
+      allowRead: true,
+      allowWrite: writeEl.checked
+    });
   });
+
+  if (duplicateCount > 0 && duplicateCount === paths.length) {
+    alert('Access rules for these paths already exist.');
+  }
 
   // reset inputs
   pathEl.value = '';
@@ -3310,11 +3320,36 @@ function openPickerModal() {
   
   modal.classList.add('active');
   
+  // Populate the drive select dropdown
+  const driveSelect = document.getElementById('picker-drive-select');
+  if (driveSelect) {
+    driveSelect.innerHTML = '';
+    state.roots.forEach(root => {
+      const opt = document.createElement('option');
+      opt.value = root.path;
+      opt.innerText = root.name;
+      driveSelect.appendChild(opt);
+    });
+  }
+
   // Set initial path: use the current explorer path or SAKURA_ROOT as fallback
   state.pickerCurrentPath = state.currentPath || '/home/sakura';
-  state.pickerSelectedPath = ''; // Nothing selected initially
+  state.pickerSelectedPaths = []; // Nothing selected initially
+  
+  // Synchronize dropdown value
+  syncPickerDriveSelect(state.pickerCurrentPath);
   
   loadPickerDirectory(state.pickerCurrentPath);
+}
+
+function syncPickerDriveSelect(path) {
+  const driveSelect = document.getElementById('picker-drive-select');
+  if (!driveSelect || !state.roots.length) return;
+  
+  const matchedRoot = findRootForPath(path);
+  if (matchedRoot) {
+    driveSelect.value = matchedRoot.path;
+  }
 }
 
 function closePickerModal() {
@@ -3327,32 +3362,27 @@ function closePickerModal() {
 async function loadPickerDirectory(path) {
   const listContainer = document.getElementById('picker-list');
   const breadcrumbsContainer = document.getElementById('picker-breadcrumbs');
-  const selectedDisplay = document.getElementById('picker-selected-display');
   
   if (!listContainer || !breadcrumbsContainer) return;
   
   listContainer.innerHTML = '<div style="padding: 10px; color: var(--text-muted); text-align: center;">Loading folder contents...</div>';
   breadcrumbsContainer.innerHTML = '';
   
-  // Set selected path text to display the current folder as default if no item is highlighted
   state.pickerCurrentPath = path;
+  syncPickerDriveSelect(path);
   
-  // We can select either a file or a folder. By default, if nothing is highlighted, 
-  // we select the current folder.
-  if (state.pickerSelectedPath && !state.pickerSelectedPath.startsWith(path)) {
-    state.pickerSelectedPath = ''; // Clear selection if we navigated away
-  }
+  // Clear active selections on directory change
+  state.pickerSelectedPaths = [];
   updatePickerSelectedDisplay();
 
   try {
     const data = await apiCall(`/api/files/browse?path=${encodeURIComponent(path)}`);
     listContainer.innerHTML = '';
     
-    // 1. Render breadcrumbs for picker
+    // Render breadcrumbs
     renderPickerBreadcrumbs(path);
     
-    // If we're at a root or subfolder, add an option to go to the parent directory if possible
-    // Let's find if the current path has a parent relative to any authorized root
+    // Up directory navigation item
     const matchedRoot = findRootForPath(path);
     const parentPath = getParentDirectory(path);
     if (parentPath && matchedRoot && path !== matchedRoot.path) {
@@ -3380,46 +3410,64 @@ async function loadPickerDirectory(path) {
       items.forEach(file => {
         const itemEl = document.createElement('div');
         itemEl.className = 'picker-item';
-        itemEl.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 8px; border-radius: 4px; cursor: pointer; transition: background var(--transition-fast);';
+        itemEl.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-radius: 4px; cursor: pointer; transition: background var(--transition-fast);';
+        
+        // Build absolute path for the item
+        const itemPath = path === '/' ? `/${file.name}` : `${path}/${file.name}`;
         
         // Icon
         const iconName = file.isFile ? 'file' : 'folder';
         const iconColor = file.isFile ? 'var(--text-muted)' : 'var(--primary)';
         
-        // Item content
+        // Left side content: checkbox + icon + name
         const itemLeft = document.createElement('div');
         itemLeft.style.cssText = 'display: flex; align-items: center; gap: 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; flex-grow: 1;';
-        itemLeft.innerHTML = `<i data-lucide="${iconName}" style="width: 16px; height: 16px; color: ${iconColor}; flex-shrink: 0;"></i> <span style="font-size: 13px; overflow: hidden; text-overflow: ellipsis;">${file.name}</span>`;
-        itemEl.appendChild(itemLeft);
         
-        // Click and highlight handling
-        itemEl.addEventListener('click', (e) => {
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.style.cssText = 'margin: 0; cursor: pointer; width: 14px; height: 14px;';
+        checkbox.checked = state.pickerSelectedPaths.includes(itemPath);
+        
+        // Prevent event bubbling on checkbox click
+        checkbox.addEventListener('click', (e) => {
           e.stopPropagation();
-          // Deselect others
-          listContainer.querySelectorAll('.picker-item').forEach(el => {
-            el.style.background = 'transparent';
-          });
-          
-          // Highlight this
-          itemEl.style.background = 'rgba(255, 74, 136, 0.15)';
-          state.pickerSelectedPath = file.path;
-          updatePickerSelectedDisplay();
+          toggleItemSelection(itemPath, itemEl, checkbox);
         });
         
-        // If it's a folder, allow double-click to navigate into it
+        itemLeft.appendChild(checkbox);
+        
+        const iconHTML = `<i data-lucide="${iconName}" style="width: 16px; height: 16px; color: ${iconColor}; flex-shrink: 0;"></i>`;
+        const iconWrapper = document.createElement('div');
+        iconWrapper.innerHTML = iconHTML;
+        itemLeft.appendChild(iconWrapper.firstChild);
+        
+        const nameSpan = document.createElement('span');
+        nameSpan.style.cssText = 'font-size: 13px; overflow: hidden; text-overflow: ellipsis;';
+        nameSpan.innerText = file.name;
+        itemLeft.appendChild(nameSpan);
+        
+        itemEl.appendChild(itemLeft);
+        
+        // Toggle selection on whole row click
+        itemEl.addEventListener('click', (e) => {
+          e.stopPropagation();
+          toggleItemSelection(itemPath, itemEl, checkbox);
+        });
+        
+        // If folder, double-click navigates inside
         if (!file.isFile) {
           itemEl.addEventListener('dblclick', (e) => {
             e.stopPropagation();
-            loadPickerDirectory(file.path);
+            loadPickerDirectory(itemPath);
           });
           
-          // Also show a small helper navigate icon on the right
+          // Helper navigate icon on the right
           const navIcon = document.createElement('i');
           navIcon.setAttribute('data-lucide', 'chevron-right');
           navIcon.style.cssText = 'width: 14px; height: 14px; color: var(--text-muted); cursor: pointer; padding: 4px;';
           navIcon.addEventListener('click', (e) => {
             e.stopPropagation();
-            loadPickerDirectory(file.path);
+            loadPickerDirectory(itemPath);
           });
           itemEl.appendChild(navIcon);
         }
@@ -3434,6 +3482,20 @@ async function loadPickerDirectory(path) {
     console.error('Failed to load picker directory:', err);
     listContainer.innerHTML = `<div style="padding: 10px; color: var(--red); text-align: center;">Error loading folder: ${err.message || err}</div>`;
   }
+}
+
+function toggleItemSelection(itemPath, itemEl, checkbox) {
+  const index = state.pickerSelectedPaths.indexOf(itemPath);
+  if (index > -1) {
+    state.pickerSelectedPaths.splice(index, 1);
+    itemEl.style.background = 'transparent';
+    checkbox.checked = false;
+  } else {
+    state.pickerSelectedPaths.push(itemPath);
+    itemEl.style.background = 'rgba(255, 74, 136, 0.15)';
+    checkbox.checked = true;
+  }
+  updatePickerSelectedDisplay();
 }
 
 function getParentDirectory(path) {
@@ -3487,18 +3549,21 @@ function updatePickerSelectedDisplay() {
   const display = document.getElementById('picker-selected-display');
   if (!display) return;
   
-  if (state.pickerSelectedPath) {
-    display.innerHTML = `Selected: <strong style="color: var(--primary);">${state.pickerSelectedPath}</strong>`;
+  if (state.pickerSelectedPaths.length > 0) {
+    display.innerHTML = `Selected (${state.pickerSelectedPaths.length} items): <strong style="color: var(--primary); font-size: 11px;">${state.pickerSelectedPaths.join(', ')}</strong>`;
   } else {
     display.innerHTML = `Selected (Current Folder): <strong style="color: var(--primary);">${state.pickerCurrentPath}</strong>`;
   }
 }
 
 function confirmPickerSelection() {
-  const targetPath = state.pickerSelectedPath || state.pickerCurrentPath;
   const inputEl = document.getElementById('rule-path');
-  if (inputEl && targetPath) {
-    inputEl.value = targetPath;
+  if (!inputEl) return;
+  
+  if (state.pickerSelectedPaths.length > 0) {
+    inputEl.value = state.pickerSelectedPaths.join(', ');
+  } else {
+    inputEl.value = state.pickerCurrentPath;
   }
   closePickerModal();
 }
