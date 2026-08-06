@@ -2730,5 +2730,9 @@ body.style-aero-classic .file-card {
   box-shadow: var(--shadow-glow);
 }
 
+.picker-item:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
 
 

@@ -33,7 +33,9 @@ let state = {
   filterType: 'all',
   activeUploadXhr: null,
   isUploadCancelled: false,
-  autoOpenFile: null
+  autoOpenFile: null,
+  pickerCurrentPath: '',
+  pickerSelectedPath: ''
 };
 
 function safeBase64Encode(str) {
@@ -424,6 +426,12 @@ function initApp() {
       setSystemUiStyle(styleName);
     });
   });
+
+  // File/Folder Picker listeners
+  safeAddListener('btn-browse-rule-path', 'click', openPickerModal);
+  safeAddListener('btn-close-picker', 'click', closePickerModal);
+  safeAddListener('btn-cancel-picker', 'click', closePickerModal);
+  safeAddListener('btn-confirm-picker', 'click', confirmPickerSelection);
 }
 
 // AUTHENTICATION FLOWS
@@ -3291,6 +3299,209 @@ async function setProfileUiStyle(styleName) {
 window.applyUserThemeAndStyle = applyUserThemeAndStyle;
 window.setProfileTheme = setProfileTheme;
 window.setProfileUiStyle = setProfileUiStyle;
+
+// ==========================================================================
+// FILE AND FOLDER PICKER FOR PERMISSIONS
+// ==========================================================================
+
+function openPickerModal() {
+  const modal = document.getElementById('modal-picker');
+  if (!modal) return;
+  
+  modal.classList.add('active');
+  
+  // Set initial path: use the current explorer path or SAKURA_ROOT as fallback
+  state.pickerCurrentPath = state.currentPath || '/home/sakura';
+  state.pickerSelectedPath = ''; // Nothing selected initially
+  
+  loadPickerDirectory(state.pickerCurrentPath);
+}
+
+function closePickerModal() {
+  const modal = document.getElementById('modal-picker');
+  if (modal) {
+    modal.classList.remove('active');
+  }
+}
+
+async function loadPickerDirectory(path) {
+  const listContainer = document.getElementById('picker-list');
+  const breadcrumbsContainer = document.getElementById('picker-breadcrumbs');
+  const selectedDisplay = document.getElementById('picker-selected-display');
+  
+  if (!listContainer || !breadcrumbsContainer) return;
+  
+  listContainer.innerHTML = '<div style="padding: 10px; color: var(--text-muted); text-align: center;">Loading folder contents...</div>';
+  breadcrumbsContainer.innerHTML = '';
+  
+  // Set selected path text to display the current folder as default if no item is highlighted
+  state.pickerCurrentPath = path;
+  
+  // We can select either a file or a folder. By default, if nothing is highlighted, 
+  // we select the current folder.
+  if (state.pickerSelectedPath && !state.pickerSelectedPath.startsWith(path)) {
+    state.pickerSelectedPath = ''; // Clear selection if we navigated away
+  }
+  updatePickerSelectedDisplay();
+
+  try {
+    const data = await apiCall(`/api/files/browse?path=${encodeURIComponent(path)}`);
+    listContainer.innerHTML = '';
+    
+    // 1. Render breadcrumbs for picker
+    renderPickerBreadcrumbs(path);
+    
+    // If we're at a root or subfolder, add an option to go to the parent directory if possible
+    // Let's find if the current path has a parent relative to any authorized root
+    const matchedRoot = findRootForPath(path);
+    const parentPath = getParentDirectory(path);
+    if (parentPath && matchedRoot && path !== matchedRoot.path) {
+      const upItem = document.createElement('div');
+      upItem.className = 'picker-item';
+      upItem.style.cssText = 'display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 4px; cursor: pointer; color: var(--primary);';
+      upItem.innerHTML = `<i data-lucide="folder-up" style="width: 16px; height: 16px;"></i> <span>.. (Parent Directory)</span>`;
+      upItem.addEventListener('click', () => {
+        loadPickerDirectory(parentPath);
+      });
+      listContainer.appendChild(upItem);
+    }
+    
+    // Sort directories first, then files
+    const folders = data.files.filter(f => !f.isFile);
+    const files = data.files.filter(f => f.isFile);
+    const items = [...folders, ...files];
+    
+    if (items.length === 0) {
+      const emptyMsg = document.createElement('div');
+      emptyMsg.style.cssText = 'padding: 15px; color: var(--text-muted); text-align: center; font-size: 13px;';
+      emptyMsg.innerText = 'This folder is empty';
+      listContainer.appendChild(emptyMsg);
+    } else {
+      items.forEach(file => {
+        const itemEl = document.createElement('div');
+        itemEl.className = 'picker-item';
+        itemEl.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 8px; border-radius: 4px; cursor: pointer; transition: background var(--transition-fast);';
+        
+        // Icon
+        const iconName = file.isFile ? 'file' : 'folder';
+        const iconColor = file.isFile ? 'var(--text-muted)' : 'var(--primary)';
+        
+        // Item content
+        const itemLeft = document.createElement('div');
+        itemLeft.style.cssText = 'display: flex; align-items: center; gap: 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; flex-grow: 1;';
+        itemLeft.innerHTML = `<i data-lucide="${iconName}" style="width: 16px; height: 16px; color: ${iconColor}; flex-shrink: 0;"></i> <span style="font-size: 13px; overflow: hidden; text-overflow: ellipsis;">${file.name}</span>`;
+        itemEl.appendChild(itemLeft);
+        
+        // Click and highlight handling
+        itemEl.addEventListener('click', (e) => {
+          e.stopPropagation();
+          // Deselect others
+          listContainer.querySelectorAll('.picker-item').forEach(el => {
+            el.style.background = 'transparent';
+          });
+          
+          // Highlight this
+          itemEl.style.background = 'rgba(255, 74, 136, 0.15)';
+          state.pickerSelectedPath = file.path;
+          updatePickerSelectedDisplay();
+        });
+        
+        // If it's a folder, allow double-click to navigate into it
+        if (!file.isFile) {
+          itemEl.addEventListener('dblclick', (e) => {
+            e.stopPropagation();
+            loadPickerDirectory(file.path);
+          });
+          
+          // Also show a small helper navigate icon on the right
+          const navIcon = document.createElement('i');
+          navIcon.setAttribute('data-lucide', 'chevron-right');
+          navIcon.style.cssText = 'width: 14px; height: 14px; color: var(--text-muted); cursor: pointer; padding: 4px;';
+          navIcon.addEventListener('click', (e) => {
+            e.stopPropagation();
+            loadPickerDirectory(file.path);
+          });
+          itemEl.appendChild(navIcon);
+        }
+        
+        listContainer.appendChild(itemEl);
+      });
+    }
+    
+    if (typeof lucide !== 'undefined') lucide.createIcons({ container: listContainer });
+    
+  } catch (err) {
+    console.error('Failed to load picker directory:', err);
+    listContainer.innerHTML = `<div style="padding: 10px; color: var(--red); text-align: center;">Error loading folder: ${err.message || err}</div>`;
+  }
+}
+
+function getParentDirectory(path) {
+  if (!path || path === '/' || path.indexOf('/') === -1) return null;
+  const lastSlash = path.lastIndexOf('/');
+  if (lastSlash === 0) return '/';
+  return path.substring(0, lastSlash);
+}
+
+function renderPickerBreadcrumbs(path) {
+  const container = document.getElementById('picker-breadcrumbs');
+  if (!container) return;
+  
+  // Find which root this path belongs to
+  const matchedRoot = findRootForPath(path);
+  if (!matchedRoot) {
+    // If not matching any root, just display the text
+    container.innerHTML = `<span>${path}</span>`;
+    return;
+  }
+  
+  // Render root badge
+  const rootBtn = document.createElement('span');
+  rootBtn.style.cssText = 'cursor: pointer; color: var(--primary); font-weight: 500;';
+  rootBtn.innerText = matchedRoot.name;
+  rootBtn.addEventListener('click', () => loadPickerDirectory(matchedRoot.path));
+  container.appendChild(rootBtn);
+  
+  const relativePart = path.substring(matchedRoot.path.length);
+  const parts = relativePart.split('/').filter(p => p !== '');
+  
+  let currentAccumulatedPath = matchedRoot.path;
+  parts.forEach(part => {
+    const sep = document.createElement('span');
+    sep.innerText = ' / ';
+    sep.style.color = 'var(--text-muted)';
+    container.appendChild(sep);
+    
+    currentAccumulatedPath += '/' + part;
+    const thisPath = currentAccumulatedPath;
+    
+    const segment = document.createElement('span');
+    segment.style.cssText = 'cursor: pointer; color: var(--text-primary);';
+    segment.innerText = part;
+    segment.addEventListener('click', () => loadPickerDirectory(thisPath));
+    container.appendChild(segment);
+  });
+}
+
+function updatePickerSelectedDisplay() {
+  const display = document.getElementById('picker-selected-display');
+  if (!display) return;
+  
+  if (state.pickerSelectedPath) {
+    display.innerHTML = `Selected: <strong style="color: var(--primary);">${state.pickerSelectedPath}</strong>`;
+  } else {
+    display.innerHTML = `Selected (Current Folder): <strong style="color: var(--primary);">${state.pickerCurrentPath}</strong>`;
+  }
+}
+
+function confirmPickerSelection() {
+  const targetPath = state.pickerSelectedPath || state.pickerCurrentPath;
+  const inputEl = document.getElementById('rule-path');
+  if (inputEl && targetPath) {
+    inputEl.value = targetPath;
+  }
+  closePickerModal();
+}
 
 
 
