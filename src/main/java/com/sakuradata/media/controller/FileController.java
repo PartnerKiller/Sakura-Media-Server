@@ -125,15 +125,35 @@ public class FileController {
 
         File[] files = folder.listFiles();
         List<Map<String, Object>> result = new ArrayList<>();
-        if (files != null) {
+        long folderSize = 0L;
+
+        if (files != null && files.length > 0) {
+            java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newFixedThreadPool(Math.min(files.length, 32));
+            List<java.util.concurrent.Future<Map<String, Object>>> futures = new ArrayList<>();
             for (File file : files) {
-                Map<String, Object> fileMap = new HashMap<>();
-                fileMap.put("name", file.getName());
-                fileMap.put("isFile", file.isFile());
-                fileMap.put("size", file.isFile() ? file.length() : 0L);
-                fileMap.put("mtime", file.lastModified());
-                result.add(fileMap);
+                futures.add(executor.submit(() -> {
+                    Map<String, Object> fileMap = new HashMap<>();
+                    fileMap.put("name", file.getName());
+                    boolean isFile = file.isFile();
+                    fileMap.put("isFile", isFile);
+                    fileMap.put("size", isFile ? file.length() : 0L);
+                    fileMap.put("mtime", file.lastModified());
+                    return fileMap;
+                }));
             }
+
+            for (java.util.concurrent.Future<Map<String, Object>> future : futures) {
+                try {
+                    Map<String, Object> fileMap = future.get();
+                    result.add(fileMap);
+                    if ((boolean) fileMap.get("isFile")) {
+                        folderSize += (long) fileMap.get("size");
+                    }
+                } catch (Exception e) {
+                    // Ignore
+                }
+            }
+            executor.shutdown();
         }
 
         // Sort folders first, then files alphabetically
@@ -145,15 +165,6 @@ public class FileController {
             }
             return ((String) a.get("name")).compareToIgnoreCase((String) b.get("name"));
         });
-
-        long folderSize = 0L;
-        if (files != null) {
-            for (File file : files) {
-                if (file.isFile()) {
-                    folderSize += file.length();
-                }
-            }
-        }
 
         return ResponseEntity.ok(Map.of(
                 "currentPath", targetPath,

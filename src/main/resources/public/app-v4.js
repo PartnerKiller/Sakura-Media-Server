@@ -1536,6 +1536,19 @@ function renderStorageAnalysis(stats) {
   const containers = document.querySelectorAll('.storage-analysis-target');
   if (containers.length === 0) return;
 
+  if (stats && stats.loading) {
+    containers.forEach(container => {
+      container.innerHTML = `
+        <div class="storage-loading">
+          <i data-lucide="loader" class="animate-spin"></i>
+          <span>Loading storage statistics...</span>
+        </div>
+      `;
+    });
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    return;
+  }
+
   const createCard = (data) => {
     if (!data) return '';
     

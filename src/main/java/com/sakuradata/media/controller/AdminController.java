@@ -371,16 +371,15 @@ public class AdminController {
 
     @EventListener(ApplicationReadyEvent.class)
     public void initStorageStats() {
-        new Thread(() -> {
+        scheduler.scheduleWithFixedDelay(() -> {
             try {
-                Thread.sleep(3000); // Settle down
                 Map<String, Object> stats = fetchStorageStats();
                 synchronized (AdminController.class) {
                     cachedStorageStats = stats;
                     lastStorageStatsUpdate = System.currentTimeMillis();
                 }
             } catch (Exception ignored) {}
-        }).start();
+        }, 3, 60, TimeUnit.SECONDS);
     }
 
     @GetMapping("/admin/storage-analysis")
@@ -389,39 +388,22 @@ public class AdminController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
         }
 
-        long now = System.currentTimeMillis();
-        boolean needsRefresh = false;
-        Map<String, Object> localCached = null;
-
+        Map<String, Object> localCached;
         synchronized (AdminController.class) {
             localCached = cachedStorageStats;
-            if (cachedStorageStats == null || (now - lastStorageStatsUpdate) >= CACHE_TTL_MS) {
-                needsRefresh = true;
-            }
         }
 
-        if (needsRefresh) {
-            if (localCached == null) {
-                // First load fallback: fetch synchronously
-                Map<String, Object> stats = fetchStorageStats();
-                synchronized (AdminController.class) {
-                    cachedStorageStats = stats;
-                    lastStorageStatsUpdate = System.currentTimeMillis();
-                }
-                return ResponseEntity.ok(stats);
-            } else {
-                // Stale-while-revalidate background update
-                new Thread(() -> {
-                    try {
-                        Map<String, Object> stats = fetchStorageStats();
-                        synchronized (AdminController.class) {
-                            cachedStorageStats = stats;
-                            lastStorageStatsUpdate = System.currentTimeMillis();
-                        }
-                    } catch (Exception ignored) {}
-                }).start();
-                return ResponseEntity.ok(localCached);
-            }
+        if (localCached == null) {
+            new Thread(() -> {
+                try {
+                    Map<String, Object> stats = fetchStorageStats();
+                    synchronized (AdminController.class) {
+                        cachedStorageStats = stats;
+                        lastStorageStatsUpdate = System.currentTimeMillis();
+                    }
+                } catch (Exception ignored) {}
+            }).start();
+            return ResponseEntity.ok(Map.of("loading", true));
         }
 
         return ResponseEntity.ok(localCached);
