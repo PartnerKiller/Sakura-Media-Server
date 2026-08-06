@@ -678,6 +678,7 @@ async function loadRoots() {
 
 function renderRoots() {
   const container = document.getElementById('roots-container');
+  if (!container) return;
   container.innerHTML = '';
 
   state.roots.forEach(root => {
@@ -686,11 +687,23 @@ function renderRoots() {
     if (state.currentRoot && state.currentRoot.path === root.path) {
       badge.classList.add('active');
     }
-    badge.innerHTML = `<i data-lucide="hard-drive"></i> <span>${root.name}</span>`;
+    
+    let rootName = root.name;
+    if (rootName === 'Home root') rootName = 'Home';
+    else if (rootName === 'Storage root') rootName = 'Storage';
+    else if (rootName === 'HDD root') rootName = 'HDD';
+    else if (rootName === 'Google Drive') rootName = 'Google Drive';
+
+    // Shorten Google Drive to GDrive on small viewports
+    if (window.innerWidth <= 576 && rootName === 'Google Drive') {
+      rootName = 'GDrive';
+    }
+
+    badge.innerHTML = `<i data-lucide="hard-drive"></i> <span>${rootName}</span>`;
     badge.addEventListener('click', () => selectRoot(root));
     container.appendChild(badge);
   });
-  lucide.createIcons();
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function selectRoot(root) {

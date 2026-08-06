@@ -2579,6 +2579,33 @@ body.theme-golden-amber {
     padding: 6px 20px 6px 10px !important;
     font-size: 11px !important;
   }
+
+  /* Compact roots selector on mobile */
+  .roots-selector-container {
+    display: flex !important;
+    overflow-x: visible !important;
+    white-space: normal !important;
+    flex-wrap: nowrap !important;
+    width: 100% !important;
+    gap: 4px !important;
+    padding: 0 !important;
+    margin-bottom: 12px !important;
+    box-sizing: border-box !important;
+  }
+
+  .root-badge {
+    flex: 1 !important;
+    justify-content: center !important;
+    padding: 6px 4px !important;
+    font-size: 11px !important;
+    white-space: nowrap !important;
+    min-width: 0 !important;
+    text-align: center !important;
+  }
+
+  .root-badge i {
+    display: none !important; /* Hide hard-drive icon on mobile */
+  }
 }
 
 /* ==========================================================================
