@@ -47,6 +47,10 @@ public class AdminController {
 
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
+    private static Map<String, Object> cachedStorageStats = null;
+    private static long lastStorageStatsUpdate = 0;
+    private static final long CACHE_TTL_MS = 60000; // 1 minute cache TTL
+
     // Helper to check admin permission
     private boolean isAdmin(HttpServletRequest request) {
         User user = (User) request.getAttribute("user");
@@ -369,99 +373,123 @@ public class AdminController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
         }
 
+        long now = System.currentTimeMillis();
+        boolean needsRefresh = false;
+        Map<String, Object> localCached = null;
+
+        synchronized (AdminController.class) {
+            localCached = cachedStorageStats;
+            if (cachedStorageStats == null || (now - lastStorageStatsUpdate) >= CACHE_TTL_MS) {
+                needsRefresh = true;
+            }
+        }
+
+        if (needsRefresh) {
+            if (localCached == null) {
+                // First load: fetch synchronously to ensure we have data to return
+                Map<String, Object> stats = fetchStorageStats();
+                synchronized (AdminController.class) {
+                    cachedStorageStats = stats;
+                    lastStorageStatsUpdate = System.currentTimeMillis();
+                }
+                return ResponseEntity.ok(stats);
+            } else {
+                // Stale-while-revalidate: return cache instantly, trigger background update
+                new Thread(() -> {
+                    try {
+                        Map<String, Object> stats = fetchStorageStats();
+                        synchronized (AdminController.class) {
+                            cachedStorageStats = stats;
+                            lastStorageStatsUpdate = System.currentTimeMillis();
+                        }
+                    } catch (Exception ignored) {}
+                }).start();
+                return ResponseEntity.ok(localCached);
+            }
+        }
+
+        return ResponseEntity.ok(localCached);
+    }
+
+    private Map<String, Object> fetchStorageStats() {
+        File homeFile = new File("/home/sakura");
+        File storageFile = new File("/media/storage");
+        File hddFile = new File("/media/hdd");
+        File gdriveFile = new File("/media/gdrive");
+
+        java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newFixedThreadPool(4);
+
+        java.util.concurrent.Future<Map<String, Object>> homeFuture = executor.submit(() -> getStatsForFile(homeFile, "local", "/home/sakura"));
+        java.util.concurrent.Future<Map<String, Object>> storageFuture = executor.submit(() -> getStatsForFile(storageFile, "storage", "/media/storage"));
+        java.util.concurrent.Future<Map<String, Object>> hddFuture = executor.submit(() -> getStatsForFile(hddFile, "hdd", "/media/hdd"));
+        java.util.concurrent.Future<Map<String, Object>> gdriveFuture = executor.submit(() -> getStatsForFile(gdriveFile, "gdrive", "/media/gdrive"));
+
+        Map<String, Object> response = new HashMap<>();
+
         try {
-            File homeFile = new File("/home/sakura");
-            File storageFile = new File("/media/storage");
-            File hddFile = new File("/media/hdd");
-            File gdriveFile = new File("/media/gdrive");
-
-            Map<String, Object> homeStats = null;
-            Map<String, Object> storageStats = null;
-            Map<String, Object> hddStats = null;
-            Map<String, Object> gdriveStats = null;
-
-            if (homeFile.exists()) {
-                long total = homeFile.getTotalSpace();
-                long usable = homeFile.getUsableSpace();
-                long used = total - usable;
-                double percent = total > 0 ? (double) used / total * 100 : 0.0;
-                homeStats = new HashMap<>();
-                homeStats.put("filesystem", "local");
-                homeStats.put("total", total);
-                homeStats.put("used", used);
-                homeStats.put("available", usable);
-                homeStats.put("usePercent", String.format(Locale.US, "%.0f%%", percent));
-                homeStats.put("mountedOn", "/home/sakura");
-            }
-
-            if (storageFile.exists()) {
-                long total = storageFile.getTotalSpace();
-                long usable = storageFile.getUsableSpace();
-                long used = total - usable;
-                double percent = total > 0 ? (double) used / total * 100 : 0.0;
-                storageStats = new HashMap<>();
-                storageStats.put("filesystem", "storage");
-                storageStats.put("total", total);
-                storageStats.put("used", used);
-                storageStats.put("available", usable);
-                storageStats.put("usePercent", String.format(Locale.US, "%.0f%%", percent));
-                storageStats.put("mountedOn", "/media/storage");
-            }
-
-            if (hddFile.exists()) {
-                long total = hddFile.getTotalSpace();
-                long usable = hddFile.getUsableSpace();
-                long used = total - usable;
-                double percent = total > 0 ? (double) used / total * 100 : 0.0;
-                hddStats = new HashMap<>();
-                hddStats.put("filesystem", "hdd");
-                hddStats.put("total", total);
-                hddStats.put("used", used);
-                hddStats.put("available", usable);
-                hddStats.put("usePercent", String.format(Locale.US, "%.0f%%", percent));
-                hddStats.put("mountedOn", "/media/hdd");
-            }
-
-            if (gdriveFile.exists()) {
-                long total = gdriveFile.getTotalSpace();
-                long usable = gdriveFile.getUsableSpace();
-                long used = total - usable;
-                double percent = total > 0 ? (double) used / total * 100 : 0.0;
-                gdriveStats = new HashMap<>();
-                gdriveStats.put("filesystem", "gdrive");
-                gdriveStats.put("total", total);
-                gdriveStats.put("used", used);
-                gdriveStats.put("available", usable);
-                gdriveStats.put("usePercent", String.format(Locale.US, "%.0f%%", percent));
-                gdriveStats.put("mountedOn", "/media/gdrive");
-            }
-
-            Map<String, Object> response = new HashMap<>();
+            Map<String, Object> homeStats = homeFuture.get(1500, java.util.concurrent.TimeUnit.MILLISECONDS);
             if (homeStats != null) {
                 homeStats.put("name", "Home (sakura)");
                 homeStats.put("path", "/home/sakura");
                 response.put("home", homeStats);
             }
+        } catch (Exception e) {
+            homeFuture.cancel(true);
+        }
+
+        try {
+            Map<String, Object> storageStats = storageFuture.get(1500, java.util.concurrent.TimeUnit.MILLISECONDS);
             if (storageStats != null) {
                 storageStats.put("name", "Storage");
                 storageStats.put("path", "/media/storage");
                 response.put("storage", storageStats);
             }
+        } catch (Exception e) {
+            storageFuture.cancel(true);
+        }
+
+        try {
+            Map<String, Object> hddStats = hddFuture.get(1500, java.util.concurrent.TimeUnit.MILLISECONDS);
             if (hddStats != null) {
                 hddStats.put("name", "HDD");
                 hddStats.put("path", "/media/hdd");
                 response.put("hdd", hddStats);
             }
+        } catch (Exception e) {
+            hddFuture.cancel(true);
+        }
+
+        try {
+            Map<String, Object> gdriveStats = gdriveFuture.get(1500, java.util.concurrent.TimeUnit.MILLISECONDS);
             if (gdriveStats != null) {
                 gdriveStats.put("name", "Google Drive");
                 gdriveStats.put("path", "/media/gdrive");
                 response.put("gdrive", gdriveStats);
             }
-
-            return ResponseEntity.ok(response);
         } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of("error", "Failed to retrieve storage stats: " + e.getMessage()));
+            gdriveFuture.cancel(true);
         }
+
+        executor.shutdown();
+        return response;
+    }
+
+    private Map<String, Object> getStatsForFile(File file, String filesystem, String mountedOn) {
+        if (file.exists()) {
+            long total = file.getTotalSpace();
+            long usable = file.getUsableSpace();
+            long used = total - usable;
+            double percent = total > 0 ? (double) used / total * 100 : 0.0;
+            Map<String, Object> stats = new HashMap<>();
+            stats.put("filesystem", filesystem);
+            stats.put("total", total);
+            stats.put("used", used);
+            stats.put("available", usable);
+            stats.put("usePercent", String.format(Locale.US, "%.0f%%", percent));
+            stats.put("mountedOn", mountedOn);
+            return stats;
+        }
+        return null;
     }
 
     @GetMapping("/admin/server-metrics")
