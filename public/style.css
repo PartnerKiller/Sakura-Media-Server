@@ -202,9 +202,11 @@ button, .btn {
 .brand-logo {
   width: 64px;
   height: 64px;
-  color: var(--primary);
+  border-radius: 50%;
+  object-fit: cover;
   margin-bottom: 12px;
   filter: drop-shadow(0 0 10px var(--primary-glow));
+  border: 2px solid var(--border-subtle);
 }
 
 .login-header h1 {
@@ -322,8 +324,10 @@ button, .btn {
 .sidebar-header .logo {
   width: 32px;
   height: 32px;
-  color: var(--primary);
+  border-radius: 50%;
+  object-fit: cover;
   filter: drop-shadow(0 0 6px var(--primary-glow));
+  border: 1px solid var(--border-subtle);
 }
 
 .sidebar-header h2 {
