@@ -35,7 +35,12 @@ let state = {
   isUploadCancelled: false,
   autoOpenFile: null,
   pickerCurrentPath: '',
-  pickerSelectedPaths: []
+  pickerSelectedPaths: [],
+  selectedPaths: new Set(),
+  clipboard: { action: null, paths: [] },
+  copyMoveAction: 'copy',
+  copyMoveSources: [],
+  copyMoveTarget: ''
 };
 
 function safeBase64Encode(str) {
@@ -435,6 +440,23 @@ function initApp() {
   safeAddListener('picker-drive-select', 'change', (e) => {
     loadPickerDirectory(e.target.value);
   });
+
+  // Batch action bar & clipboard listeners
+  safeAddListener('btn-paste', 'click', handlePasteClipboard);
+  safeAddListener('batch-select-all-checkbox', 'change', toggleSelectAll);
+  safeAddListener('btn-batch-copy', 'click', handleBatchCopy);
+  safeAddListener('btn-batch-move', 'click', handleBatchMove);
+  safeAddListener('btn-batch-download', 'click', handleBatchDownload);
+  safeAddListener('btn-batch-delete', 'click', handleBatchDelete);
+  safeAddListener('btn-batch-clear', 'click', clearSelection);
+
+  // Copy / Move Modal listeners
+  safeAddListener('btn-close-copy-move', 'click', closeCopyMoveModal);
+  safeAddListener('btn-cancel-copy-move', 'click', closeCopyMoveModal);
+  safeAddListener('btn-confirm-copy-move', 'click', confirmCopyMove);
+  safeAddListener('copy-move-drive-select', 'change', (e) => {
+    loadCopyMoveDirectory(e.target.value);
+  });
 }
 
 // AUTHENTICATION FLOWS
@@ -739,6 +761,9 @@ function updateUploadActionsVisibility() {
 
 async function browsePath(targetPath) {
   state.currentPath = targetPath;
+  state.selectedPaths.clear();
+  updateBatchActionBar();
+  updatePasteButton();
   document.getElementById('search-input').value = ''; // clear search
   updateUploadActionsVisibility();
   
@@ -883,6 +908,7 @@ function renderFiles(files) {
 
   if (files.length === 0) {
     emptyState.style.display = 'flex';
+    updateBatchActionBar();
     return;
   }
   emptyState.style.display = 'none';
@@ -893,9 +919,20 @@ function renderFiles(files) {
     grid.classList.remove('list-view');
   }
 
+  if (state.selectedPaths.size > 0) {
+    grid.classList.add('has-selection');
+  } else {
+    grid.classList.remove('has-selection');
+  }
+
   files.forEach(file => {
     const card = document.createElement('div');
     card.className = 'file-card';
+    const filePath = `${state.currentPath}/${file.name}`;
+    const isSelected = state.selectedPaths.has(filePath);
+    if (isSelected) {
+      card.classList.add('selected');
+    }
     
     // Determine card category class and icon
     let category = 'file';
@@ -918,7 +955,6 @@ function renderFiles(files) {
 
     card.classList.add(category);
     
-    const filePath = `${state.currentPath}/${file.name}`;
     const srcUrl = `/api/files/stream?path=${encodeURIComponent(filePath)}&token=${state.token}`;
     
     // Size formatting helper
@@ -931,6 +967,9 @@ function renderFiles(files) {
     }
 
     card.innerHTML = `
+      <div class="file-checkbox-wrapper">
+        <input type="checkbox" class="file-checkbox" data-path="${filePath.replace(/"/g, '&quot;')}" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleCardSelection('${filePath.replace(/'/g, "\\'")}', this.checked);">
+      </div>
       <div class="file-icon-wrapper" ${category === 'image' && state.viewMode === 'grid' ? 'style="overflow: hidden; padding: 0;"' : ''}>
         ${iconHtml}
       </div>
@@ -940,6 +979,12 @@ function renderFiles(files) {
         <div class="file-meta-date">${formattedDate}</div>
       </div>
       <div class="file-actions">
+        <button class="btn-card-action btn-copy" onclick="handleCopySingle(event, '${filePath.replace(/'/g, "\\'")}')" title="Copy">
+          <i data-lucide="copy"></i>
+        </button>
+        <button class="btn-card-action btn-move" onclick="handleMoveSingle(event, '${filePath.replace(/'/g, "\\'")}')" title="Move">
+          <i data-lucide="folder-input"></i>
+        </button>
         ${file.isFile ? `
           <button class="btn-card-action btn-download" onclick="handleDownloadFile(event, '${filePath.replace(/'/g, "\\'")}')" title="Download">
             <i data-lucide="download"></i>
@@ -960,9 +1005,14 @@ function renderFiles(files) {
 
     // Click handler: Double-click / Click to open
     card.addEventListener('click', (e) => {
-      // Prevent action button click from triggering card click
-      if (e.target.closest('.btn-card-action')) return;
+      // Prevent action button click or checkbox click from triggering card click
+      if (e.target.closest('.btn-card-action') || e.target.closest('.file-checkbox-wrapper')) return;
       
+      if (e.ctrlKey || e.metaKey) {
+        toggleCardSelection(filePath, !state.selectedPaths.has(filePath));
+        return;
+      }
+
       if (!file.isFile) {
         browsePath(filePath);
       } else {
@@ -973,6 +1023,7 @@ function renderFiles(files) {
     grid.appendChild(card);
   });
   
+  updateBatchActionBar();
   lucide.createIcons();
 }
 
@@ -1223,10 +1274,478 @@ function handleDownloadFile(e, filePath) {
 window.handleDownloadFile = handleDownloadFile;
 
 function handleDownloadFolder(e, filePath) {
-  e.stopPropagation(); // prevent card click
+  if (e) { e.stopPropagation(); }
   window.open(`/api/files/download-folder?path=${encodeURIComponent(filePath)}&token=${state.token}`, '_blank');
 }
 window.handleDownloadFolder = handleDownloadFolder;
+
+// ============================================================
+// TOAST NOTIFICATIONS & SELECTION & BATCH ACTIONS & COPY/MOVE
+// ============================================================
+
+function showToast(message, type = 'info') {
+  let container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    container.style.cssText = 'position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none;';
+    document.body.appendChild(container);
+  }
+  const toast = document.createElement('div');
+  const bg = type === 'error' ? 'rgba(239, 68, 68, 0.95)' : type === 'success' ? 'rgba(16, 185, 129, 0.95)' : 'rgba(24, 24, 37, 0.95)';
+  const border = type === 'error' ? '#ef4444' : type === 'success' ? '#10b981' : 'var(--primary)';
+  toast.style.cssText = `background: ${bg}; color: #fff; border: 1px solid ${border}; border-radius: 8px; padding: 12px 18px; font-size: 13px; font-weight: 500; box-shadow: 0 8px 24px rgba(0,0,0,0.4); pointer-events: auto; display: flex; align-items: center; gap: 8px; animation: slideDown 0.25s ease-out;`;
+  toast.innerHTML = `<span>${message}</span>`;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(10px)';
+    toast.style.transition = 'all 0.3s ease';
+    setTimeout(() => toast.remove(), 300);
+  }, 3500);
+}
+window.showToast = showToast;
+
+function toggleCardSelection(filePath, isChecked) {
+  if (isChecked) {
+    state.selectedPaths.add(filePath);
+  } else {
+    state.selectedPaths.delete(filePath);
+  }
+  updateBatchActionBar();
+  
+  // Update card styling directly without re-rendering everything
+  const cards = document.querySelectorAll('.file-card');
+  cards.forEach(card => {
+    const cb = card.querySelector('.file-checkbox');
+    if (cb && cb.getAttribute('data-path') === filePath) {
+      cb.checked = isChecked;
+      if (isChecked) card.classList.add('selected');
+      else card.classList.remove('selected');
+    }
+  });
+
+  const grid = document.getElementById('files-grid-container');
+  if (grid) {
+    if (state.selectedPaths.size > 0) grid.classList.add('has-selection');
+    else grid.classList.remove('has-selection');
+  }
+}
+window.toggleCardSelection = toggleCardSelection;
+
+function toggleSelectAll(e) {
+  const isChecked = e.target.checked;
+  if (!isChecked) {
+    state.selectedPaths.clear();
+  } else {
+    state.files.forEach(f => {
+      const p = `${state.currentPath}/${f.name}`;
+      state.selectedPaths.add(p);
+    });
+  }
+  processAndRenderFiles();
+  updateBatchActionBar();
+}
+window.toggleSelectAll = toggleSelectAll;
+
+function clearSelection() {
+  state.selectedPaths.clear();
+  processAndRenderFiles();
+  updateBatchActionBar();
+}
+window.clearSelection = clearSelection;
+
+function updateBatchActionBar() {
+  const bar = document.getElementById('batch-action-bar');
+  const countEl = document.getElementById('batch-selected-count');
+  const selectAllCb = document.getElementById('batch-select-all-checkbox');
+  
+  const count = state.selectedPaths.size;
+  if (countEl) {
+    countEl.innerText = `${count} item${count === 1 ? '' : 's'} selected`;
+  }
+  
+  if (bar) {
+    if (count > 0) {
+      bar.style.display = 'flex';
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    } else {
+      bar.style.display = 'none';
+    }
+  }
+
+  if (selectAllCb) {
+    const totalFiles = state.files.length;
+    selectAllCb.checked = totalFiles > 0 && count === totalFiles;
+    selectAllCb.indeterminate = count > 0 && count < totalFiles;
+  }
+}
+window.updateBatchActionBar = updateBatchActionBar;
+
+function updatePasteButton() {
+  const btn = document.getElementById('btn-paste');
+  const label = document.getElementById('btn-paste-label');
+  if (!btn || !label) return;
+
+  const count = state.clipboard && state.clipboard.paths ? state.clipboard.paths.length : 0;
+  if (count > 0) {
+    const actionLabel = state.clipboard.action === 'move' ? 'Move' : 'Paste';
+    label.innerText = `${actionLabel} (${count})`;
+    btn.style.display = 'inline-flex';
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  } else {
+    btn.style.display = 'none';
+  }
+}
+window.updatePasteButton = updatePasteButton;
+
+// COPY & MOVE ACTIONS
+function handleCopySingle(e, filePath) {
+  if (e) { e.preventDefault(); e.stopPropagation(); }
+  openCopyMoveModal('copy', [filePath]);
+}
+window.handleCopySingle = handleCopySingle;
+
+function handleMoveSingle(e, filePath) {
+  if (e) { e.preventDefault(); e.stopPropagation(); }
+  openCopyMoveModal('move', [filePath]);
+}
+window.handleMoveSingle = handleMoveSingle;
+
+function handleBatchCopy() {
+  const paths = Array.from(state.selectedPaths);
+  if (paths.length === 0) return;
+  openCopyMoveModal('copy', paths);
+}
+window.handleBatchCopy = handleBatchCopy;
+
+function handleBatchMove() {
+  const paths = Array.from(state.selectedPaths);
+  if (paths.length === 0) return;
+  openCopyMoveModal('move', paths);
+}
+window.handleBatchMove = handleBatchMove;
+
+async function handleBatchDelete() {
+  const paths = Array.from(state.selectedPaths);
+  if (paths.length === 0) return;
+
+  const count = paths.length;
+  if (!confirm(`Are you sure you want to move ${count} item${count === 1 ? '' : 's'} to the Recycle Bin?`)) {
+    return;
+  }
+
+  try {
+    const res = await apiCall('/api/files/batch-delete', {
+      method: 'POST',
+      body: JSON.stringify({ paths })
+    });
+    if (res.success) {
+      showToast(`Moved ${res.deletedCount || count} item(s) to Recycle Bin`, 'success');
+      state.selectedPaths.clear();
+      updateBatchActionBar();
+      browsePath(state.currentPath);
+    } else {
+      showToast(`Delete completed with some errors: ${(res.errors || []).join(', ')}`, 'error');
+      state.selectedPaths.clear();
+      updateBatchActionBar();
+      browsePath(state.currentPath);
+    }
+  } catch (err) {
+    showToast(`Failed to delete items: ${err.message}`, 'error');
+  }
+}
+window.handleBatchDelete = handleBatchDelete;
+
+async function handleBatchDownload() {
+  const paths = Array.from(state.selectedPaths);
+  if (paths.length === 0) return;
+
+  if (paths.length === 1) {
+    const p = paths[0];
+    const fileObj = state.files.find(f => `${state.currentPath}/${f.name}` === p);
+    if (fileObj && !fileObj.isFile) {
+      handleDownloadFolder(null, p);
+    } else {
+      handleDownloadFile(null, p);
+    }
+    return;
+  }
+
+  // Multi-item ZIP download
+  showToast('Preparing ZIP download for selected items...', 'info');
+  try {
+    const response = await fetch('/api/files/download-batch', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${state.token}`
+      },
+      body: JSON.stringify({ paths })
+    });
+    if (!response.ok) throw new Error('Download failed');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `sakura_batch_${Date.now()}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    showToast(`Failed to download: ${err.message}`, 'error');
+  }
+}
+window.handleBatchDownload = handleBatchDownload;
+
+async function handlePasteClipboard() {
+  if (!state.clipboard || !state.clipboard.paths || state.clipboard.paths.length === 0) return;
+
+  const { action, paths } = state.clipboard;
+  const destination = state.currentPath;
+  const endpoint = action === 'move' ? '/api/files/move' : '/api/files/copy';
+
+  showToast(`${action === 'move' ? 'Moving' : 'Copying'} ${paths.length} item(s)...`, 'info');
+
+  try {
+    const res = await apiCall(endpoint, {
+      method: 'POST',
+      body: JSON.stringify({
+        sources: paths,
+        destination: destination,
+        overwrite: false
+      })
+    });
+
+    if (res.success) {
+      showToast(`Successfully ${action === 'move' ? 'moved' : 'copied'} items!`, 'success');
+      if (action === 'move') {
+        state.clipboard = { action: null, paths: [] };
+      }
+      updatePasteButton();
+      browsePath(state.currentPath);
+    } else {
+      showToast(`Operation completed with errors: ${(res.errors || []).join('; ')}`, 'error');
+      browsePath(state.currentPath);
+    }
+  } catch (err) {
+    showToast(`Failed to paste items: ${err.message}`, 'error');
+  }
+}
+window.handlePasteClipboard = handlePasteClipboard;
+
+// COPY / MOVE DESTINATION PICKER MODAL
+function openCopyMoveModal(action, paths) {
+  state.copyMoveAction = action; // 'copy' | 'move'
+  state.copyMoveSources = paths;
+  state.copyMoveTarget = state.currentPath || (state.roots.length > 0 ? state.roots[0].path : '/home/sakura');
+
+  const modal = document.getElementById('modal-copy-move');
+  const title = document.getElementById('modal-copy-move-title');
+  const summary = document.getElementById('modal-copy-move-summary');
+  const confirmBtnText = document.getElementById('btn-confirm-copy-move-text');
+
+  if (title) title.innerText = action === 'move' ? 'Move Items' : 'Copy Items';
+  if (confirmBtnText) confirmBtnText.innerText = action === 'move' ? 'Move Here' : 'Copy Here';
+  if (summary) {
+    summary.innerText = `Selected: ${paths.length} item${paths.length === 1 ? '' : 's'} to ${action}`;
+  }
+
+  // Populate drive select
+  const driveSelect = document.getElementById('copy-move-drive-select');
+  if (driveSelect) {
+    driveSelect.innerHTML = '';
+    state.roots.forEach(root => {
+      const opt = document.createElement('option');
+      opt.value = root.path;
+      opt.innerText = root.name;
+      driveSelect.appendChild(opt);
+    });
+  }
+
+  syncCopyMoveDriveSelect(state.copyMoveTarget);
+  loadCopyMoveDirectory(state.copyMoveTarget);
+
+  if (modal) modal.classList.add('active');
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+window.openCopyMoveModal = openCopyMoveModal;
+
+function closeCopyMoveModal() {
+  const modal = document.getElementById('modal-copy-move');
+  if (modal) modal.classList.remove('active');
+}
+window.closeCopyMoveModal = closeCopyMoveModal;
+
+function syncCopyMoveDriveSelect(path) {
+  const driveSelect = document.getElementById('copy-move-drive-select');
+  if (!driveSelect || !state.roots.length) return;
+  const matchedRoot = findRootForPath(path);
+  if (matchedRoot) {
+    driveSelect.value = matchedRoot.path;
+  }
+}
+
+async function loadCopyMoveDirectory(path) {
+  state.copyMoveTarget = path;
+  syncCopyMoveDriveSelect(path);
+
+  const listContainer = document.getElementById('copy-move-list');
+  const breadcrumbsContainer = document.getElementById('copy-move-breadcrumbs');
+  const targetDisplay = document.getElementById('copy-move-current-target-display');
+
+  if (targetDisplay) targetDisplay.innerText = `Target: ${path}`;
+  if (listContainer) listContainer.innerHTML = '<div style="padding: 10px; color: var(--text-muted); text-align: center;">Loading folders...</div>';
+
+  try {
+    const data = await apiCall(`/api/files/browse?path=${encodeURIComponent(path)}`);
+    if (!listContainer || !breadcrumbsContainer) return;
+    listContainer.innerHTML = '';
+
+    // Render breadcrumbs
+    breadcrumbsContainer.innerHTML = '';
+    const matchedRoot = findRootForPath(path);
+    if (matchedRoot) {
+      let relativePath = path.substring(matchedRoot.path.length);
+      if (relativePath.startsWith('/')) relativePath = relativePath.substring(1);
+      const segments = relativePath.split('/').filter(Boolean);
+
+      const rootCrumb = document.createElement('span');
+      rootCrumb.className = 'breadcrumb-item';
+      rootCrumb.style.cssText = 'color: var(--primary); font-weight: 600; cursor: pointer;';
+      rootCrumb.innerText = matchedRoot.name;
+      rootCrumb.addEventListener('click', () => loadCopyMoveDirectory(matchedRoot.path));
+      breadcrumbsContainer.appendChild(rootCrumb);
+
+      let currentAccum = matchedRoot.path;
+      segments.forEach((seg, idx) => {
+        currentAccum += `/${seg}`;
+        const finalPath = currentAccum;
+
+        const sep = document.createElement('span');
+        sep.style.cssText = 'color: var(--text-muted);';
+        sep.innerText = '/';
+        breadcrumbsContainer.appendChild(sep);
+
+        const segCrumb = document.createElement('span');
+        segCrumb.className = 'breadcrumb-item';
+        segCrumb.style.cssText = idx === segments.length - 1 ? 'color: var(--text-primary); font-weight: 500;' : 'color: var(--text-secondary); cursor: pointer;';
+        segCrumb.innerText = seg;
+        if (idx !== segments.length - 1) {
+          segCrumb.addEventListener('click', () => loadCopyMoveDirectory(finalPath));
+        }
+        breadcrumbsContainer.appendChild(segCrumb);
+      });
+    }
+
+    // Up Directory navigation item
+    const parentPath = getParentDirectory(path);
+    if (parentPath && matchedRoot && path !== matchedRoot.path) {
+      const upItem = document.createElement('div');
+      upItem.className = 'copy-move-item';
+      upItem.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 8px; color: var(--primary);">
+          <i data-lucide="folder-up" style="width: 16px; height: 16px;"></i>
+          <span>.. (Parent Directory)</span>
+        </div>
+      `;
+      upItem.addEventListener('click', () => loadCopyMoveDirectory(parentPath));
+      listContainer.appendChild(upItem);
+    }
+
+    // Show only subfolders for destination picking
+    const folders = (data.files || []).filter(f => !f.isFile);
+    if (folders.length === 0) {
+      const emptyMsg = document.createElement('div');
+      emptyMsg.style.cssText = 'padding: 15px; color: var(--text-muted); text-align: center; font-size: 13px;';
+      emptyMsg.innerText = 'No subfolders in this directory. Current folder selected.';
+      listContainer.appendChild(emptyMsg);
+    } else {
+      folders.forEach(folder => {
+        const folderPath = path === '/' ? `/${folder.name}` : `${path}/${folder.name}`;
+        
+        // Circular check: cannot move/copy inside source folder
+        const isCircular = state.copyMoveSources.some(src => folderPath === src || folderPath.startsWith(src + '/'));
+
+        const itemEl = document.createElement('div');
+        itemEl.className = 'copy-move-item';
+        if (isCircular) {
+          itemEl.style.opacity = '0.4';
+          itemEl.style.cursor = 'not-allowed';
+          itemEl.title = 'Cannot select a source folder or its subdirectories as destination';
+        }
+
+        itemEl.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            <i data-lucide="folder" style="width: 16px; height: 16px; color: var(--primary); flex-shrink: 0;"></i>
+            <span style="font-size: 13px;">${folder.name}</span>
+          </div>
+          <i data-lucide="chevron-right" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+        `;
+
+        if (!isCircular) {
+          itemEl.addEventListener('click', () => {
+            loadCopyMoveDirectory(folderPath);
+          });
+        }
+        listContainer.appendChild(itemEl);
+      });
+    }
+
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  } catch (err) {
+    if (listContainer) {
+      listContainer.innerHTML = `<div style="padding: 10px; color: var(--error); text-align: center;">Error: ${err.message}</div>`;
+    }
+  }
+}
+
+async function confirmCopyMove() {
+  if (!state.copyMoveSources || state.copyMoveSources.length === 0) return;
+  const action = state.copyMoveAction;
+  const destination = state.copyMoveTarget;
+  const endpoint = action === 'move' ? '/api/files/move' : '/api/files/copy';
+
+  const confirmBtn = document.getElementById('btn-confirm-copy-move');
+  if (confirmBtn) {
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = '<i data-lucide="loader" class="animate-spin" style="width: 14px; height: 14px;"></i> <span>Processing...</span>';
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+
+  try {
+    const res = await apiCall(endpoint, {
+      method: 'POST',
+      body: JSON.stringify({
+        sources: state.copyMoveSources,
+        destination: destination,
+        overwrite: false
+      })
+    });
+
+    closeCopyMoveModal();
+    if (res.success) {
+      showToast(`Successfully ${action === 'move' ? 'moved' : 'copied'} items!`, 'success');
+      state.selectedPaths.clear();
+      updateBatchActionBar();
+      browsePath(state.currentPath);
+    } else {
+      showToast(`Completed with errors: ${(res.errors || []).join('; ')}`, 'error');
+      state.selectedPaths.clear();
+      updateBatchActionBar();
+      browsePath(state.currentPath);
+    }
+  } catch (err) {
+    showToast(`Failed: ${err.message}`, 'error');
+  } finally {
+    if (confirmBtn) {
+      confirmBtn.disabled = false;
+      confirmBtn.innerHTML = `<i data-lucide="check"></i> <span>${action === 'move' ? 'Move Here' : 'Copy Here'}</span>`;
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+  }
+}
 
 const UPLOAD_MAX_SINGLE_SIZE = 95 * 1024 * 1024; // 95MB to stay safely below Cloudflare's 100MB body limit
 const UPLOAD_CHUNK_SIZE = 80 * 1024 * 1024; // 80MB chunks for larger files

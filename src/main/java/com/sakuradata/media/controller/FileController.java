@@ -672,6 +672,387 @@ public class FileController {
         }
     }
 
+    @PostMapping("/copy")
+    public ResponseEntity<?> copyFiles(HttpServletRequest request, @RequestBody Map<String, Object> body) {
+        User user = (User) request.getAttribute("user");
+        Object sourcesObj = body.get("sources");
+        String destination = (String) body.get("destination");
+        boolean overwrite = Boolean.TRUE.equals(body.get("overwrite"));
+
+        if (sourcesObj == null || destination == null || destination.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Sources and destination are required"));
+        }
+
+        List<String> sources = new ArrayList<>();
+        if (sourcesObj instanceof List<?>) {
+            for (Object item : (List<?>) sourcesObj) {
+                if (item != null) sources.add(item.toString());
+            }
+        } else if (sourcesObj instanceof String) {
+            sources.add((String) sourcesObj);
+        }
+
+        if (sources.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "No source files/folders provided"));
+        }
+
+        String targetDirStr = resolvePath(destination);
+        if (targetDirStr == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid destination path"));
+        }
+
+        if (!hasPermission(user, targetDirStr, "write")) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Write permission denied for destination"));
+        }
+
+        File targetDir = new File(targetDirStr);
+        if (!targetDir.exists() || !targetDir.isDirectory()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Destination must be an existing directory"));
+        }
+
+        int copiedCount = 0;
+        List<String> errors = new ArrayList<>();
+
+        for (String srcStr : sources) {
+            String resolvedSrc = resolvePath(srcStr);
+            if (resolvedSrc == null) continue;
+
+            if (!hasPermission(user, resolvedSrc, "read")) {
+                errors.add("Read permission denied: " + srcStr);
+                continue;
+            }
+
+            File srcFile = new File(resolvedSrc);
+            if (!srcFile.exists()) {
+                errors.add("Source not found: " + srcStr);
+                continue;
+            }
+
+            // Prevent circular copy
+            if (srcFile.isDirectory() && isSubPath(resolvedSrc, targetDirStr)) {
+                errors.add("Cannot copy a directory into itself or its subdirectories: " + srcFile.getName());
+                continue;
+            }
+
+            Path destPath = targetDir.toPath().resolve(srcFile.getName());
+            try {
+                copyRecursively(srcFile.toPath(), destPath, overwrite);
+                copiedCount++;
+            } catch (Exception e) {
+                errors.add("Failed to copy " + srcFile.getName() + ": " + e.getMessage());
+            }
+        }
+
+        SseController.broadcast("fs-change", Map.of("userId", user.getId(), "parentPath", targetDirStr));
+
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("success", errors.isEmpty());
+        resp.put("copiedCount", copiedCount);
+        if (!errors.isEmpty()) {
+            resp.put("errors", errors);
+        }
+        return ResponseEntity.ok(resp);
+    }
+
+    @PostMapping("/move")
+    public ResponseEntity<?> moveFiles(HttpServletRequest request, @RequestBody Map<String, Object> body) {
+        User user = (User) request.getAttribute("user");
+        Object sourcesObj = body.get("sources");
+        String destination = (String) body.get("destination");
+        boolean overwrite = Boolean.TRUE.equals(body.get("overwrite"));
+
+        if (sourcesObj == null || destination == null || destination.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Sources and destination are required"));
+        }
+
+        List<String> sources = new ArrayList<>();
+        if (sourcesObj instanceof List<?>) {
+            for (Object item : (List<?>) sourcesObj) {
+                if (item != null) sources.add(item.toString());
+            }
+        } else if (sourcesObj instanceof String) {
+            sources.add((String) sourcesObj);
+        }
+
+        if (sources.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "No source files/folders provided"));
+        }
+
+        String targetDirStr = resolvePath(destination);
+        if (targetDirStr == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid destination path"));
+        }
+
+        if (!hasPermission(user, targetDirStr, "write")) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Write permission denied for destination"));
+        }
+
+        File targetDir = new File(targetDirStr);
+        if (!targetDir.exists() || !targetDir.isDirectory()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Destination must be an existing directory"));
+        }
+
+        int movedCount = 0;
+        List<String> errors = new ArrayList<>();
+        Set<String> affectedParents = new HashSet<>();
+        affectedParents.add(targetDirStr);
+
+        for (String srcStr : sources) {
+            String resolvedSrc = resolvePath(srcStr);
+            if (resolvedSrc == null) continue;
+
+            if (!hasPermission(user, resolvedSrc, "write")) {
+                errors.add("Write permission denied for source: " + srcStr);
+                continue;
+            }
+
+            File srcFile = new File(resolvedSrc);
+            if (!srcFile.exists()) {
+                errors.add("Source not found: " + srcStr);
+                continue;
+            }
+
+            // Prevent circular move
+            if (srcFile.isDirectory() && isSubPath(resolvedSrc, targetDirStr)) {
+                errors.add("Cannot move a directory into itself or its subdirectories: " + srcFile.getName());
+                continue;
+            }
+
+            if (srcFile.getParentFile() != null) {
+                affectedParents.add(srcFile.getParentFile().getAbsolutePath().replace("\\", "/"));
+            }
+
+            Path destPath = targetDir.toPath().resolve(srcFile.getName());
+            try {
+                moveRecursively(srcFile.toPath(), destPath, overwrite);
+                movedCount++;
+            } catch (Exception e) {
+                errors.add("Failed to move " + srcFile.getName() + ": " + e.getMessage());
+            }
+        }
+
+        for (String p : affectedParents) {
+            SseController.broadcast("fs-change", Map.of("userId", user.getId(), "parentPath", p));
+        }
+
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("success", errors.isEmpty());
+        resp.put("movedCount", movedCount);
+        if (!errors.isEmpty()) {
+            resp.put("errors", errors);
+        }
+        return ResponseEntity.ok(resp);
+    }
+
+    @PostMapping("/batch-delete")
+    public ResponseEntity<?> batchDelete(HttpServletRequest request, @RequestBody Map<String, Object> body) {
+        User user = (User) request.getAttribute("user");
+        Object pathsObj = body.get("paths");
+        if (pathsObj == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Paths list is required"));
+        }
+
+        List<String> paths = new ArrayList<>();
+        if (pathsObj instanceof List<?>) {
+            for (Object item : (List<?>) pathsObj) {
+                if (item != null) paths.add(item.toString());
+            }
+        }
+
+        if (paths.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "No paths provided"));
+        }
+
+        File recycleBinFolder = new File("./recycle-bin");
+        if (!recycleBinFolder.exists()) {
+            recycleBinFolder.mkdirs();
+        }
+
+        int deletedCount = 0;
+        List<String> errors = new ArrayList<>();
+        Set<String> affectedParents = new HashSet<>();
+
+        for (String path : paths) {
+            String targetPath = resolvePath(path);
+            if (targetPath == null) continue;
+
+            if (!hasPermission(user, targetPath, "write")) {
+                errors.add("Permission denied: " + path);
+                continue;
+            }
+
+            File file = new File(targetPath);
+            if (!file.exists()) {
+                continue;
+            }
+
+            try {
+                String tempName = UUID.randomUUID().toString() + "_" + file.getName();
+                File dest = new File(recycleBinFolder, tempName);
+                
+                boolean moved = file.renameTo(dest);
+                if (!moved) {
+                    try {
+                        Files.move(file.toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                        moved = true;
+                    } catch (IOException e) {
+                        copyRecursively(file.toPath(), dest.toPath(), true);
+                        deleteRecursively(file);
+                        moved = true;
+                    }
+                }
+
+                if (moved) {
+                    com.sakuradata.media.model.RecycleItem item = new com.sakuradata.media.model.RecycleItem(
+                        user.getId(),
+                        targetPath,
+                        file.getName(),
+                        dest.getAbsolutePath(),
+                        java.time.LocalDateTime.now(),
+                        dest.isDirectory() ? null : dest.length(),
+                        dest.isDirectory()
+                    );
+                    recycleItemRepository.save(item);
+                    deletedCount++;
+
+                    if (file.getParentFile() != null) {
+                        affectedParents.add(file.getParentFile().getAbsolutePath().replace("\\", "/"));
+                    }
+                }
+            } catch (Exception e) {
+                errors.add("Failed to delete " + file.getName() + ": " + e.getMessage());
+            }
+        }
+
+        for (String p : affectedParents) {
+            SseController.broadcast("fs-change", Map.of("userId", user.getId(), "parentPath", p));
+        }
+
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("success", errors.isEmpty());
+        resp.put("deletedCount", deletedCount);
+        if (!errors.isEmpty()) {
+            resp.put("errors", errors);
+        }
+        return ResponseEntity.ok(resp);
+    }
+
+    @PostMapping("/download-batch")
+    public void downloadBatch(HttpServletRequest request, HttpServletResponse response, @RequestBody Map<String, Object> body) throws IOException {
+        User user = (User) request.getAttribute("user");
+        Object pathsObj = body.get("paths");
+        if (pathsObj == null) {
+            response.sendError(400, "Paths required");
+            return;
+        }
+
+        List<String> paths = new ArrayList<>();
+        if (pathsObj instanceof List<?>) {
+            for (Object item : (List<?>) pathsObj) {
+                if (item != null) paths.add(item.toString());
+            }
+        }
+
+        if (paths.isEmpty()) {
+            response.sendError(400, "No paths provided");
+            return;
+        }
+
+        response.setContentType("application/zip");
+        response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"sakura_batch_" + System.currentTimeMillis() + ".zip\"");
+
+        try (ZipOutputStream zos = new ZipOutputStream(response.getOutputStream())) {
+            for (String pStr : paths) {
+                String targetPath = resolvePath(pStr);
+                if (targetPath == null || !hasPermission(user, targetPath, "read")) continue;
+
+                File file = new File(targetPath);
+                if (!file.exists()) continue;
+
+                if (file.isDirectory()) {
+                    zipFolder(file, file.getName(), zos);
+                } else {
+                    zos.putNextEntry(new ZipEntry(file.getName()));
+                    try (FileInputStream fis = new FileInputStream(file)) {
+                        byte[] buffer = new byte[8192];
+                        int len;
+                        while ((len = fis.read(buffer)) > 0) {
+                            zos.write(buffer, 0, len);
+                        }
+                    }
+                    zos.closeEntry();
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void copyRecursively(Path source, Path target, boolean overwrite) throws IOException {
+        if (Files.isDirectory(source)) {
+            if (!Files.exists(target)) {
+                Files.createDirectories(target);
+            }
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(source)) {
+                for (Path entry : stream) {
+                    Path destEntry = target.resolve(entry.getFileName());
+                    copyRecursively(entry, destEntry, overwrite);
+                }
+            }
+        } else {
+            if (overwrite) {
+                Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+            } else {
+                Path finalTarget = target;
+                if (Files.exists(finalTarget)) {
+                    finalTarget = getUniqueDestinationPath(finalTarget);
+                }
+                Files.copy(source, finalTarget);
+            }
+        }
+    }
+
+    private void moveRecursively(Path source, Path target, boolean overwrite) throws IOException {
+        if (source.equals(target)) return;
+
+        try {
+            if (overwrite) {
+                Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
+            } else {
+                Path finalTarget = target;
+                if (Files.exists(finalTarget)) {
+                    finalTarget = getUniqueDestinationPath(finalTarget);
+                }
+                Files.move(source, finalTarget);
+            }
+            return;
+        } catch (Exception ignored) {
+            // Cross-filesystem fallback
+        }
+
+        copyRecursively(source, target, overwrite);
+        deleteRecursively(source.toFile());
+    }
+
+    private Path getUniqueDestinationPath(Path target) {
+        String filename = target.getFileName().toString();
+        Path parent = target.getParent();
+        String name = filename;
+        String ext = "";
+        int dotIdx = filename.lastIndexOf('.');
+        if (dotIdx > 0 && !Files.isDirectory(target)) {
+            name = filename.substring(0, dotIdx);
+            ext = filename.substring(dotIdx);
+        }
+        int count = 1;
+        Path newTarget = target;
+        while (Files.exists(newTarget)) {
+            newTarget = parent.resolve(name + " (Copy " + count + ")" + ext);
+            count++;
+        }
+        return newTarget;
+    }
+
     private void deleteRecursively(File file) throws IOException {
         if (file.isDirectory()) {
             File[] entries = file.listFiles();

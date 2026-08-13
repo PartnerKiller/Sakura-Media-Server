@@ -2738,5 +2738,198 @@ body.style-aero-classic .file-card {
   background: rgba(255, 255, 255, 0.08) !important;
 }
 
+/* ============================================================
+   MULTI-SELECTION & BATCH ACTIONS & COPY/MOVE
+   ============================================================ */
+
+.file-checkbox-wrapper {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 6;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.file-card:hover .file-checkbox-wrapper,
+.file-card.selected .file-checkbox-wrapper,
+.has-selection .file-checkbox-wrapper {
+  opacity: 1;
+}
+
+.file-checkbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--primary);
+  border-radius: 4px;
+}
+
+.file-card.selected {
+  border-color: var(--primary) !important;
+  background: rgba(236, 72, 153, 0.12) !important;
+  box-shadow: 0 0 12px var(--primary-glow) !important;
+}
+
+/* List view multi-select */
+.files-grid.list-view .file-card .file-checkbox-wrapper {
+  position: static;
+  opacity: 0.6;
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+
+.files-grid.list-view .file-card:hover .file-checkbox-wrapper,
+.files-grid.list-view .file-card.selected .file-checkbox-wrapper,
+.has-selection .files-grid.list-view .file-card .file-checkbox-wrapper {
+  opacity: 1;
+}
+
+/* Card Action Buttons for Copy/Move */
+.btn-card-action.btn-copy:hover {
+  background: var(--primary);
+  color: var(--bg-main);
+  border-color: transparent;
+}
+
+.btn-card-action.btn-move:hover {
+  background: var(--accent);
+  color: var(--bg-main);
+  border-color: transparent;
+}
+
+/* BATCH ACTION BAR */
+.batch-action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35), 0 0 15px var(--primary-glow);
+  animation: batchSlideDown 0.2s ease-out;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+@keyframes batchSlideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.batch-action-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.batch-select-all-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  user-select: none;
+}
+
+.batch-select-all-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.batch-action-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-batch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-batch:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--border-focus);
+  transform: translateY(-1px);
+}
+
+.btn-batch i, .btn-batch svg {
+  width: 14px;
+  height: 14px;
+}
+
+.btn-batch-danger {
+  color: var(--error, #ef4444);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.btn-batch-danger:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: var(--error, #ef4444);
+}
+
+.btn-batch-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-batch-icon:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+/* Copy / Move Modal Items */
+.copy-move-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  color: var(--text-primary);
+}
+
+.copy-move-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.copy-move-item.selected {
+  background: rgba(236, 72, 153, 0.15);
+  border: 1px solid var(--primary);
+}
+
+
 
 

@@ -112,6 +112,10 @@
           <input type="text" id="search-input" placeholder="Search files in current folder...">
         </div>
         <div class="topbar-actions" id="explorer-actions">
+          <button id="btn-paste" class="btn-primary" style="display: none;" title="Paste copied/cut items into this folder">
+            <i data-lucide="clipboard-paste"></i>
+            <span id="btn-paste-label">Paste (0)</span>
+          </button>
           <button id="btn-refresh-explorer" class="btn-secondary" title="Refresh folder">
             <i data-lucide="refresh-cw"></i>
           </button>
@@ -215,6 +219,37 @@
               <div class="progress-bar-bg">
                 <div class="progress-bar-fill" id="upload-progress-fill"></div>
               </div>
+            </div>
+          </div>
+
+          <!-- BATCH ACTION BAR -->
+          <div id="batch-action-bar" class="batch-action-bar" style="display: none;">
+            <div class="batch-action-left">
+              <label class="batch-select-all-label">
+                <input type="checkbox" id="batch-select-all-checkbox" title="Select All Items">
+                <span id="batch-selected-count">0 items selected</span>
+              </label>
+            </div>
+            <div class="batch-action-right">
+              <button id="btn-batch-copy" class="btn-batch" title="Copy selected items">
+                <i data-lucide="copy"></i>
+                <span>Copy</span>
+              </button>
+              <button id="btn-batch-move" class="btn-batch" title="Move selected items">
+                <i data-lucide="folder-input"></i>
+                <span>Move</span>
+              </button>
+              <button id="btn-batch-download" class="btn-batch" title="Download selected items as ZIP">
+                <i data-lucide="download"></i>
+                <span>Download</span>
+              </button>
+              <button id="btn-batch-delete" class="btn-batch btn-batch-danger" title="Move selected items to Recycle Bin">
+                <i data-lucide="trash-2"></i>
+                <span>Delete</span>
+              </button>
+              <button id="btn-batch-clear" class="btn-batch-icon" title="Clear selection">
+                <i data-lucide="x"></i>
+              </button>
             </div>
           </div>
 
@@ -1220,6 +1255,49 @@
     </div>
   </div>
 
-  <script src="/app-v4.js?v=4.04"></script>
+  <!-- COPY / MOVE DESTINATION PICKER OVERLAY MODAL -->
+  <div id="modal-copy-move" class="modal-backdrop" style="z-index: 1100;">
+    <div class="modal" style="max-width: 500px; width: 92%;">
+      <div class="modal-header">
+        <h3 id="modal-copy-move-title">Copy Items</h3>
+        <button class="btn-close-modal" id="btn-close-copy-move">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body" style="padding: 15px; display: flex; flex-direction: column; gap: 10px;">
+        <div id="modal-copy-move-summary" style="font-size: 13px; color: var(--primary); font-weight: 500;">
+          Selected: 1 item
+        </div>
+        <!-- Drive Selector Dropdown -->
+        <div class="input-group" style="margin-bottom: 0;">
+          <label style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 4px; display: block;">Select Destination Drive</label>
+          <select id="copy-move-drive-select" class="toolbar-select" style="width: 100%; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 8px 12px; background: var(--bg-panel); color: var(--text-primary); font-size: 13px; font-weight: 500;">
+            <!-- Roots options -->
+          </select>
+        </div>
+        
+        <div>
+          <label style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 4px; display: block;">Destination Folder</label>
+          <div id="copy-move-breadcrumbs" class="breadcrumbs" style="font-size: 12px; padding: 6px 12px; background: rgba(255,255,255,0.02); border-radius: 4px; display: flex; flex-wrap: wrap; gap: 4px;"></div>
+        </div>
+
+        <div id="copy-move-list" style="max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 8px; background: rgba(0,0,0,0.15);">
+          <!-- Dynamic destination folder items populated here -->
+        </div>
+      </div>
+      <div class="modal-footer" style="padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-subtle);">
+        <div style="font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; max-width: 55%;" id="copy-move-current-target-display">Target: /</div>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" class="btn-secondary" id="btn-cancel-copy-move">Cancel</button>
+          <button type="button" class="btn-primary" id="btn-confirm-copy-move" style="display: flex; align-items: center; gap: 6px;">
+            <i data-lucide="check"></i>
+            <span id="btn-confirm-copy-move-text">Paste Here</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app-v4.js?v=4.05"></script>
 </body>
 </html>
