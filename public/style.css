@@ -2801,45 +2801,41 @@ body.style-aero-classic .file-card {
   border-color: transparent;
 }
 
-/* FLOATING BATCH ACTION BAR - Clean, Spacious & Uncongested Island */
+/* HEADER-DOCKED BATCH ACTION BAR - Clean, Pill-Shaped, Integrated */
 .batch-action-bar {
-  position: fixed !important;
-  bottom: 28px !important;
-  left: 50% !important;
-  transform: translateX(-50%) !important;
-  display: flex !important;
+  display: inline-flex !important;
   align-items: center !important;
-  justify-content: space-between !important;
-  gap: 16px !important;
-  padding: 8px 16px !important;
+  gap: 8px !important;
+  padding: 3px 8px 3px 12px !important;
+  height: 38px !important;
+  box-sizing: border-box !important;
   background: rgba(15, 20, 32, 0.94) !important;
-  backdrop-filter: blur(24px) saturate(190%) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(190%) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
   border: 1px solid rgba(255, 255, 255, 0.14) !important;
   border-radius: 50px !important;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 25px rgba(236, 72, 153, 0.25) !important;
-  z-index: 9999 !important;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4), 0 0 15px rgba(236, 72, 153, 0.2) !important;
   white-space: nowrap !important;
   flex-wrap: nowrap !important;
-  max-width: 95vw !important;
-  animation: batchIslandPop 0.28s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  animation: batchFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  margin-right: 4px !important;
 }
 
-@keyframes batchIslandPop {
+@keyframes batchFadeIn {
   from {
     opacity: 0;
-    transform: translate(-50%, 20px) scale(0.92);
+    transform: scale(0.96);
   }
   to {
     opacity: 1;
-    transform: translate(-50%, 0) scale(1);
+    transform: scale(1);
   }
 }
 
 .batch-action-left {
   display: flex !important;
   align-items: center !important;
-  gap: 10px !important;
+  gap: 8px !important;
   flex-shrink: 0 !important;
 }
 
@@ -2851,8 +2847,8 @@ body.style-aero-classic .file-card {
 }
 
 .batch-select-all-label input[type="checkbox"] {
-  width: 18px !important;
-  height: 18px !important;
+  width: 16px !important;
+  height: 16px !important;
   accent-color: var(--primary, #ec4899) !important;
   cursor: pointer !important;
   margin: 0 !important;
@@ -2861,12 +2857,12 @@ body.style-aero-classic .file-card {
 .batch-count-pill {
   display: inline-flex !important;
   align-items: center !important;
-  gap: 6px !important;
-  padding: 5px 12px !important;
+  gap: 5px !important;
+  padding: 3px 10px !important;
   background: rgba(236, 72, 153, 0.15) !important;
   border: 1px solid rgba(236, 72, 153, 0.35) !important;
-  border-radius: 20px !important;
-  font-size: 13px !important;
+  border-radius: 16px !important;
+  font-size: 12px !important;
   font-weight: 600 !important;
   color: var(--primary, #ec4899) !important;
   letter-spacing: 0.2px !important;
@@ -2875,7 +2871,7 @@ body.style-aero-classic .file-card {
 .batch-action-right {
   display: flex !important;
   align-items: center !important;
-  gap: 8px !important;
+  gap: 6px !important;
   flex-shrink: 0 !important;
 }
 
@@ -2884,13 +2880,14 @@ body.style-aero-classic .file-card {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 6px !important;
-  padding: 7px 15px !important;
+  gap: 5px !important;
+  padding: 4px 12px !important;
+  height: 28px !important;
   background: rgba(255, 255, 255, 0.08) !important;
   border: 1px solid rgba(255, 255, 255, 0.14) !important;
-  border-radius: 20px !important;
+  border-radius: 16px !important;
   color: #ffffff !important;
-  font-size: 13px !important;
+  font-size: 12px !important;
   font-weight: 500 !important;
   cursor: pointer !important;
   outline: none !important;
@@ -2911,8 +2908,8 @@ body.style-aero-classic .file-card {
 }
 
 .btn-batch i, .btn-batch svg {
-  width: 14px !important;
-  height: 14px !important;
+  width: 13px !important;
+  height: 13px !important;
   color: currentColor !important;
 }
 
@@ -2940,17 +2937,17 @@ body.style-aero-classic .file-card {
 
 .batch-divider-small {
   width: 1px !important;
-  height: 18px !important;
+  height: 16px !important;
   background: rgba(255, 255, 255, 0.18) !important;
-  margin: 0 2px !important;
+  margin: 0 1px !important;
 }
 
 .btn-batch-clear, .btn-batch-icon {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  width: 30px !important;
-  height: 30px !important;
+  width: 26px !important;
+  height: 26px !important;
   padding: 0 !important;
   background: rgba(255, 255, 255, 0.06) !important;
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
@@ -2968,25 +2965,8 @@ body.style-aero-classic .file-card {
 }
 
 .btn-batch-clear i, .btn-batch-clear svg, .btn-batch-icon i, .btn-batch-icon svg {
-  width: 14px !important;
-  height: 14px !important;
-}
-
-@media (max-width: 600px) {
-  .batch-action-bar {
-    bottom: 16px !important;
-    padding: 6px 12px !important;
-    gap: 8px !important;
-  }
-  .btn-batch span {
-    display: none !important;
-  }
-  .btn-batch {
-    padding: 8px !important;
-    width: 34px !important;
-    height: 34px !important;
-    border-radius: 50% !important;
-  }
+  width: 13px !important;
+  height: 13px !important;
 }
 
 /* Copy / Move Modal Items */

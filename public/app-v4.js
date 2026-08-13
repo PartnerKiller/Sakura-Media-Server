@@ -1367,7 +1367,7 @@ function updateBatchActionBar() {
   
   if (bar) {
     if (count > 0) {
-      bar.style.display = 'flex';
+      bar.style.display = 'inline-flex';
       if (typeof lucide !== 'undefined') lucide.createIcons();
     } else {
       bar.style.display = 'none';
