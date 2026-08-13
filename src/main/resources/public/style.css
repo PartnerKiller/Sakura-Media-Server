@@ -2801,24 +2801,28 @@ body.style-aero-classic .file-card {
   border-color: transparent;
 }
 
-/* CLIPBOARD DOCK - Direct Copy/Move Paste Dock */
+/* CLIPBOARD DOCK - Direct Copy/Move Paste Dock (Hidden by default, shown when active) */
 .clipboard-dock {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 8px 3px 12px;
+  height: 38px;
+  box-sizing: border-box;
+  background: rgba(15, 20, 32, 0.94);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(236, 72, 153, 0.5);
+  border-radius: 50px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4), 0 0 15px rgba(236, 72, 153, 0.25);
+  white-space: nowrap;
+  flex-wrap: nowrap;
+  animation: batchFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  margin-right: 4px;
+}
+
+.clipboard-dock.active {
   display: inline-flex !important;
-  align-items: center !important;
-  gap: 8px !important;
-  padding: 3px 8px 3px 12px !important;
-  height: 38px !important;
-  box-sizing: border-box !important;
-  background: rgba(15, 20, 32, 0.94) !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-  border: 1px solid rgba(236, 72, 153, 0.5) !important;
-  border-radius: 50px !important;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4), 0 0 15px rgba(236, 72, 153, 0.25) !important;
-  white-space: nowrap !important;
-  flex-wrap: nowrap !important;
-  animation: batchFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
-  margin-right: 4px !important;
 }
 
 .btn-batch-paste {
@@ -2841,24 +2845,28 @@ body.style-aero-classic .file-card {
   border-style: dashed !important;
 }
 
-/* HEADER-DOCKED BATCH ACTION BAR - Clean, Pill-Shaped, Integrated */
+/* HEADER-DOCKED BATCH ACTION BAR - Clean, Pill-Shaped, Integrated (Hidden by default, shown when active) */
 .batch-action-bar {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 8px 3px 12px;
+  height: 38px;
+  box-sizing: border-box;
+  background: rgba(15, 20, 32, 0.94);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 50px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4), 0 0 15px rgba(236, 72, 153, 0.2);
+  white-space: nowrap;
+  flex-wrap: nowrap;
+  animation: batchFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  margin-right: 4px;
+}
+
+.batch-action-bar.active {
   display: inline-flex !important;
-  align-items: center !important;
-  gap: 8px !important;
-  padding: 3px 8px 3px 12px !important;
-  height: 38px !important;
-  box-sizing: border-box !important;
-  background: rgba(15, 20, 32, 0.94) !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.14) !important;
-  border-radius: 50px !important;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4), 0 0 15px rgba(236, 72, 153, 0.2) !important;
-  white-space: nowrap !important;
-  flex-wrap: nowrap !important;
-  animation: batchFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
-  margin-right: 4px !important;
 }
 
 @keyframes batchFadeIn {

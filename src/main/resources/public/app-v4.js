@@ -843,6 +843,8 @@ function initToolbar() {
   }
 
   updateViewButtons();
+  updateBatchActionBar();
+  updatePasteButton();
 }
 
 function updateViewButtons() {
@@ -1413,9 +1415,11 @@ function updateBatchActionBar() {
   
   if (bar) {
     if (count > 0) {
+      bar.classList.add('active');
       bar.style.display = 'inline-flex';
       if (typeof lucide !== 'undefined') lucide.createIcons();
     } else {
+      bar.classList.remove('active');
       bar.style.display = 'none';
     }
   }
@@ -1450,12 +1454,16 @@ function updatePasteButton() {
     if (dock) {
       if (dockStatus) dockStatus.innerText = statusText;
       if (dockBtnText) dockBtnText.innerText = `${actionText} Here`;
+      dock.classList.add('active');
       dock.style.display = 'inline-flex';
     }
     if (typeof lucide !== 'undefined') lucide.createIcons();
   } else {
     if (topBtn) topBtn.style.display = 'none';
-    if (dock) dock.style.display = 'none';
+    if (dock) {
+      dock.classList.remove('active');
+      dock.style.display = 'none';
+    }
   }
 }
 window.updatePasteButton = updatePasteButton;
