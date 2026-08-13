@@ -1645,13 +1645,13 @@ async function handlePasteClipboard() {
 
     if (res.success) {
       showToast(`Successfully ${action === 'move' ? 'moved' : 'copied'} items!`, 'success');
-      if (action === 'move') {
-        state.clipboard = { action: null, paths: [] };
-      }
+      state.clipboard = { action: null, paths: [] };
       updatePasteButton();
       browsePath(state.currentPath);
     } else {
       showToast(`Operation completed with errors: ${(res.errors || []).join('; ')}`, 'error');
+      state.clipboard = { action: null, paths: [] };
+      updatePasteButton();
       browsePath(state.currentPath);
     }
   } catch (err) {
