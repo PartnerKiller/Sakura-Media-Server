@@ -443,12 +443,43 @@ function initApp() {
 
   // Batch action bar & clipboard listeners
   safeAddListener('btn-paste', 'click', handlePasteClipboard);
+  safeAddListener('btn-paste-dock', 'click', handlePasteClipboard);
+  safeAddListener('btn-paste-dock-cancel', 'click', clearClipboard);
   safeAddListener('batch-select-all-checkbox', 'change', toggleSelectAll);
   safeAddListener('btn-batch-copy', 'click', handleBatchCopy);
   safeAddListener('btn-batch-move', 'click', handleBatchMove);
   safeAddListener('btn-batch-download', 'click', handleBatchDownload);
   safeAddListener('btn-batch-delete', 'click', handleBatchDelete);
   safeAddListener('btn-batch-clear', 'click', clearSelection);
+
+  // Global keyboard shortcuts for clipboard (Copy / Cut / Paste / Clear)
+  document.addEventListener('keydown', (e) => {
+    // Ignore when user is typing in input or textarea
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+    
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+      if (state.selectedPaths.size > 0) {
+        e.preventDefault();
+        handleBatchCopy();
+      }
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'x') {
+      if (state.selectedPaths.size > 0) {
+        e.preventDefault();
+        handleBatchMove();
+      }
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+      if (state.clipboard && state.clipboard.paths && state.clipboard.paths.length > 0) {
+        e.preventDefault();
+        handlePasteClipboard();
+      }
+    } else if (e.key === 'Escape') {
+      if (state.selectedPaths.size > 0) {
+        clearSelection();
+      } else if (state.clipboard && state.clipboard.paths && state.clipboard.paths.length > 0) {
+        clearClipboard();
+      }
+    }
+  });
 
   // Copy / Move Modal listeners
   safeAddListener('btn-close-copy-move', 'click', closeCopyMoveModal);
@@ -934,6 +965,11 @@ function renderFiles(files) {
       card.classList.add('selected');
     }
     
+    // Check if item is marked for cut/move
+    if (state.clipboard && state.clipboard.action === 'move' && state.clipboard.paths && state.clipboard.paths.includes(filePath)) {
+      card.classList.add('cut-item');
+    }
+    
     // Determine card category class and icon
     let category = 'file';
     let icon = 'file-text';
@@ -1383,46 +1419,91 @@ function updateBatchActionBar() {
 window.updateBatchActionBar = updateBatchActionBar;
 
 function updatePasteButton() {
-  const btn = document.getElementById('btn-paste');
-  const label = document.getElementById('btn-paste-label');
-  if (!btn || !label) return;
-
+  const topBtn = document.getElementById('btn-paste');
+  const topLabel = document.getElementById('btn-paste-label');
+  const dock = document.getElementById('clipboard-dock');
+  const dockStatus = document.getElementById('clipboard-status-label');
+  const dockBtnText = document.getElementById('btn-paste-dock-text');
+  
   const count = state.clipboard && state.clipboard.paths ? state.clipboard.paths.length : 0;
+  const isMove = state.clipboard && state.clipboard.action === 'move';
+  
   if (count > 0) {
-    const actionLabel = state.clipboard.action === 'move' ? 'Move' : 'Paste';
-    label.innerText = `${actionLabel} (${count})`;
-    btn.style.display = 'inline-flex';
+    const actionText = isMove ? 'Move' : 'Paste';
+    const statusText = `${count} item${count === 1 ? '' : 's'} (${isMove ? 'Cut' : 'Copied'})`;
+    
+    if (topBtn && topLabel) {
+      topLabel.innerText = `${actionText} (${count})`;
+      topBtn.style.display = 'inline-flex';
+    }
+    
+    if (dock) {
+      if (dockStatus) dockStatus.innerText = statusText;
+      if (dockBtnText) dockBtnText.innerText = `${actionText} Here`;
+      dock.style.display = 'inline-flex';
+    }
     if (typeof lucide !== 'undefined') lucide.createIcons();
   } else {
-    btn.style.display = 'none';
+    if (topBtn) topBtn.style.display = 'none';
+    if (dock) dock.style.display = 'none';
   }
 }
 window.updatePasteButton = updatePasteButton;
 
-// COPY & MOVE ACTIONS
+function clearClipboard() {
+  state.clipboard = { action: null, paths: [] };
+  updatePasteButton();
+  renderExplorer();
+  showToast('Clipboard cleared', 'info');
+}
+window.clearClipboard = clearClipboard;
+
+// COPY & MOVE ACTIONS (Direct Clipboard Workflow)
 function handleCopySingle(e, filePath) {
   if (e) { e.preventDefault(); e.stopPropagation(); }
-  openCopyMoveModal('copy', [filePath]);
+  state.clipboard = { action: 'copy', paths: [filePath] };
+  state.selectedPaths.clear();
+  updateBatchActionBar();
+  updatePasteButton();
+  renderExplorer();
+  const filename = filePath.split('/').pop();
+  showToast(`Copied "${filename}" to clipboard. Navigate to destination folder and click Paste.`, 'info');
 }
 window.handleCopySingle = handleCopySingle;
 
 function handleMoveSingle(e, filePath) {
   if (e) { e.preventDefault(); e.stopPropagation(); }
-  openCopyMoveModal('move', [filePath]);
+  state.clipboard = { action: 'move', paths: [filePath] };
+  state.selectedPaths.clear();
+  updateBatchActionBar();
+  updatePasteButton();
+  renderExplorer();
+  const filename = filePath.split('/').pop();
+  showToast(`Cut "${filename}" to clipboard. Navigate to destination folder and click Move Here.`, 'info');
 }
 window.handleMoveSingle = handleMoveSingle;
 
 function handleBatchCopy() {
   const paths = Array.from(state.selectedPaths);
   if (paths.length === 0) return;
-  openCopyMoveModal('copy', paths);
+  state.clipboard = { action: 'copy', paths: paths };
+  state.selectedPaths.clear();
+  updateBatchActionBar();
+  updatePasteButton();
+  renderExplorer();
+  showToast(`Copied ${paths.length} item(s) to clipboard. Navigate to destination folder and click Paste.`, 'info');
 }
 window.handleBatchCopy = handleBatchCopy;
 
 function handleBatchMove() {
   const paths = Array.from(state.selectedPaths);
   if (paths.length === 0) return;
-  openCopyMoveModal('move', paths);
+  state.clipboard = { action: 'move', paths: paths };
+  state.selectedPaths.clear();
+  updateBatchActionBar();
+  updatePasteButton();
+  renderExplorer();
+  showToast(`Cut ${paths.length} item(s) to clipboard. Navigate to destination folder and click Move Here.`, 'info');
 }
 window.handleBatchMove = handleBatchMove;
 
@@ -1506,6 +1587,18 @@ async function handlePasteClipboard() {
   const destination = state.currentPath;
   const endpoint = action === 'move' ? '/api/files/move' : '/api/files/copy';
   const taskId = 'task_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+
+  // Check if user is trying to move into the exact same folder
+  if (action === 'move') {
+    const isSameDir = paths.every(p => {
+      const parent = p.substring(0, p.lastIndexOf('/')) || '/';
+      return parent === destination;
+    });
+    if (isSameDir) {
+      showToast('Items are already in this destination directory.', 'warning');
+      return;
+    }
+  }
 
   showToast(`${action === 'move' ? 'Moving' : 'Copying'} ${paths.length} item(s)...`, 'info');
   updateFileOpProgressUI({

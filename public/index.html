@@ -11,7 +11,7 @@
   <!-- Lucide Icons Local -->
   <script src="/lucide.min.js?v=0.453"></script>
   <script src="/chart.min.js"></script>
-  <link rel="stylesheet" href="/style.css?v=6.20">
+  <link rel="stylesheet" href="/style.css?v=6.30">
   <link rel="icon" type="image/jpeg" href="/favicon.jpg">
 </head>
 <body>
@@ -167,6 +167,22 @@
 
             <!-- Explorer Controls -->
             <div class="explorer-sticky-right" id="explorer-toolbar">
+              <!-- CLIPBOARD DOCK (Appears after Copy or Move) -->
+              <div id="clipboard-dock" class="clipboard-dock" style="display: none; align-items: center; gap: 8px; padding: 3px 8px 3px 12px; height: 38px; box-sizing: border-box; background: rgba(15, 20, 32, 0.94); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(236, 72, 153, 0.5); border-radius: 50px; box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4), 0 0 15px rgba(236, 72, 153, 0.25); white-space: nowrap; flex-wrap: nowrap; margin-right: 4px;">
+                <div style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--primary, #ec4899);">
+                  <i data-lucide="clipboard" style="width: 14px; height: 14px;"></i>
+                  <span id="clipboard-status-label">0 items</span>
+                </div>
+                <div class="batch-divider-small" style="width: 1px; height: 16px; background: rgba(255, 255, 255, 0.18); margin: 0 2px;"></div>
+                <button id="btn-paste-dock" class="btn-batch btn-batch-paste" title="Paste clipboard items into current folder" style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 14px; height: 28px; background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); border: none; border-radius: 16px; color: #ffffff; font-size: 12px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(236, 72, 153, 0.4);">
+                  <i data-lucide="clipboard-paste" style="width: 13px; height: 13px;"></i>
+                  <span id="btn-paste-dock-text">Paste Here</span>
+                </button>
+                <button id="btn-paste-dock-cancel" class="btn-batch-clear" title="Cancel clipboard" style="display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 50%; color: #94a3b8; cursor: pointer;">
+                  <i data-lucide="x" style="width: 13px; height: 13px;"></i>
+                </button>
+              </div>
+
               <!-- BATCH ACTION BAR (Docked in Header) -->
               <div id="batch-action-bar" class="batch-action-bar" style="display: none; align-items: center; gap: 8px; padding: 3px 8px 3px 12px; height: 38px; box-sizing: border-box; background: rgba(15, 20, 32, 0.94); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 50px; box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4), 0 0 15px rgba(236, 72, 153, 0.2); white-space: nowrap; flex-wrap: nowrap; margin-right: 4px;">
                 <div class="batch-action-left" style="display: flex; align-items: center; gap: 8px;">
@@ -1346,6 +1362,6 @@
     </div>
   </div>
 
-  <script src="/app-v4.js?v=4.10"></script>
+  <script src="/app-v4.js?v=4.11"></script>
 </body>
 </html>
