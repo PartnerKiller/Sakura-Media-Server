@@ -248,8 +248,11 @@
             <div class="batch-action-left">
               <label class="batch-select-all-label">
                 <input type="checkbox" id="batch-select-all-checkbox" title="Select All Items">
-                <span id="batch-selected-count">0 items selected</span>
               </label>
+              <div class="batch-count-pill">
+                <i data-lucide="layers" style="width: 14px; height: 14px; color: var(--primary);"></i>
+                <span id="batch-selected-count">0 items selected</span>
+              </div>
             </div>
             <div class="batch-action-right">
               <button id="btn-batch-copy" class="btn-batch" title="Copy selected items">
@@ -260,7 +263,7 @@
                 <i data-lucide="folder-input"></i>
                 <span>Move</span>
               </button>
-              <button id="btn-batch-download" class="btn-batch" title="Download selected items as ZIP">
+              <button id="btn-batch-download" class="btn-batch btn-batch-download" title="Download selected items as ZIP">
                 <i data-lucide="download"></i>
                 <span>Download</span>
               </button>
@@ -268,7 +271,8 @@
                 <i data-lucide="trash-2"></i>
                 <span>Delete</span>
               </button>
-              <button id="btn-batch-clear" class="btn-batch-icon" title="Clear selection">
+              <div class="batch-divider-small"></div>
+              <button id="btn-batch-clear" class="btn-batch-clear" title="Clear selection">
                 <i data-lucide="x"></i>
               </button>
             </div>
@@ -1340,6 +1344,6 @@
     </div>
   </div>
 
-  <script src="/app-v4.js?v=4.06"></script>
+  <script src="/app-v4.js?v=4.07"></script>
 </body>
 </html>
