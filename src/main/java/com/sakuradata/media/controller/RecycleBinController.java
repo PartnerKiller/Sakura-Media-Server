@@ -10,6 +10,9 @@ import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -50,13 +53,34 @@ public class RecycleBinController {
         File src = new File(item.getTempPath());
         File dest = new File(item.getOriginalPath());
 
+        if (!src.exists()) {
+            recycleItemRepository.delete(item);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Source file in recycle bin no longer exists"));
+        }
+
         // Ensure parent directories exist
         File destParent = dest.getParentFile();
         if (destParent != null && !destParent.exists()) {
             destParent.mkdirs();
         }
 
-        if (src.renameTo(dest)) {
+        boolean success = src.renameTo(dest);
+        if (!success) {
+            try {
+                Files.move(src.toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                success = true;
+            } catch (Exception e) {
+                try {
+                    copyRecursively(src.toPath(), dest.toPath());
+                    deleteRecursively(src.toPath());
+                    success = true;
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+            }
+        }
+
+        if (success) {
             recycleItemRepository.delete(item);
 
             // Broadcast change event for destination parent path
@@ -88,7 +112,7 @@ public class RecycleBinController {
 
         File file = new File(item.getTempPath());
         if (file.exists()) {
-            deleteRecursively(file);
+            deleteRecursively(file.toPath());
         }
 
         recycleItemRepository.delete(item);
@@ -106,7 +130,7 @@ public class RecycleBinController {
         for (RecycleItem item : items) {
             File file = new File(item.getTempPath());
             if (file.exists()) {
-                deleteRecursively(file);
+                deleteRecursively(file.toPath());
             }
             recycleItemRepository.delete(item);
         }
@@ -114,15 +138,47 @@ public class RecycleBinController {
         return ResponseEntity.ok(Map.of("success", true));
     }
 
-    private void deleteRecursively(File file) {
-        if (file.isDirectory()) {
-            File[] entries = file.listFiles();
-            if (entries != null) {
-                for (File entry : entries) {
-                    deleteRecursively(entry);
+    private void copyRecursively(Path source, Path target) throws IOException {
+        if (Files.isDirectory(source)) {
+            if (!Files.exists(target)) {
+                Files.createDirectories(target);
+            }
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(source)) {
+                for (Path entry : stream) {
+                    copyRecursively(entry, target.resolve(entry.getFileName()));
                 }
             }
+        } else {
+            Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
         }
-        file.delete();
+    }
+
+    private void deleteRecursively(Path path) {
+        if (!Files.exists(path)) return;
+        try {
+            Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                    try {
+                        Files.delete(file);
+                    } catch (Exception e) {
+                        file.toFile().setWritable(true);
+                        file.toFile().delete();
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                    try {
+                        Files.delete(dir);
+                    } catch (Exception e) {
+                        dir.toFile().setWritable(true);
+                        dir.toFile().delete();
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        } catch (Exception ignored) {}
     }
 }

@@ -128,8 +128,12 @@ public class FileController {
 
         try (java.nio.file.DirectoryStream<java.nio.file.Path> stream = java.nio.file.Files.newDirectoryStream(folder.toPath())) {
             for (java.nio.file.Path entry : stream) {
+                String fileName = entry.getFileName().toString();
+                if (fileName.startsWith(".") || fileName.equals(".recycle-bin")) {
+                    continue; // Hide hidden and recycle bin folders
+                }
                 Map<String, Object> fileMap = new HashMap<>();
-                fileMap.put("name", entry.getFileName().toString());
+                fileMap.put("name", fileName);
                 try {
                     java.nio.file.attribute.BasicFileAttributes attrs = java.nio.file.Files.readAttributes(entry, java.nio.file.attribute.BasicFileAttributes.class);
                     boolean isFile = attrs.isRegularFile();
@@ -579,10 +583,7 @@ public class FileController {
         }
 
         try {
-            File recycleBinFolder = new File("./recycle-bin");
-            if (!recycleBinFolder.exists()) {
-                recycleBinFolder.mkdirs();
-            }
+            File recycleBinFolder = getRecycleBinFolderForPath(targetPath);
             String tempName = UUID.randomUUID().toString() + "_" + file.getName();
             File dest = new File(recycleBinFolder, tempName);
             
@@ -591,8 +592,14 @@ public class FileController {
                 try {
                     Files.move(file.toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING);
                     moved = true;
-                } catch (IOException e) {
-                    e.printStackTrace();
+                } catch (Exception e) {
+                    try {
+                        copyRecursively(file.toPath(), dest.toPath(), true);
+                        deleteRecursively(file.toPath());
+                        moved = true;
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    }
                 }
             }
             
@@ -863,15 +870,6 @@ public class FileController {
             return ResponseEntity.badRequest().body(Map.of("error", "No paths provided"));
         }
 
-        File recycleBinFolder = new File("./recycle-bin");
-        if (!recycleBinFolder.exists()) {
-            recycleBinFolder.mkdirs();
-        }
-
-        int deletedCount = 0;
-        List<String> errors = new ArrayList<>();
-        Set<String> affectedParents = new HashSet<>();
-
         for (String path : paths) {
             String targetPath = resolvePath(path);
             if (targetPath == null) continue;
@@ -887,6 +885,7 @@ public class FileController {
             }
 
             try {
+                File recycleBinFolder = getRecycleBinFolderForPath(targetPath);
                 String tempName = UUID.randomUUID().toString() + "_" + file.getName();
                 File dest = new File(recycleBinFolder, tempName);
                 
@@ -895,10 +894,14 @@ public class FileController {
                     try {
                         Files.move(file.toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING);
                         moved = true;
-                    } catch (IOException e) {
-                        copyRecursively(file.toPath(), dest.toPath(), true);
-                        deleteRecursively(file);
-                        moved = true;
+                    } catch (Exception e) {
+                        try {
+                            copyRecursively(file.toPath(), dest.toPath(), true);
+                            deleteRecursively(file.toPath());
+                            moved = true;
+                        } catch (Exception ex) {
+                            ex.printStackTrace();
+                        }
                     }
                 }
 
@@ -1012,6 +1015,23 @@ public class FileController {
         }
     }
 
+    private File getRecycleBinFolderForPath(String path) {
+        String normalized = Paths.get(path).toAbsolutePath().normalize().toString().replace("\\", "/");
+        List<String> knownRoots = List.of("/media/storage", "/media/hdd", "/media/gdrive", "/home/sakura");
+        String matchedRoot = "/home/sakura";
+        for (String r : knownRoots) {
+            if (normalized.equals(r) || normalized.startsWith(r + "/")) {
+                matchedRoot = r;
+                break;
+            }
+        }
+        File bin = new File(matchedRoot, ".recycle-bin");
+        if (!bin.exists()) {
+            bin.mkdirs();
+        }
+        return bin;
+    }
+
     private void moveRecursively(Path source, Path target, boolean overwrite) throws IOException {
         if (source.equals(target)) return;
 
@@ -1031,7 +1051,7 @@ public class FileController {
         }
 
         copyRecursively(source, target, overwrite);
-        deleteRecursively(source.toFile());
+        deleteRecursively(source);
     }
 
     private Path getUniqueDestinationPath(Path target) {
@@ -1053,17 +1073,31 @@ public class FileController {
         return newTarget;
     }
 
-    private void deleteRecursively(File file) throws IOException {
-        if (file.isDirectory()) {
-            File[] entries = file.listFiles();
-            if (entries != null) {
-                for (File entry : entries) {
-                    deleteRecursively(entry);
+    private void deleteRecursively(Path path) throws IOException {
+        if (!Files.exists(path)) return;
+        Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                try {
+                    Files.delete(file);
+                } catch (Exception e) {
+                    file.toFile().setWritable(true);
+                    file.toFile().delete();
                 }
+                return FileVisitResult.CONTINUE;
             }
-        }
-        if (!file.delete()) {
-            throw new IOException("Failed to delete " + file.getAbsolutePath());
-        }
+
+            @Override
+            public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                if (exc != null) throw exc;
+                try {
+                    Files.delete(dir);
+                } catch (Exception e) {
+                    dir.toFile().setWritable(true);
+                    dir.toFile().delete();
+                }
+                return FileVisitResult.CONTINUE;
+            }
+        });
     }
 }
