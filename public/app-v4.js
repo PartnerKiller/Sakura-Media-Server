@@ -875,12 +875,16 @@ function processAndRenderFiles() {
       const ext = file.name.split('.').pop().toLowerCase();
       if (!file.isFile) {
         category = 'folder';
-      } else if (['mp4', 'mkv', 'webm', 'avi', 'mov'].includes(ext)) {
+      } else if (['mp4', 'mkv', 'webm', 'avi', 'mov', 'flv', 'wmv', 'm4v', 'ts', '3gp'].includes(ext)) {
         category = 'video';
-      } else if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) {
+      } else if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'tiff'].includes(ext)) {
         category = 'image';
-      } else if (['mp3', 'wav', 'ogg', 'flac', 'm4a'].includes(ext)) {
+      } else if (['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac', 'opus', 'wma', 'alac'].includes(ext)) {
         category = 'audio';
+      } else if (['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'rtf', 'odt', 'ods', 'odp', 'epub', 'srt', 'ass', 'vtt', 'md', 'json', 'xml', 'csv', 'log'].includes(ext)) {
+        category = 'document';
+      } else if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'iso', 'tgz'].includes(ext)) {
+        category = 'archive';
       }
       return category === state.filterType;
     });
@@ -978,15 +982,21 @@ function renderFiles(files) {
     if (!file.isFile) {
       category = 'folder';
       icon = 'folder';
-    } else if (['mp4', 'mkv', 'webm', 'avi', 'mov'].includes(ext)) {
+    } else if (['mp4', 'mkv', 'webm', 'avi', 'mov', 'flv', 'wmv', 'm4v', 'ts', '3gp'].includes(ext)) {
       category = 'video';
       icon = 'video';
-    } else if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) {
+    } else if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'tiff'].includes(ext)) {
       category = 'image';
       icon = 'image';
-    } else if (['mp3', 'wav', 'ogg', 'flac', 'm4a'].includes(ext)) {
+    } else if (['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac', 'opus', 'wma', 'alac'].includes(ext)) {
       category = 'audio';
       icon = 'music';
+    } else if (['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'rtf', 'odt', 'ods', 'odp', 'epub', 'srt', 'ass', 'vtt', 'md', 'json', 'xml', 'csv', 'log'].includes(ext)) {
+      category = 'document';
+      icon = 'file-text';
+    } else if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'iso', 'tgz'].includes(ext)) {
+      category = 'archive';
+      icon = 'archive';
     }
 
     card.classList.add(category);
