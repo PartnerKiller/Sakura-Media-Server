@@ -220,6 +220,27 @@
                 <div class="progress-bar-fill" id="upload-progress-fill"></div>
               </div>
             </div>
+
+            <!-- File Operation (Copy/Move) Progress Overlay -->
+            <div class="upload-progress-card" id="file-op-progress-container" style="display: none; width: 100%; margin-top: 10px; border-color: var(--primary);">
+              <div class="progress-info">
+                <div style="display: flex; flex-direction: column; gap: 2px; overflow: hidden; max-width: 70%;">
+                  <span id="file-op-progress-title" style="font-weight: 600; font-size: 13px; color: var(--text-primary);">Copying files...</span>
+                  <span id="file-op-progress-filename" style="font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">file.mp4</span>
+                </div>
+                <div class="progress-info-right" style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
+                  <span id="file-op-progress-percentage" style="font-weight: 700; color: var(--primary); font-size: 13px;">0%</span>
+                  <span id="file-op-progress-speed" style="opacity: 0.8; font-size: 11px;">0 MB/s</span>
+                </div>
+              </div>
+              <div class="progress-bar-bg" style="margin-top: 8px;">
+                <div class="progress-bar-fill" id="file-op-progress-fill" style="width: 0%; transition: width 0.15s ease;"></div>
+              </div>
+              <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-top: 6px;">
+                <span id="file-op-progress-files">0 / 0 files</span>
+                <span id="file-op-progress-bytes">0 MB / 0 MB</span>
+              </div>
+            </div>
           </div>
 
           <!-- BATCH ACTION BAR -->
@@ -1284,6 +1305,27 @@
         <div id="copy-move-list" style="max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 8px; background: rgba(0,0,0,0.15);">
           <!-- Dynamic destination folder items populated here -->
         </div>
+
+        <!-- Progress Bar (shown when processing) -->
+        <div id="copy-move-progress-container" class="upload-progress-card" style="display: none; margin-top: 6px; width: 100%; box-sizing: border-box; border-color: var(--primary);">
+          <div class="progress-info">
+            <div style="display: flex; flex-direction: column; gap: 2px; overflow: hidden; max-width: 72%;">
+              <span id="copy-move-progress-title" style="font-weight: 600; font-size: 13px; color: var(--text-primary);">Copying files...</span>
+              <span id="copy-move-progress-filename" style="font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Preparing files...</span>
+            </div>
+            <div class="progress-info-right" style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
+              <span id="copy-move-progress-percentage" style="font-weight: 700; color: var(--primary); font-size: 13px;">0%</span>
+              <span id="copy-move-progress-speed" style="opacity: 0.8; font-size: 11px;">0 MB/s</span>
+            </div>
+          </div>
+          <div class="progress-bar-bg" style="margin-top: 8px;">
+            <div class="progress-bar-fill" id="copy-move-progress-fill" style="width: 0%; transition: width 0.15s ease;"></div>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-top: 6px;">
+            <span id="copy-move-progress-files">0 / 0 files</span>
+            <span id="copy-move-progress-bytes">0 MB / 0 MB</span>
+          </div>
+        </div>
       </div>
       <div class="modal-footer" style="padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-subtle);">
         <div style="font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; max-width: 55%;" id="copy-move-current-target-display">Target: /</div>
@@ -1298,6 +1340,6 @@
     </div>
   </div>
 
-  <script src="/app-v4.js?v=4.05"></script>
+  <script src="/app-v4.js?v=4.06"></script>
 </body>
 </html>

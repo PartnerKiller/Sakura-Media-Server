@@ -15,6 +15,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
@@ -684,6 +685,7 @@ public class FileController {
         User user = (User) request.getAttribute("user");
         Object sourcesObj = body.get("sources");
         String destination = (String) body.get("destination");
+        String taskId = (String) body.get("taskId");
         boolean overwrite = Boolean.TRUE.equals(body.get("overwrite"));
 
         if (sourcesObj == null || destination == null || destination.trim().isEmpty()) {
@@ -717,23 +719,27 @@ public class FileController {
             return ResponseEntity.badRequest().body(Map.of("error", "Destination must be an existing directory"));
         }
 
+        List<File> validSourceFiles = new ArrayList<>();
+        for (String srcStr : sources) {
+            String resolvedSrc = resolvePath(srcStr);
+            if (resolvedSrc != null) {
+                File f = new File(resolvedSrc);
+                if (f.exists() && hasPermission(user, resolvedSrc, "read")) {
+                    validSourceFiles.add(f);
+                }
+            }
+        }
+
+        long totalBytes = calculateTotalBytes(validSourceFiles);
+        int totalFiles = countTotalFiles(validSourceFiles);
+        ProgressTracker tracker = new ProgressTracker(taskId, "copy", totalBytes, totalFiles);
+        tracker.broadcastProgress("Starting copy...", false);
+
         int copiedCount = 0;
         List<String> errors = new ArrayList<>();
 
-        for (String srcStr : sources) {
-            String resolvedSrc = resolvePath(srcStr);
-            if (resolvedSrc == null) continue;
-
-            if (!hasPermission(user, resolvedSrc, "read")) {
-                errors.add("Read permission denied: " + srcStr);
-                continue;
-            }
-
-            File srcFile = new File(resolvedSrc);
-            if (!srcFile.exists()) {
-                errors.add("Source not found: " + srcStr);
-                continue;
-            }
+        for (File srcFile : validSourceFiles) {
+            String resolvedSrc = srcFile.getAbsolutePath().replace("\\", "/");
 
             // Prevent circular copy
             if (srcFile.isDirectory() && isSubPath(resolvedSrc, targetDirStr)) {
@@ -743,13 +749,14 @@ public class FileController {
 
             Path destPath = targetDir.toPath().resolve(srcFile.getName());
             try {
-                copyRecursively(srcFile.toPath(), destPath, overwrite);
+                copyRecursively(srcFile.toPath(), destPath, overwrite, tracker);
                 copiedCount++;
             } catch (Exception e) {
                 errors.add("Failed to copy " + srcFile.getName() + ": " + e.getMessage());
             }
         }
 
+        tracker.broadcastProgress("Completed", true);
         SseController.broadcast("fs-change", Map.of("userId", user.getId(), "parentPath", targetDirStr));
 
         Map<String, Object> resp = new HashMap<>();
@@ -766,6 +773,7 @@ public class FileController {
         User user = (User) request.getAttribute("user");
         Object sourcesObj = body.get("sources");
         String destination = (String) body.get("destination");
+        String taskId = (String) body.get("taskId");
         boolean overwrite = Boolean.TRUE.equals(body.get("overwrite"));
 
         if (sourcesObj == null || destination == null || destination.trim().isEmpty()) {
@@ -799,25 +807,29 @@ public class FileController {
             return ResponseEntity.badRequest().body(Map.of("error", "Destination must be an existing directory"));
         }
 
+        List<File> validSourceFiles = new ArrayList<>();
+        for (String srcStr : sources) {
+            String resolvedSrc = resolvePath(srcStr);
+            if (resolvedSrc != null) {
+                File f = new File(resolvedSrc);
+                if (f.exists() && hasPermission(user, resolvedSrc, "write")) {
+                    validSourceFiles.add(f);
+                }
+            }
+        }
+
+        long totalBytes = calculateTotalBytes(validSourceFiles);
+        int totalFiles = countTotalFiles(validSourceFiles);
+        ProgressTracker tracker = new ProgressTracker(taskId, "move", totalBytes, totalFiles);
+        tracker.broadcastProgress("Starting move...", false);
+
         int movedCount = 0;
         List<String> errors = new ArrayList<>();
         Set<String> affectedParents = new HashSet<>();
         affectedParents.add(targetDirStr);
 
-        for (String srcStr : sources) {
-            String resolvedSrc = resolvePath(srcStr);
-            if (resolvedSrc == null) continue;
-
-            if (!hasPermission(user, resolvedSrc, "write")) {
-                errors.add("Write permission denied for source: " + srcStr);
-                continue;
-            }
-
-            File srcFile = new File(resolvedSrc);
-            if (!srcFile.exists()) {
-                errors.add("Source not found: " + srcStr);
-                continue;
-            }
+        for (File srcFile : validSourceFiles) {
+            String resolvedSrc = srcFile.getAbsolutePath().replace("\\", "/");
 
             // Prevent circular move
             if (srcFile.isDirectory() && isSubPath(resolvedSrc, targetDirStr)) {
@@ -831,13 +843,14 @@ public class FileController {
 
             Path destPath = targetDir.toPath().resolve(srcFile.getName());
             try {
-                moveRecursively(srcFile.toPath(), destPath, overwrite);
+                moveRecursively(srcFile.toPath(), destPath, overwrite, tracker);
                 movedCount++;
             } catch (Exception e) {
                 errors.add("Failed to move " + srcFile.getName() + ": " + e.getMessage());
             }
         }
 
+        tracker.broadcastProgress("Completed", true);
         for (String p : affectedParents) {
             SseController.broadcast("fs-change", Map.of("userId", user.getId(), "parentPath", p));
         }
@@ -869,6 +882,10 @@ public class FileController {
         if (paths.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "No paths provided"));
         }
+
+        int deletedCount = 0;
+        List<String> errors = new ArrayList<>();
+        Set<String> affectedParents = new HashSet<>();
 
         for (String path : paths) {
             String targetPath = resolvePath(path);
@@ -992,6 +1009,10 @@ public class FileController {
     }
 
     private void copyRecursively(Path source, Path target, boolean overwrite) throws IOException {
+        copyRecursively(source, target, overwrite, null);
+    }
+
+    private void copyRecursively(Path source, Path target, boolean overwrite, ProgressTracker tracker) throws IOException {
         if (Files.isDirectory(source)) {
             if (!Files.exists(target)) {
                 Files.createDirectories(target);
@@ -999,18 +1020,31 @@ public class FileController {
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(source)) {
                 for (Path entry : stream) {
                     Path destEntry = target.resolve(entry.getFileName());
-                    copyRecursively(entry, destEntry, overwrite);
+                    copyRecursively(entry, destEntry, overwrite, tracker);
                 }
             }
         } else {
-            if (overwrite) {
-                Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
-            } else {
-                Path finalTarget = target;
-                if (Files.exists(finalTarget)) {
-                    finalTarget = getUniqueDestinationPath(finalTarget);
-                }
-                Files.copy(source, finalTarget);
+            Path finalTarget = target;
+            if (!overwrite && Files.exists(finalTarget)) {
+                finalTarget = getUniqueDestinationPath(finalTarget);
+            }
+            try (InputStream in = Files.newInputStream(source);
+                 OutputStream out = Files.newOutputStream(finalTarget)) {
+                copyStreamWithProgress(in, out, source.getFileName().toString(), tracker);
+            }
+            if (tracker != null) {
+                tracker.fileCompleted(source.getFileName().toString());
+            }
+        }
+    }
+
+    private void copyStreamWithProgress(InputStream in, OutputStream out, String filename, ProgressTracker tracker) throws IOException {
+        byte[] buffer = new byte[128 * 1024]; // 128KB buffer
+        int bytesRead;
+        while ((bytesRead = in.read(buffer)) != -1) {
+            out.write(buffer, 0, bytesRead);
+            if (tracker != null) {
+                tracker.addBytes(bytesRead, filename);
             }
         }
     }
@@ -1033,25 +1067,84 @@ public class FileController {
     }
 
     private void moveRecursively(Path source, Path target, boolean overwrite) throws IOException {
+        moveRecursively(source, target, overwrite, null);
+    }
+
+    private void moveRecursively(Path source, Path target, boolean overwrite, ProgressTracker tracker) throws IOException {
         if (source.equals(target)) return;
 
         try {
-            if (overwrite) {
-                Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
-            } else {
-                Path finalTarget = target;
-                if (Files.exists(finalTarget)) {
-                    finalTarget = getUniqueDestinationPath(finalTarget);
-                }
-                Files.move(source, finalTarget);
+            Path finalTarget = target;
+            if (!overwrite && Files.exists(finalTarget)) {
+                finalTarget = getUniqueDestinationPath(finalTarget);
+            }
+            Files.move(source, finalTarget, overwrite ? StandardCopyOption.REPLACE_EXISTING : StandardCopyOption.ATOMIC_MOVE);
+            if (tracker != null) {
+                long size = Files.isDirectory(finalTarget) ? calculateDirectorySize(finalTarget.toFile()) : Files.size(finalTarget);
+                tracker.addBytes(size, source.getFileName().toString());
+                tracker.fileCompleted(source.getFileName().toString());
             }
             return;
         } catch (Exception ignored) {
             // Cross-filesystem fallback
         }
 
-        copyRecursively(source, target, overwrite);
+        copyRecursively(source, target, overwrite, tracker);
         deleteRecursively(source);
+    }
+
+    private long calculateTotalBytes(List<File> files) {
+        long total = 0;
+        for (File f : files) {
+            if (f.isFile()) {
+                total += f.length();
+            } else if (f.isDirectory()) {
+                total += calculateDirectorySize(f);
+            }
+        }
+        return total;
+    }
+
+    private long calculateDirectorySize(File dir) {
+        long length = 0;
+        File[] files = dir.listFiles();
+        if (files != null) {
+            for (File file : files) {
+                if (file.isFile()) {
+                    length += file.length();
+                } else if (file.isDirectory()) {
+                    length += calculateDirectorySize(file);
+                }
+            }
+        }
+        return length;
+    }
+
+    private int countTotalFiles(List<File> files) {
+        int count = 0;
+        for (File f : files) {
+            if (f.isFile()) {
+                count++;
+            } else if (f.isDirectory()) {
+                count += countFilesInDirectory(f);
+            }
+        }
+        return Math.max(1, count);
+    }
+
+    private int countFilesInDirectory(File dir) {
+        int count = 0;
+        File[] files = dir.listFiles();
+        if (files != null) {
+            for (File f : files) {
+                if (f.isFile()) {
+                    count++;
+                } else if (f.isDirectory()) {
+                    count += countFilesInDirectory(f);
+                }
+            }
+        }
+        return count;
     }
 
     private Path getUniqueDestinationPath(Path target) {
@@ -1099,5 +1192,59 @@ public class FileController {
                 return FileVisitResult.CONTINUE;
             }
         });
+    }
+
+    private static class ProgressTracker {
+        final String taskId;
+        final String action;
+        final long totalBytes;
+        final int totalFiles;
+        long copiedBytes = 0;
+        int copiedFiles = 0;
+        long lastBroadcastTime = 0;
+        long startTime = System.currentTimeMillis();
+
+        ProgressTracker(String taskId, String action, long totalBytes, int totalFiles) {
+            this.taskId = taskId;
+            this.action = action;
+            this.totalBytes = Math.max(1, totalBytes);
+            this.totalFiles = Math.max(1, totalFiles);
+        }
+
+        synchronized void addBytes(long bytes, String currentFile) {
+            this.copiedBytes += bytes;
+            long now = System.currentTimeMillis();
+            if (now - lastBroadcastTime > 150) { // Broadcast max ~6 times per second
+                lastBroadcastTime = now;
+                broadcastProgress(currentFile, false);
+            }
+        }
+
+        synchronized void fileCompleted(String currentFile) {
+            this.copiedFiles++;
+            broadcastProgress(currentFile, false);
+        }
+
+        void broadcastProgress(String currentFile, boolean completed) {
+            int percent = (int) Math.min(100, (copiedBytes * 100) / totalBytes);
+            if (completed) percent = 100;
+            
+            long elapsedSec = (System.currentTimeMillis() - startTime) / 1000;
+            double speedMbps = elapsedSec > 0 ? (copiedBytes / (1024.0 * 1024.0)) / elapsedSec : 0;
+            String speedStr = speedMbps > 0 ? String.format(Locale.US, "%.1f MB/s", speedMbps) : "";
+
+            SseController.broadcast("file-op-progress", Map.of(
+                "taskId", taskId != null ? taskId : "",
+                "action", action,
+                "currentFile", currentFile != null ? currentFile : "",
+                "copiedBytes", copiedBytes,
+                "totalBytes", totalBytes,
+                "copiedFiles", copiedFiles,
+                "totalFiles", totalFiles,
+                "percent", percent,
+                "speed", speedStr,
+                "completed", completed
+            ));
+        }
     }
 }

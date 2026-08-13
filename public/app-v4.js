@@ -1505,8 +1505,21 @@ async function handlePasteClipboard() {
   const { action, paths } = state.clipboard;
   const destination = state.currentPath;
   const endpoint = action === 'move' ? '/api/files/move' : '/api/files/copy';
+  const taskId = 'task_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
 
   showToast(`${action === 'move' ? 'Moving' : 'Copying'} ${paths.length} item(s)...`, 'info');
+  updateFileOpProgressUI({
+    taskId: taskId,
+    action: action,
+    currentFile: 'Preparing...',
+    copiedBytes: 0,
+    totalBytes: 0,
+    copiedFiles: 0,
+    totalFiles: paths.length,
+    percent: 0,
+    speed: '',
+    completed: false
+  });
 
   try {
     const res = await apiCall(endpoint, {
@@ -1514,7 +1527,8 @@ async function handlePasteClipboard() {
       body: JSON.stringify({
         sources: paths,
         destination: destination,
-        overwrite: false
+        overwrite: false,
+        taskId: taskId
       })
     });
 
@@ -1545,11 +1559,22 @@ function openCopyMoveModal(action, paths) {
   const title = document.getElementById('modal-copy-move-title');
   const summary = document.getElementById('modal-copy-move-summary');
   const confirmBtnText = document.getElementById('btn-confirm-copy-move-text');
+  const confirmBtn = document.getElementById('btn-confirm-copy-move');
+  const cancelBtn = document.getElementById('btn-cancel-copy-move');
+  const progressContainer = document.getElementById('copy-move-progress-container');
 
   if (title) title.innerText = action === 'move' ? 'Move Items' : 'Copy Items';
   if (confirmBtnText) confirmBtnText.innerText = action === 'move' ? 'Move Here' : 'Copy Here';
   if (summary) {
     summary.innerText = `Selected: ${paths.length} item${paths.length === 1 ? '' : 's'} to ${action}`;
+  }
+
+  if (confirmBtn) confirmBtn.disabled = false;
+  if (cancelBtn) cancelBtn.disabled = false;
+  if (progressContainer) {
+    progressContainer.style.display = 'none';
+    const fillEl = document.getElementById('copy-move-progress-fill');
+    if (fillEl) fillEl.style.width = '0%';
   }
 
   // Populate drive select
@@ -1575,6 +1600,8 @@ window.openCopyMoveModal = openCopyMoveModal;
 function closeCopyMoveModal() {
   const modal = document.getElementById('modal-copy-move');
   if (modal) modal.classList.remove('active');
+  const progressContainer = document.getElementById('copy-move-progress-container');
+  if (progressContainer) progressContainer.style.display = 'none';
 }
 window.closeCopyMoveModal = closeCopyMoveModal;
 
@@ -1706,13 +1733,29 @@ async function confirmCopyMove() {
   const action = state.copyMoveAction;
   const destination = state.copyMoveTarget;
   const endpoint = action === 'move' ? '/api/files/move' : '/api/files/copy';
+  const taskId = 'task_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
 
   const confirmBtn = document.getElementById('btn-confirm-copy-move');
+  const cancelBtn = document.getElementById('btn-cancel-copy-move');
   if (confirmBtn) {
     confirmBtn.disabled = true;
     confirmBtn.innerHTML = '<i data-lucide="loader" class="animate-spin" style="width: 14px; height: 14px;"></i> <span>Processing...</span>';
-    if (typeof lucide !== 'undefined') lucide.createIcons();
   }
+  if (cancelBtn) cancelBtn.disabled = true;
+
+  // Show progress immediately in modal
+  updateFileOpProgressUI({
+    taskId: taskId,
+    action: action,
+    currentFile: 'Preparing...',
+    copiedBytes: 0,
+    totalBytes: 0,
+    copiedFiles: 0,
+    totalFiles: state.copyMoveSources.length,
+    percent: 0,
+    speed: '',
+    completed: false
+  });
 
   try {
     const res = await apiCall(endpoint, {
@@ -1720,22 +1763,34 @@ async function confirmCopyMove() {
       body: JSON.stringify({
         sources: state.copyMoveSources,
         destination: destination,
-        overwrite: false
+        overwrite: false,
+        taskId: taskId
       })
     });
 
-    closeCopyMoveModal();
-    if (res.success) {
-      showToast(`Successfully ${action === 'move' ? 'moved' : 'copied'} items!`, 'success');
-      state.selectedPaths.clear();
-      updateBatchActionBar();
-      browsePath(state.currentPath);
-    } else {
-      showToast(`Completed with errors: ${(res.errors || []).join('; ')}`, 'error');
-      state.selectedPaths.clear();
-      updateBatchActionBar();
-      browsePath(state.currentPath);
-    }
+    // Mark 100% complete
+    updateFileOpProgressUI({
+      taskId: taskId,
+      action: action,
+      currentFile: 'Finished!',
+      percent: 100,
+      completed: true
+    });
+
+    setTimeout(() => {
+      closeCopyMoveModal();
+      if (res.success) {
+        showToast(`Successfully ${action === 'move' ? 'moved' : 'copied'} items!`, 'success');
+        state.selectedPaths.clear();
+        updateBatchActionBar();
+        browsePath(state.currentPath);
+      } else {
+        showToast(`Completed with errors: ${(res.errors || []).join('; ')}`, 'error');
+        state.selectedPaths.clear();
+        updateBatchActionBar();
+        browsePath(state.currentPath);
+      }
+    }, 400);
   } catch (err) {
     showToast(`Failed: ${err.message}`, 'error');
   } finally {
@@ -1744,8 +1799,68 @@ async function confirmCopyMove() {
       confirmBtn.innerHTML = `<i data-lucide="check"></i> <span>${action === 'move' ? 'Move Here' : 'Copy Here'}</span>`;
       if (typeof lucide !== 'undefined') lucide.createIcons();
     }
+    if (cancelBtn) cancelBtn.disabled = false;
   }
 }
+
+function updateFileOpProgressUI(data) {
+  const percent = Math.min(100, Math.max(0, data.percent || 0));
+  const actionLabel = data.action === 'move' ? 'Moving' : 'Copying';
+  const fileName = data.currentFile || 'Processing...';
+  const speed = data.speed || '';
+  const copiedBytes = formatBytes(data.copiedBytes || 0);
+  const totalBytes = formatBytes(data.totalBytes || 0);
+  const filesStr = `${data.copiedFiles || 0} / ${data.totalFiles || 1} files`;
+
+  // Update in-modal progress card
+  const modalProg = document.getElementById('copy-move-progress-container');
+  if (modalProg) {
+    modalProg.style.display = 'block';
+    const titleEl = document.getElementById('copy-move-progress-title');
+    const fileEl = document.getElementById('copy-move-progress-filename');
+    const pctEl = document.getElementById('copy-move-progress-percentage');
+    const speedEl = document.getElementById('copy-move-progress-speed');
+    const fillEl = document.getElementById('copy-move-progress-fill');
+    const filesEl = document.getElementById('copy-move-progress-files');
+    const bytesEl = document.getElementById('copy-move-progress-bytes');
+
+    if (titleEl) titleEl.innerText = `${actionLabel} files...`;
+    if (fileEl) fileEl.innerText = fileName;
+    if (pctEl) pctEl.innerText = `${percent}%`;
+    if (speedEl) speedEl.innerText = speed;
+    if (fillEl) fillEl.style.width = `${percent}%`;
+    if (filesEl) filesEl.innerText = filesStr;
+    if (bytesEl) bytesEl.innerText = `${copiedBytes} / ${totalBytes}`;
+  }
+
+  // Update sticky explorer header progress card
+  const expProg = document.getElementById('file-op-progress-container');
+  if (expProg) {
+    expProg.style.display = 'block';
+    const titleEl = document.getElementById('file-op-progress-title');
+    const fileEl = document.getElementById('file-op-progress-filename');
+    const pctEl = document.getElementById('file-op-progress-percentage');
+    const speedEl = document.getElementById('file-op-progress-speed');
+    const fillEl = document.getElementById('file-op-progress-fill');
+    const filesEl = document.getElementById('file-op-progress-files');
+    const bytesEl = document.getElementById('file-op-progress-bytes');
+
+    if (titleEl) titleEl.innerText = `${actionLabel} files...`;
+    if (fileEl) fileEl.innerText = fileName;
+    if (pctEl) pctEl.innerText = `${percent}%`;
+    if (speedEl) speedEl.innerText = speed;
+    if (fillEl) fillEl.style.width = `${percent}%`;
+    if (filesEl) filesEl.innerText = filesStr;
+    if (bytesEl) bytesEl.innerText = `${copiedBytes} / ${totalBytes}`;
+
+    if (data.completed) {
+      setTimeout(() => {
+        if (expProg) expProg.style.display = 'none';
+      }, 2500);
+    }
+  }
+}
+window.updateFileOpProgressUI = updateFileOpProgressUI;
 
 const UPLOAD_MAX_SINGLE_SIZE = 95 * 1024 * 1024; // 95MB to stay safely below Cloudflare's 100MB body limit
 const UPLOAD_CHUNK_SIZE = 80 * 1024 * 1024; // 80MB chunks for larger files
@@ -3404,6 +3519,15 @@ function initSse() {
       }
     } catch (err) {
       console.error('Failed to parse SSE event data:', err);
+    }
+  });
+
+  eventSource.addEventListener('file-op-progress', (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      updateFileOpProgressUI(data);
+    } catch (err) {
+      console.error('Failed to parse SSE file-op-progress event data:', err);
     }
   });
 
