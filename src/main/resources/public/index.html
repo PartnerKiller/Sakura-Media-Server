@@ -11,7 +11,7 @@
   <!-- Lucide Icons Local -->
   <script src="/lucide.min.js?v=0.453"></script>
   <script src="/chart.min.js"></script>
-  <link rel="stylesheet" href="/style.css?v=6.61">
+  <link rel="stylesheet" href="/style.css?v=6.70">
   <link rel="icon" type="image/jpeg" href="/favicon.jpg">
 </head>
 <body>
@@ -1192,14 +1192,7 @@
         </div>
       </div>
       <div class="modal-body video-body" style="padding: 0; background: #000; overflow: hidden; position: relative;">
-        <!-- Left / Right Nav Chevrons -->
-        <button id="btn-viewer-prev-video" class="btn-media-nav btn-media-prev" title="Previous (Left Arrow)">
-          <i data-lucide="chevron-left"></i>
-        </button>
         <video id="html5-video-player" autoplay controls preload="metadata" style="max-width: 100%; max-height: 75vh; display: block; margin: 0 auto; outline: none;"></video>
-        <button id="btn-viewer-next-video" class="btn-media-nav btn-media-next" title="Next (Right Arrow)">
-          <i data-lucide="chevron-right"></i>
-        </button>
         <div id="video-error-banner" style="display: none; padding: 32px 24px; text-align: center; color: var(--text-secondary); background: rgba(15, 17, 26, 0.95);">
           <i data-lucide="alert-triangle" style="width: 42px; height: 42px; color: #ffb703; margin-bottom: 12px;"></i>
           <h4 style="color: #fff; margin-bottom: 8px; font-size: 1.1rem; font-weight: 600;">Unsupported Browser Video Codec</h4>
@@ -1210,11 +1203,11 @@
       </div>
       <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
         <div class="media-nav-buttons" style="display: flex; gap: 6px;">
-          <button id="btn-footer-prev-video" class="btn btn-secondary" style="display: flex; align-items: center; gap: 4px; padding: 6px 12px; font-size: 12px;" title="Previous Video (Left Arrow)">
+          <button id="btn-footer-prev-video" class="btn btn-secondary" style="display: flex; align-items: center; gap: 4px; padding: 6px 14px; font-size: 12px; border-radius: 20px;" title="Previous Video (Left Arrow)">
             <i data-lucide="chevron-left" style="width: 15px; height: 15px;"></i>
             <span>Prev</span>
           </button>
-          <button id="btn-footer-next-video" class="btn btn-secondary" style="display: flex; align-items: center; gap: 4px; padding: 6px 12px; font-size: 12px;" title="Next Video (Right Arrow)">
+          <button id="btn-footer-next-video" class="btn btn-secondary" style="display: flex; align-items: center; gap: 4px; padding: 6px 14px; font-size: 12px; border-radius: 20px;" title="Next Video (Right Arrow)">
             <span>Next</span>
             <i data-lucide="chevron-right" style="width: 15px; height: 15px;"></i>
           </button>
@@ -1250,22 +1243,15 @@
         </div>
       </div>
       <div class="modal-body image-body">
-        <!-- Left / Right Nav Chevrons -->
-        <button id="btn-viewer-prev-image" class="btn-media-nav btn-media-prev" title="Previous (Left Arrow)">
-          <i data-lucide="chevron-left"></i>
-        </button>
         <img id="viewer-img" src="" alt="Media Preview">
-        <button id="btn-viewer-next-image" class="btn-media-nav btn-media-next" title="Next (Right Arrow)">
-          <i data-lucide="chevron-right"></i>
-        </button>
       </div>
       <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
         <div class="media-nav-buttons" style="display: flex; gap: 6px;">
-          <button id="btn-footer-prev-image" class="btn btn-secondary" style="display: flex; align-items: center; gap: 4px; padding: 6px 12px; font-size: 12px;" title="Previous Image (Left Arrow)">
+          <button id="btn-footer-prev-image" class="btn btn-secondary" style="display: flex; align-items: center; gap: 4px; padding: 6px 14px; font-size: 12px; border-radius: 20px;" title="Previous Image (Left Arrow)">
             <i data-lucide="chevron-left" style="width: 15px; height: 15px;"></i>
             <span>Prev</span>
           </button>
-          <button id="btn-footer-next-image" class="btn btn-secondary" style="display: flex; align-items: center; gap: 4px; padding: 6px 12px; font-size: 12px;" title="Next Image (Right Arrow)">
+          <button id="btn-footer-next-image" class="btn btn-secondary" style="display: flex; align-items: center; gap: 4px; padding: 6px 14px; font-size: 12px; border-radius: 20px;" title="Next Image (Right Arrow)">
             <span>Next</span>
             <i data-lucide="chevron-right" style="width: 15px; height: 15px;"></i>
           </button>
@@ -1406,6 +1392,6 @@
     </div>
   </div>
 
-  <script src="/app-v4.js?v=4.16"></script>
+  <script src="/app-v4.js?v=4.17"></script>
 </body>
 </html>

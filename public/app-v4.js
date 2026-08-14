@@ -455,14 +455,10 @@ function initApp() {
   safeAddListener('btn-batch-delete', 'click', handleBatchDelete);
   safeAddListener('btn-batch-clear', 'click', clearSelection);
 
-  // Media viewer navigation buttons
-  safeAddListener('btn-viewer-prev-image', 'click', () => navigateMedia(-1));
-  safeAddListener('btn-viewer-next-image', 'click', () => navigateMedia(1));
+  // Media viewer footer navigation buttons
   safeAddListener('btn-footer-prev-image', 'click', () => navigateMedia(-1));
   safeAddListener('btn-footer-next-image', 'click', () => navigateMedia(1));
 
-  safeAddListener('btn-viewer-prev-video', 'click', () => navigateMedia(-1));
-  safeAddListener('btn-viewer-next-video', 'click', () => navigateMedia(1));
   safeAddListener('btn-footer-prev-video', 'click', () => navigateMedia(-1));
   safeAddListener('btn-footer-next-video', 'click', () => navigateMedia(1));
 
@@ -1190,22 +1186,12 @@ function updateMediaNavUI() {
     counterEl.style.display = total > 1 ? 'inline-flex' : 'none';
   }
 
-  const prevBtns = [
-    document.getElementById(isImage ? 'btn-viewer-prev-image' : 'btn-viewer-prev-video'),
-    document.getElementById(isImage ? 'btn-footer-prev-image' : 'btn-footer-prev-video')
-  ];
-  const nextBtns = [
-    document.getElementById(isImage ? 'btn-viewer-next-image' : 'btn-viewer-next-video'),
-    document.getElementById(isImage ? 'btn-footer-next-image' : 'btn-footer-next-video')
-  ];
+  const prevBtn = document.getElementById(isImage ? 'btn-footer-prev-image' : 'btn-footer-prev-video');
+  const nextBtn = document.getElementById(isImage ? 'btn-footer-next-image' : 'btn-footer-next-video');
 
   const hasMultiple = total > 1;
-  prevBtns.forEach(btn => {
-    if (btn) btn.style.display = hasMultiple ? 'inline-flex' : 'none';
-  });
-  nextBtns.forEach(btn => {
-    if (btn) btn.style.display = hasMultiple ? 'inline-flex' : 'none';
-  });
+  if (prevBtn) prevBtn.style.display = hasMultiple ? 'inline-flex' : 'none';
+  if (nextBtn) nextBtn.style.display = hasMultiple ? 'inline-flex' : 'none';
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
