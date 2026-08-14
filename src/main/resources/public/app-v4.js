@@ -1052,7 +1052,8 @@ function renderFiles(files) {
 
     let iconHtml = `<i data-lucide="${icon}"></i>`;
     if (category === 'image' && state.viewMode === 'grid') {
-      iconHtml = `<img src="${srcUrl}" style="width: 100%; height: 100%; object-fit: cover; border-radius: var(--radius-md);" alt="${file.name}">`;
+      const thumbUrl = `/api/files/preview?path=${encodeURIComponent(filePath)}&token=${state.token}&maxDim=400`;
+      iconHtml = `<img src="${thumbUrl}" loading="lazy" style="width: 100%; height: 100%; object-fit: cover; border-radius: var(--radius-md);" alt="${file.name}">`;
     }
 
     card.innerHTML = `
@@ -1208,6 +1209,26 @@ function updateMediaNavUI() {
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
+function preloadAdjacentMediaImages() {
+  if (!state.currentMediaList || state.currentMediaList.length <= 1 || state.currentMediaCategory !== 'image') return;
+  
+  const total = state.currentMediaList.length;
+  const cur = state.currentMediaIndex;
+  
+  // Preload next 3 images and previous 2 images into browser cache
+  const offsets = [1, 2, 3, -1, -2];
+  offsets.forEach(offset => {
+    const targetIdx = (cur + offset + total) % total;
+    const fileObj = state.currentMediaList[targetIdx];
+    if (fileObj) {
+      const p = `${state.currentPath}/${fileObj.name}`;
+      const preloadUrl = `/api/files/preview?path=${encodeURIComponent(p)}&token=${state.token}&maxDim=1600`;
+      const preloader = new Image();
+      preloader.src = preloadUrl;
+    }
+  });
+}
+
 function navigateMedia(delta) {
   if (!state.currentMediaList || state.currentMediaList.length <= 1) return;
   
@@ -1340,13 +1361,16 @@ function openMedia(filePath, fileName, category) {
     document.getElementById('image-viewer-title').innerText = fileName;
     const img = document.getElementById('viewer-img');
     
-    const srcUrl = `/api/files/stream?path=${encodeURIComponent(filePath)}&token=${state.token}`;
-    img.src = srcUrl;
+    const previewUrl = `/api/files/preview?path=${encodeURIComponent(filePath)}&token=${state.token}&maxDim=1600`;
+    img.style.opacity = '0.5';
+    img.onload = () => { img.style.opacity = '1'; };
+    img.src = previewUrl;
     
     const downloadBtn = document.getElementById('btn-download-image');
     downloadBtn.href = `/api/files/download?path=${encodeURIComponent(filePath)}&token=${state.token}`;
     
     openModal('modal-image-viewer');
+    preloadAdjacentMediaImages();
   } else {
     // Just trigger standard download
     window.open(`/api/files/download?path=${encodeURIComponent(filePath)}&token=${state.token}`, '_blank');

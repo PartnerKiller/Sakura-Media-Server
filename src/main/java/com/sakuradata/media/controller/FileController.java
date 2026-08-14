@@ -37,6 +37,9 @@ public class FileController {
     @Autowired
     private com.sakuradata.media.repository.RecycleItemRepository recycleItemRepository;
 
+    @Autowired
+    private com.sakuradata.media.service.ImagePreviewService imagePreviewService;
+
     // Helper to check subpath relation
     private boolean isSubPath(String parentStr, String childStr) {
         try {
@@ -310,6 +313,47 @@ public class FileController {
         User user = (User) request.getAttribute("user");
         String targetPath = resolvePath(path);
         return handleStreamRequest(request, targetPath, rangeHeader, user);
+    }
+
+    @GetMapping("/preview")
+    public ResponseEntity<Resource> preview(HttpServletRequest request,
+                                            @RequestParam String path,
+                                            @RequestParam(defaultValue = "1600") int maxDim,
+                                            @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch) {
+        User user = (User) request.getAttribute("user");
+        String targetPath = resolvePath(path);
+        if (targetPath == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        if (!hasPermission(user, targetPath, "read")) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
+        File file = new File(targetPath);
+        if (!file.exists() || !file.isFile()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        File previewFile = imagePreviewService.getOrCreatePreview(file, maxDim);
+        if (previewFile == null || !previewFile.exists()) {
+            previewFile = file;
+        }
+
+        String etag = "\"" + previewFile.getName() + "-" + previewFile.lastModified() + "-" + previewFile.length() + "\"";
+        if (ifNoneMatch != null && ifNoneMatch.equals(etag)) {
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag).build();
+        }
+
+        String contentType = previewFile.getName().toLowerCase().endsWith(".png") ? "image/png" : "image/jpeg";
+        FileSystemResource resource = new FileSystemResource(previewFile);
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CACHE_CONTROL, "public, max-age=604800, immutable")
+                .header(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*")
+                .eTag(etag)
+                .contentLength(previewFile.length())
+                .contentType(MediaType.parseMediaType(contentType))
+                .body(resource);
     }
 
     private String decodeBase64Path(String base64Path) {
