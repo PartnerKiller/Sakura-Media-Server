@@ -40,7 +40,10 @@ let state = {
   clipboard: { action: null, paths: [] },
   copyMoveAction: 'copy',
   copyMoveSources: [],
-  copyMoveTarget: ''
+  copyMoveTarget: '',
+  currentMediaList: [],
+  currentMediaIndex: -1,
+  currentMediaCategory: null
 };
 
 function safeBase64Encode(str) {
@@ -452,11 +455,49 @@ function initApp() {
   safeAddListener('btn-batch-delete', 'click', handleBatchDelete);
   safeAddListener('btn-batch-clear', 'click', clearSelection);
 
-  // Global keyboard shortcuts for clipboard (Copy / Cut / Paste / Clear)
+  // Media viewer navigation buttons
+  safeAddListener('btn-viewer-prev-image', 'click', () => navigateMedia(-1));
+  safeAddListener('btn-viewer-next-image', 'click', () => navigateMedia(1));
+  safeAddListener('btn-footer-prev-image', 'click', () => navigateMedia(-1));
+  safeAddListener('btn-footer-next-image', 'click', () => navigateMedia(1));
+
+  safeAddListener('btn-viewer-prev-video', 'click', () => navigateMedia(-1));
+  safeAddListener('btn-viewer-next-video', 'click', () => navigateMedia(1));
+  safeAddListener('btn-footer-prev-video', 'click', () => navigateMedia(-1));
+  safeAddListener('btn-footer-next-video', 'click', () => navigateMedia(1));
+
+  // Global keyboard shortcuts (Media navigation, Clipboard Copy/Cut/Paste, Escape)
   document.addEventListener('keydown', (e) => {
     // Ignore when user is typing in input or textarea
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
     
+    // 1. Media Modal Arrow Key Navigation
+    const imageModal = document.getElementById('modal-image-viewer');
+    const videoModal = document.getElementById('modal-video-player');
+    const isImageOpen = imageModal && imageModal.classList.contains('active');
+    const isVideoOpen = videoModal && videoModal.classList.contains('active');
+
+    if (isImageOpen || isVideoOpen) {
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        navigateMedia(-1);
+        return;
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        navigateMedia(1);
+        return;
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        if (isImageOpen) closeModal('modal-image-viewer');
+        if (isVideoOpen) {
+          closeAllMediaViewersSilently();
+          closeModal('modal-video-player');
+        }
+        return;
+      }
+    }
+
+    // 2. Clipboard shortcuts
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
       if (state.selectedPaths.size > 0) {
         e.preventDefault();
@@ -1135,11 +1176,81 @@ function filterFiles() {
   processAndRenderFiles();
 }
 
-// MEDIA HANDLERS
+// MEDIA HANDLERS & NAVIGATION
+function updateMediaNavUI() {
+  const isImage = state.currentMediaCategory === 'image';
+  const total = state.currentMediaList ? state.currentMediaList.length : 0;
+  const currentNum = state.currentMediaIndex >= 0 ? state.currentMediaIndex + 1 : 1;
+  const counterText = total > 0 ? `${currentNum} / ${total}` : '';
+
+  const counterEl = document.getElementById(isImage ? 'image-viewer-counter' : 'video-player-counter');
+  if (counterEl) {
+    counterEl.innerText = counterText;
+    counterEl.style.display = total > 1 ? 'inline-flex' : 'none';
+  }
+
+  const prevBtns = [
+    document.getElementById(isImage ? 'btn-viewer-prev-image' : 'btn-viewer-prev-video'),
+    document.getElementById(isImage ? 'btn-footer-prev-image' : 'btn-footer-prev-video')
+  ];
+  const nextBtns = [
+    document.getElementById(isImage ? 'btn-viewer-next-image' : 'btn-viewer-next-video'),
+    document.getElementById(isImage ? 'btn-footer-next-image' : 'btn-footer-next-video')
+  ];
+
+  const hasMultiple = total > 1;
+  prevBtns.forEach(btn => {
+    if (btn) btn.style.display = hasMultiple ? 'inline-flex' : 'none';
+  });
+  nextBtns.forEach(btn => {
+    if (btn) btn.style.display = hasMultiple ? 'inline-flex' : 'none';
+  });
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function navigateMedia(delta) {
+  if (!state.currentMediaList || state.currentMediaList.length <= 1) return;
+  
+  let newIndex = state.currentMediaIndex + delta;
+  if (newIndex < 0) {
+    newIndex = state.currentMediaList.length - 1; // Wrap around to end
+  } else if (newIndex >= state.currentMediaList.length) {
+    newIndex = 0; // Wrap around to start
+  }
+  
+  state.currentMediaIndex = newIndex;
+  const nextFile = state.currentMediaList[newIndex];
+  if (!nextFile) return;
+  
+  const nextFilePath = `${state.currentPath}/${nextFile.name}`;
+  openMedia(nextFilePath, nextFile.name, state.currentMediaCategory);
+}
+window.navigateMedia = navigateMedia;
+
 function openMedia(filePath, fileName, category) {
   if (window.location.hash.substring(1) !== filePath) {
     window.location.hash = filePath;
   }
+
+  // Populate media list for previous/next navigation
+  const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'tiff'];
+  const videoExts = ['mp4', 'mkv', 'webm', 'avi', 'mov', 'flv', 'wmv', 'm4v', 'ts', '3gp'];
+  
+  let targetList = [];
+  if (category === 'image') {
+    targetList = (state.files || []).filter(f => f.isFile && imageExts.includes(f.name.split('.').pop().toLowerCase()));
+  } else if (category === 'video') {
+    targetList = (state.files || []).filter(f => f.isFile && videoExts.includes(f.name.split('.').pop().toLowerCase()));
+  }
+  
+  state.currentMediaList = targetList;
+  state.currentMediaCategory = category;
+  state.currentMediaIndex = targetList.findIndex(f => `${state.currentPath}/${f.name}` === filePath || f.name === fileName);
+  if (state.currentMediaIndex === -1 && targetList.length > 0) {
+    state.currentMediaIndex = 0;
+  }
+  updateMediaNavUI();
+
   if (category === 'video') {
     document.getElementById('video-player-title').innerText = fileName;
     const player = document.getElementById('html5-video-player');
@@ -1207,8 +1318,6 @@ function openMedia(filePath, fileName, category) {
     m3uBtn.href = URL.createObjectURL(blob);
     m3uBtn.download = fileName.substring(0, fileName.lastIndexOf('.')) + ".m3u";
 
-
-
     // 3. Copy Stream URL action
     const copyBtn = document.getElementById('btn-copy-stream-link');
     copyBtn.onclick = async () => {
@@ -1225,8 +1334,6 @@ function openMedia(filePath, fileName, category) {
         alert('Could not copy link: ' + absoluteStreamUrl);
       }
     };
-
-
 
     openModal('modal-video-player');
   } else if (category === 'image') {
