@@ -1,5 +1,8 @@
 package com.sakuradata.media.service;
 
+import com.drew.imaging.ImageMetadataReader;
+import com.drew.metadata.Metadata;
+import com.drew.metadata.exif.ExifIFD0Directory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -11,6 +14,7 @@ import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageOutputStream;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -42,7 +46,6 @@ public class ImagePreviewService {
         }
 
         String filenameLower = sourceFile.getName().toLowerCase();
-        // Check if file is an image format we can optimize
         boolean isConvertible = filenameLower.endsWith(".jpg") || filenameLower.endsWith(".jpeg")
                 || filenameLower.endsWith(".png") || filenameLower.endsWith(".webp")
                 || filenameLower.endsWith(".bmp") || filenameLower.endsWith(".jfif");
@@ -51,8 +54,10 @@ public class ImagePreviewService {
             return sourceFile;
         }
 
-        // If file is already small (under 600KB), serve original directly
-        if (sourceFile.length() <= 600 * 1024) {
+        int orientation = getExifOrientation(sourceFile);
+
+        // If file is already small (under 600KB) and has standard orientation, serve original directly
+        if (sourceFile.length() <= 600 * 1024 && orientation == 1) {
             return sourceFile;
         }
 
@@ -63,7 +68,6 @@ public class ImagePreviewService {
             return cachedFile;
         }
 
-        // Synchronize per cacheKey to avoid duplicate resizing work
         Object lock = lockMap.computeIfAbsent(cacheKey, k -> new Object());
         synchronized (lock) {
             try {
@@ -79,14 +83,14 @@ public class ImagePreviewService {
                 int origW = originalImage.getWidth();
                 int origH = originalImage.getHeight();
 
-                // If image is already smaller than maxDim in both dimensions, return source
-                if (origW <= maxDim && origH <= maxDim) {
-                    return sourceFile;
-                }
+                int visualW = (orientation == 6 || orientation == 8 || orientation == 5 || orientation == 7) ? origH : origW;
+                int visualH = (orientation == 6 || orientation == 8 || orientation == 5 || orientation == 7) ? origW : origH;
 
-                double scale = Math.min((double) maxDim / origW, (double) maxDim / origH);
-                int targetW = (int) Math.round(origW * scale);
-                int targetH = (int) Math.round(origH * scale);
+                double scale = Math.min((double) maxDim / visualW, (double) maxDim / visualH);
+                if (scale > 1.0) scale = 1.0;
+
+                int targetW = (int) Math.round(visualW * scale);
+                int targetH = (int) Math.round(visualH * scale);
 
                 if (targetW <= 0) targetW = 1;
                 if (targetH <= 0) targetH = 1;
@@ -97,18 +101,40 @@ public class ImagePreviewService {
                 g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
                 g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-                g2d.drawImage(originalImage, 0, 0, targetW, targetH, null);
+                AffineTransform at = new AffineTransform();
+                switch (orientation) {
+                    case 6: // 90 deg CW
+                        at.translate(targetW, 0);
+                        at.rotate(Math.PI / 2.0);
+                        at.scale(scale, scale);
+                        break;
+                    case 8: // 270 deg CW (90 CCW)
+                        at.translate(0, targetH);
+                        at.rotate(-Math.PI / 2.0);
+                        at.scale(scale, scale);
+                        break;
+                    case 3: // 180 deg
+                        at.translate(targetW, targetH);
+                        at.rotate(Math.PI);
+                        at.scale(scale, scale);
+                        break;
+                    default: // 1 (Normal)
+                        at.scale(scale, scale);
+                        break;
+                }
+
+                g2d.drawImage(originalImage, at, null);
                 g2d.dispose();
                 originalImage.flush();
 
                 File tempFile = new File(cacheDir, cacheKey + ".tmp");
-                writeCompressedJpeg(scaledImage, tempFile, 0.82f);
+                writeCompressedJpeg(scaledImage, tempFile, 0.85f);
                 scaledImage.flush();
 
                 if (tempFile.exists() && tempFile.length() > 0) {
                     tempFile.renameTo(cachedFile);
-                    log.info("Generated optimized preview for {} (original {} -> preview {})",
-                            sourceFile.getName(), sourceFile.length(), cachedFile.length());
+                    log.info("Generated optimized preview for {} (orientation={}, original {} -> preview {})",
+                            sourceFile.getName(), orientation, sourceFile.length(), cachedFile.length());
                     return cachedFile;
                 }
             } catch (Exception e) {
@@ -119,6 +145,17 @@ public class ImagePreviewService {
         }
 
         return sourceFile;
+    }
+
+    private int getExifOrientation(File file) {
+        try {
+            Metadata metadata = ImageMetadataReader.readMetadata(file);
+            ExifIFD0Directory directory = metadata.getFirstDirectoryOfType(ExifIFD0Directory.class);
+            if (directory != null && directory.containsTag(ExifIFD0Directory.TAG_ORIENTATION)) {
+                return directory.getInt(ExifIFD0Directory.TAG_ORIENTATION);
+            }
+        } catch (Exception ignored) {}
+        return 1;
     }
 
     private void writeCompressedJpeg(BufferedImage image, File destination, float quality) throws IOException {
