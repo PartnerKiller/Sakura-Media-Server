@@ -24,6 +24,9 @@ public class JwtInterceptor implements HandlerInterceptor {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private com.sakuradata.media.service.UserActivityService userActivityService;
+
     private DecodedJWT verifyToken(String token) {
         try {
             Algorithm algorithm = Algorithm.HMAC256(JWT_SECRET);
@@ -110,8 +113,10 @@ public class JwtInterceptor implements HandlerInterceptor {
                 return false;
             }
 
-            // Set user in request context attribute
-            request.setAttribute("user", userOpt.get());
+            // Set user in request context attribute and record activity
+            User currentUser = userOpt.get();
+            request.setAttribute("user", currentUser);
+            userActivityService.recordActivity(currentUser.getId());
             return true;
         } catch (Exception e) {
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);

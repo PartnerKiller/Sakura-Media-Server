@@ -78,6 +78,15 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/heartbeat")
+    public ResponseEntity<?> heartbeat(HttpServletRequest request) {
+        User user = (User) request.getAttribute("user");
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Unauthorized"));
+        }
+        return ResponseEntity.ok(Map.of("status", "ok", "userId", user.getId()));
+    }
+
     @PutMapping("/profile")
     public ResponseEntity<?> updateProfile(HttpServletRequest request, @RequestBody Map<String, String> body) {
         User user = (User) request.getAttribute("user");

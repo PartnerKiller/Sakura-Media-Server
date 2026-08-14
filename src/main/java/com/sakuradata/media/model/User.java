@@ -132,4 +132,15 @@ public class User {
     public void setProfilePicture(String profilePicture) {
         this.profilePicture = profilePicture;
     }
+
+    @Column(name = "last_active_at")
+    private java.time.LocalDateTime lastActiveAt;
+
+    public java.time.LocalDateTime getLastActiveAt() {
+        return lastActiveAt;
+    }
+
+    public void setLastActiveAt(java.time.LocalDateTime lastActiveAt) {
+        this.lastActiveAt = lastActiveAt;
+    }
 }

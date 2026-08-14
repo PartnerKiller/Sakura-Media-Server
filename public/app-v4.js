@@ -2479,9 +2479,29 @@ async function loadUsers() {
   }
 }
 
+function formatUserLastSeen(timestamp) {
+  if (!timestamp) return 'Never';
+  const diffSec = Math.floor((Date.now() - timestamp) / 1000);
+  if (diffSec < 120) return 'Just now';
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+  const days = Math.floor(diffSec / 86400);
+  if (days === 1) return 'Yesterday';
+  if (days < 30) return `${days}d ago`;
+  return new Date(timestamp).toLocaleDateString();
+}
+
 function renderUsers() {
   const tbody = document.getElementById('users-table-body');
   tbody.innerHTML = '';
+
+  const onlineCount = (state.users || []).filter(u => u.isOnline).length;
+  const counterEl = document.getElementById('active-users-counter-badge');
+  const counterText = document.getElementById('active-users-count-text');
+  if (counterEl && counterText) {
+    counterText.innerText = `${onlineCount} Online`;
+    counterEl.style.display = 'inline-flex';
+  }
 
   state.users.forEach(u => {
     const tr = document.createElement('tr');
@@ -2511,15 +2531,22 @@ function renderUsers() {
                        <span>Edit</span>
                      </button>`;
 
+    const isOnline = !!u.isOnline;
+    const statusHtml = isOnline
+      ? `<span class="user-status-pill online"><span class="status-pulse-dot"></span><span>Online</span></span>`
+      : `<span class="user-status-pill offline" title="${u.lastActiveAt ? 'Last active: ' + new Date(u.lastActiveAt).toLocaleString() : 'Never logged in'}"><span class="status-pulse-dot"></span><span>${formatUserLastSeen(u.lastActiveAt)}</span></span>`;
+
     tr.innerHTML = `
       <td>
         <div style="display:flex; align-items:center; gap:10px;">
-          <div style="width: 28px; height: 28px; border-radius: 50%; overflow: hidden; background: var(--bg-surface); border: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: center;">
-            <img src="/api/users/avatar/${u.username}?v=${Date.now()}" alt="" style="width: 100%; height: 100%; object-fit: cover;">
+          <div class="user-avatar-wrap">
+            <img class="avatar-img" src="/api/users/avatar/${u.username}?v=${Date.now()}" alt="">
+            <span class="status-dot-avatar ${isOnline ? 'online' : 'offline'}" title="${isOnline ? 'Online' : 'Offline'}"></span>
           </div>
           <span style="font-weight: 500;">${escapeHtml(u.username)}</span>
         </div>
       </td>
+      <td>${statusHtml}</td>
       <td><span class="role-badge ${u.role}">${u.role}</span></td>
       <td>${u.role === 'admin' ? 'All (Full access)' : permCount + ' path rule(s)'}</td>
       <td>${formatBandwidth(u.downloadBandwidthLimit)}</td>
@@ -4451,6 +4478,22 @@ function confirmPickerSelection() {
   }
   closePickerModal();
 }
+
+// Global active presence heartbeat loop
+setInterval(() => {
+  if (state.token) {
+    apiCall('/api/auth/heartbeat', { method: 'POST' }).catch(() => {});
+    
+    // If admin is actively on the User Management panel, refresh user statuses seamlessly
+    const usersPanel = document.getElementById('panel-users');
+    if (usersPanel && usersPanel.classList.contains('active') && state.user && state.user.role === 'admin') {
+      apiCall('/api/users').then(users => {
+        state.users = users;
+        renderUsers();
+      }).catch(() => {});
+    }
+  }
+}, 30000);
 
 
 

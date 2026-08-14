@@ -11,7 +11,7 @@
   <!-- Lucide Icons Local -->
   <script src="/lucide.min.js?v=0.453"></script>
   <script src="/chart.min.js"></script>
-  <link rel="stylesheet" href="/style.css?v=6.70">
+  <link rel="stylesheet" href="/style.css?v=6.80">
   <link rel="icon" type="image/jpeg" href="/favicon.jpg">
 </head>
 <body>
@@ -314,8 +314,14 @@
         <section id="panel-users" class="content-panel">
           <div class="panel-header">
             <div>
-              <h2>User Management</h2>
-              <p>Create user accounts and set directory access levels</p>
+              <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 4px;">
+                <h2 style="margin: 0;">User Management</h2>
+                <div id="active-users-counter-badge" class="badge" style="display: none; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 20px; font-size: 12px; background: rgba(16, 185, 129, 0.14); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);">
+                  <span class="status-pulse-dot" style="background:#10b981; animation: statusDotPulse 2s infinite ease-in-out;"></span>
+                  <span id="active-users-count-text">0 Online</span>
+                </div>
+              </div>
+              <p>Create user accounts, monitor real-time online status, and set directory access levels</p>
             </div>
             <button id="btn-add-user" class="btn-primary">
               <i data-lucide="plus"></i>
@@ -339,6 +345,7 @@
               <thead>
                 <tr>
                   <th>USERNAME</th>
+                  <th>STATUS</th>
                   <th>ROLE</th>
                   <th>PERMISSIONS COUNT</th>
                   <th>DOWNLOAD LIMIT</th>
@@ -1392,6 +1399,6 @@
     </div>
   </div>
 
-  <script src="/app-v4.js?v=4.17"></script>
+  <script src="/app-v4.js?v=4.18"></script>
 </body>
 </html>

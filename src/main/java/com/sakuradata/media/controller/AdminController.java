@@ -47,6 +47,9 @@ public class AdminController {
     @Autowired
     private AuditLogRepository auditLogRepository;
 
+    @Autowired
+    private com.sakuradata.media.service.UserActivityService userActivityService;
+
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
     private static Map<String, Object> cachedStorageStats = null;
@@ -75,6 +78,17 @@ public class AdminController {
             map.put("uploadBandwidthLimit", u.getUploadBandwidthLimit());
             map.put("plainPassword", u.getPlainPassword());
             map.put("permissions", permissionRepository.findByUserId(u.getId()));
+
+            boolean isOnline = userActivityService.isOnline(u.getId());
+            Long activeTs = userActivityService.getLastActiveTimestamp(u.getId());
+            if (activeTs == null && u.getLastActiveAt() != null) {
+                try {
+                    activeTs = u.getLastActiveAt().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+                } catch (Exception ignored) {}
+            }
+
+            map.put("isOnline", isOnline);
+            map.put("lastActiveAt", activeTs);
             return map;
         }).collect(Collectors.toList());
 
