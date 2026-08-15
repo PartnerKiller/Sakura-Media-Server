@@ -40,6 +40,14 @@ public class FileController {
     @Autowired
     private com.sakuradata.media.service.ImagePreviewService imagePreviewService;
 
+    @jakarta.annotation.PostConstruct
+    public void initTempDirectories() {
+        try {
+            Files.createDirectories(Paths.get("./temp-uploads"));
+            Files.createDirectories(Paths.get("./temp-chunks"));
+        } catch (Exception ignored) {}
+    }
+
     // Helper to check subpath relation
     private boolean isSubPath(String parentStr, String childStr) {
         try {
