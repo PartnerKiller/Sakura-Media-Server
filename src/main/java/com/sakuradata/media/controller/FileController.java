@@ -111,10 +111,19 @@ public class FileController {
 
     private String resolvePath(String inputPath) {
         if (inputPath == null || inputPath.trim().isEmpty()) return null;
-        String raw = inputPath;
-        try {
-            raw = java.net.URLDecoder.decode(inputPath, java.nio.charset.StandardCharsets.UTF_8);
-        } catch (Exception ignored) {}
+        String raw = inputPath.trim();
+        File directFile = new File(raw);
+        if (directFile.exists()) {
+            return Paths.get(raw).toAbsolutePath().normalize().toString().replace("\\", "/");
+        }
+        if (raw.contains("%")) {
+            try {
+                String decoded = java.net.URLDecoder.decode(raw, java.nio.charset.StandardCharsets.UTF_8);
+                if (new File(decoded).exists()) {
+                    return Paths.get(decoded).toAbsolutePath().normalize().toString().replace("\\", "/");
+                }
+            } catch (Exception ignored) {}
+        }
         return Paths.get(raw).toAbsolutePath().normalize().toString().replace("\\", "/");
     }
 
@@ -772,14 +781,26 @@ public class FileController {
         }
 
         List<File> validSourceFiles = new ArrayList<>();
+        List<String> errors = new ArrayList<>();
+
         for (String srcStr : sources) {
             String resolvedSrc = resolvePath(srcStr);
             if (resolvedSrc != null) {
                 File f = new File(resolvedSrc);
-                if (f.exists() && hasPermission(user, resolvedSrc, "read")) {
+                if (!f.exists()) {
+                    errors.add("Source file or folder not found: " + srcStr);
+                } else if (!hasPermission(user, resolvedSrc, "read")) {
+                    errors.add("Permission denied for source: " + srcStr);
+                } else {
                     validSourceFiles.add(f);
                 }
+            } else {
+                errors.add("Invalid source path: " + srcStr);
             }
+        }
+
+        if (validSourceFiles.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "errors", errors.isEmpty() ? List.of("No valid source files found") : errors, "copiedCount", 0));
         }
 
         long totalBytes = calculateTotalBytes(validSourceFiles);
@@ -788,7 +809,6 @@ public class FileController {
         tracker.broadcastProgress("Starting copy...", false);
 
         int copiedCount = 0;
-        List<String> errors = new ArrayList<>();
 
         for (File srcFile : validSourceFiles) {
             String resolvedSrc = srcFile.getAbsolutePath().replace("\\", "/");
@@ -860,14 +880,26 @@ public class FileController {
         }
 
         List<File> validSourceFiles = new ArrayList<>();
+        List<String> errors = new ArrayList<>();
+
         for (String srcStr : sources) {
             String resolvedSrc = resolvePath(srcStr);
             if (resolvedSrc != null) {
                 File f = new File(resolvedSrc);
-                if (f.exists() && hasPermission(user, resolvedSrc, "write")) {
+                if (!f.exists()) {
+                    errors.add("Source file or folder not found: " + srcStr);
+                } else if (!hasPermission(user, resolvedSrc, "write")) {
+                    errors.add("Permission denied for source: " + srcStr);
+                } else {
                     validSourceFiles.add(f);
                 }
+            } else {
+                errors.add("Invalid source path: " + srcStr);
             }
+        }
+
+        if (validSourceFiles.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "errors", errors.isEmpty() ? List.of("No valid source files found") : errors, "movedCount", 0));
         }
 
         long totalBytes = calculateTotalBytes(validSourceFiles);
@@ -876,7 +908,6 @@ public class FileController {
         tracker.broadcastProgress("Starting move...", false);
 
         int movedCount = 0;
-        List<String> errors = new ArrayList<>();
         Set<String> affectedParents = new HashSet<>();
         affectedParents.add(targetDirStr);
 
@@ -1091,7 +1122,7 @@ public class FileController {
     }
 
     private void copyStreamWithProgress(InputStream in, OutputStream out, String filename, ProgressTracker tracker) throws IOException {
-        byte[] buffer = new byte[128 * 1024]; // 128KB buffer
+        byte[] buffer = new byte[1024 * 1024]; // 1MB buffer for fast I/O
         int bytesRead;
         while ((bytesRead = in.read(buffer)) != -1) {
             out.write(buffer, 0, bytesRead);
@@ -1125,11 +1156,12 @@ public class FileController {
     private void moveRecursively(Path source, Path target, boolean overwrite, ProgressTracker tracker) throws IOException {
         if (source.equals(target)) return;
 
+        Path finalTarget = target;
+        if (!overwrite && Files.exists(finalTarget)) {
+            finalTarget = getUniqueDestinationPath(finalTarget);
+        }
+
         try {
-            Path finalTarget = target;
-            if (!overwrite && Files.exists(finalTarget)) {
-                finalTarget = getUniqueDestinationPath(finalTarget);
-            }
             Files.move(source, finalTarget, overwrite ? StandardCopyOption.REPLACE_EXISTING : StandardCopyOption.ATOMIC_MOVE);
             if (tracker != null) {
                 long size = Files.isDirectory(finalTarget) ? calculateDirectorySize(finalTarget.toFile()) : Files.size(finalTarget);
@@ -1141,7 +1173,7 @@ public class FileController {
             // Cross-filesystem fallback
         }
 
-        copyRecursively(source, target, overwrite, tracker);
+        copyRecursively(source, finalTarget, overwrite, tracker);
         deleteRecursively(source);
     }
 
@@ -1188,11 +1220,11 @@ public class FileController {
         int count = 0;
         File[] files = dir.listFiles();
         if (files != null) {
-            for (File f : files) {
-                if (f.isFile()) {
+            for (File file : files) {
+                if (file.isFile()) {
                     count++;
-                } else if (f.isDirectory()) {
-                    count += countFilesInDirectory(f);
+                } else if (file.isDirectory()) {
+                    count += countFilesInDirectory(file);
                 }
             }
         }
@@ -1278,25 +1310,27 @@ public class FileController {
         }
 
         void broadcastProgress(String currentFile, boolean completed) {
-            int percent = (int) Math.min(100, (copiedBytes * 100) / totalBytes);
-            if (completed) percent = 100;
-            
-            long elapsedSec = (System.currentTimeMillis() - startTime) / 1000;
-            double speedMbps = elapsedSec > 0 ? (copiedBytes / (1024.0 * 1024.0)) / elapsedSec : 0;
-            String speedStr = speedMbps > 0 ? String.format(Locale.US, "%.1f MB/s", speedMbps) : "";
+            try {
+                int percent = (int) Math.min(100, (copiedBytes * 100) / totalBytes);
+                if (completed) percent = 100;
+                
+                long elapsedSec = (System.currentTimeMillis() - startTime) / 1000;
+                double speedMbps = elapsedSec > 0 ? (copiedBytes / (1024.0 * 1024.0)) / elapsedSec : 0;
+                String speedStr = speedMbps > 0 ? String.format(Locale.US, "%.1f MB/s", speedMbps) : "";
 
-            SseController.broadcast("file-op-progress", Map.of(
-                "taskId", taskId != null ? taskId : "",
-                "action", action,
-                "currentFile", currentFile != null ? currentFile : "",
-                "copiedBytes", copiedBytes,
-                "totalBytes", totalBytes,
-                "copiedFiles", copiedFiles,
-                "totalFiles", totalFiles,
-                "percent", percent,
-                "speed", speedStr,
-                "completed", completed
-            ));
+                SseController.broadcast("file-op-progress", Map.of(
+                    "taskId", taskId != null ? taskId : "",
+                    "action", action,
+                    "currentFile", currentFile != null ? currentFile : "",
+                    "copiedBytes", copiedBytes,
+                    "totalBytes", totalBytes,
+                    "copiedFiles", copiedFiles,
+                    "totalFiles", totalFiles,
+                    "percent", percent,
+                    "speed", speedStr,
+                    "completed", completed
+                ));
+            } catch (Throwable ignored) {}
         }
     }
 }
