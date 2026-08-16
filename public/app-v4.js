@@ -1313,7 +1313,14 @@ function openMedia(filePath, fileName, category) {
     };
     
     const downloadBtn = document.getElementById('btn-download-video');
-    downloadBtn.href = `/api/files/download?path=${encodePathQuery(filePath)}&token=${state.token}`;
+    if (downloadBtn) {
+      const dlUrl = `/api/files/download?path=${encodeURIComponent(filePath)}&token=${state.token}`;
+      downloadBtn.href = dlUrl;
+      downloadBtn.setAttribute('download', fileName);
+      downloadBtn.onclick = (e) => {
+        handleDownloadFile(e, filePath);
+      };
+    }
 
     // Configure VLC Streaming Options
     const absoluteStreamUrl = window.location.origin + relativeStreamUrl;
@@ -1353,13 +1360,20 @@ function openMedia(filePath, fileName, category) {
     img.src = previewUrl;
     
     const downloadBtn = document.getElementById('btn-download-image');
-    downloadBtn.href = `/api/files/download?path=${encodeURIComponent(filePath)}&token=${state.token}`;
+    if (downloadBtn) {
+      const dlUrl = `/api/files/download?path=${encodeURIComponent(filePath)}&token=${state.token}`;
+      downloadBtn.href = dlUrl;
+      downloadBtn.setAttribute('download', fileName);
+      downloadBtn.onclick = (e) => {
+        handleDownloadFile(e, filePath);
+      };
+    }
     
     openModal('modal-image-viewer');
     preloadAdjacentMediaImages();
   } else {
     // Just trigger standard download
-    window.open(`/api/files/download?path=${encodeURIComponent(filePath)}&token=${state.token}`, '_blank');
+    handleDownloadFile(null, filePath);
   }
 }
 
@@ -1433,14 +1447,36 @@ async function handleRenameFile(e, filePath, oldName) {
 window.handleRenameFile = handleRenameFile;
 
 function handleDownloadFile(e, filePath) {
-  e.stopPropagation(); // prevent card click
-  window.open(`/api/files/download?path=${encodeURIComponent(filePath)}&token=${state.token}`, '_blank');
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  const fileName = filePath.split('/').pop() || 'download';
+  const url = `/api/files/download?path=${encodeURIComponent(filePath)}&token=${state.token}`;
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  a.target = '_blank';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => a.remove(), 200);
 }
 window.handleDownloadFile = handleDownloadFile;
 
 function handleDownloadFolder(e, filePath) {
-  if (e) { e.stopPropagation(); }
-  window.open(`/api/files/download-folder?path=${encodeURIComponent(filePath)}&token=${state.token}`, '_blank');
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  const folderName = filePath.split('/').filter(Boolean).pop() || 'folder';
+  const url = `/api/files/download-folder?path=${encodeURIComponent(filePath)}&token=${state.token}`;
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${folderName}.zip`;
+  a.target = '_blank';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => a.remove(), 200);
 }
 window.handleDownloadFolder = handleDownloadFolder;
 
