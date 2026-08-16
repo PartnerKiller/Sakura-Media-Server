@@ -451,9 +451,6 @@ function initApp() {
   safeAddListener('batch-select-all-checkbox', 'change', toggleSelectAll);
   safeAddListener('btn-batch-copy', 'click', handleBatchCopy);
   safeAddListener('btn-batch-move', 'click', handleBatchMove);
-  safeAddListener('btn-batch-download-direct', 'click', handleBatchDownloadDirect);
-  safeAddListener('btn-batch-download-zip', 'click', handleBatchDownloadZip);
-  safeAddListener('btn-batch-download', 'click', handleBatchDownloadZip);
   safeAddListener('btn-batch-delete', 'click', handleBatchDelete);
   safeAddListener('btn-batch-clear', 'click', clearSelection);
 
@@ -1709,42 +1706,62 @@ async function handleBatchDelete() {
 }
 window.handleBatchDelete = handleBatchDelete;
 
+let isBatchDownloading = false;
+
 async function handleBatchDownloadDirect(e) {
   if (e) {
     e.preventDefault();
     e.stopPropagation();
   }
+  if (isBatchDownloading) return;
+
   const paths = Array.from(state.selectedPaths);
   if (paths.length === 0) return;
 
-  const count = paths.length;
-  showToast(`Downloading ${count} item${count === 1 ? '' : 's'} directly...`, 'info');
+  isBatchDownloading = true;
+  try {
+    const count = paths.length;
+    showToast(`Downloading ${count} item${count === 1 ? '' : 's'} directly...`, 'info');
 
-  for (let i = 0; i < paths.length; i++) {
-    const p = paths[i];
-    const fileName = p.split('/').pop();
-    const fileObj = (state.files || []).find(f => `${state.currentPath}/${f.name}` === p || f.name === fileName);
-    
-    if (fileObj && !fileObj.isFile) {
-      handleDownloadFolder(null, p);
-    } else {
-      handleDownloadFile(null, p);
-    }
+    for (let i = 0; i < paths.length; i++) {
+      const p = paths[i];
+      const fileName = p.split('/').pop();
+      const fileObj = (state.files || []).find(f => `${state.currentPath}/${f.name}` === p || f.name === fileName);
+      
+      if (fileObj && !fileObj.isFile) {
+        handleDownloadFolder(null, p);
+      } else {
+        handleDownloadFile(null, p);
+      }
 
-    if (i < paths.length - 1) {
-      await new Promise(r => setTimeout(r, 300));
+      if (i < paths.length - 1) {
+        await new Promise(r => setTimeout(r, 300));
+      }
     }
+  } finally {
+    setTimeout(() => {
+      isBatchDownloading = false;
+    }, 1200);
   }
 }
 window.handleBatchDownloadDirect = handleBatchDownloadDirect;
+
+let isBatchZipDownloading = false;
 
 function handleBatchDownloadZip(e) {
   if (e) {
     e.preventDefault();
     e.stopPropagation();
   }
+  if (isBatchZipDownloading) return;
+
   const paths = Array.from(state.selectedPaths);
   if (paths.length === 0) return;
+
+  isBatchZipDownloading = true;
+  setTimeout(() => {
+    isBatchZipDownloading = false;
+  }, 2000);
 
   if (paths.length === 1) {
     const p = paths[0];
