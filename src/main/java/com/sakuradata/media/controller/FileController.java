@@ -226,8 +226,11 @@ public class FileController {
         } else {
             contentType = getCustomMimeType(targetPath, request);
         }
+        org.springframework.http.ContentDisposition contentDisposition = org.springframework.http.ContentDisposition.attachment()
+                .filename(file.getName(), java.nio.charset.StandardCharsets.UTF_8)
+                .build();
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + file.getName() + "\"")
+                .headers(headers -> headers.setContentDisposition(contentDisposition))
                 .header(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*")
                 .contentLength(file.length())
                 .contentType(MediaType.parseMediaType(contentType))
@@ -423,7 +426,10 @@ public class FileController {
         }
 
         response.setContentType("application/zip");
-        response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + folder.getName() + ".zip\"");
+        org.springframework.http.ContentDisposition contentDisposition = org.springframework.http.ContentDisposition.attachment()
+                .filename(folder.getName() + ".zip", java.nio.charset.StandardCharsets.UTF_8)
+                .build();
+        response.setHeader(HttpHeaders.CONTENT_DISPOSITION, contentDisposition.toString());
 
         try (ZipOutputStream zos = new ZipOutputStream(response.getOutputStream())) {
             zipFolder(folder, folder.getName(), zos);
@@ -455,11 +461,12 @@ public class FileController {
         try (FileInputStream fis = new FileInputStream(fileToZip)) {
             ZipEntry zipEntry = new ZipEntry(fileName);
             zipOut.putNextEntry(zipEntry);
-            byte[] bytes = new byte[4096];
+            byte[] bytes = new byte[65536];
             int length;
             while ((length = fis.read(bytes)) >= 0) {
                 zipOut.write(bytes, 0, length);
             }
+            zipOut.closeEntry();
         }
     }
 
@@ -1062,7 +1069,10 @@ public class FileController {
         }
 
         response.setContentType("application/zip");
-        response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"sakura_batch_" + System.currentTimeMillis() + ".zip\"");
+        org.springframework.http.ContentDisposition contentDisposition = org.springframework.http.ContentDisposition.attachment()
+                .filename("sakura_batch_" + System.currentTimeMillis() + ".zip", java.nio.charset.StandardCharsets.UTF_8)
+                .build();
+        response.setHeader(HttpHeaders.CONTENT_DISPOSITION, contentDisposition.toString());
 
         try (ZipOutputStream zos = new ZipOutputStream(response.getOutputStream())) {
             for (String pStr : paths) {
