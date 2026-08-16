@@ -451,7 +451,9 @@ function initApp() {
   safeAddListener('batch-select-all-checkbox', 'change', toggleSelectAll);
   safeAddListener('btn-batch-copy', 'click', handleBatchCopy);
   safeAddListener('btn-batch-move', 'click', handleBatchMove);
-  safeAddListener('btn-batch-download', 'click', handleBatchDownload);
+  safeAddListener('btn-batch-download-direct', 'click', handleBatchDownloadDirect);
+  safeAddListener('btn-batch-download-zip', 'click', handleBatchDownloadZip);
+  safeAddListener('btn-batch-download', 'click', handleBatchDownloadZip);
   safeAddListener('btn-batch-delete', 'click', handleBatchDelete);
   safeAddListener('btn-batch-clear', 'click', clearSelection);
 
@@ -1709,13 +1711,39 @@ async function handleBatchDelete() {
 }
 window.handleBatchDelete = handleBatchDelete;
 
-async function handleBatchDownload() {
+async function handleBatchDownloadDirect() {
+  const paths = Array.from(state.selectedPaths);
+  if (paths.length === 0) return;
+
+  const count = paths.length;
+  showToast(`Initiating direct download for ${count} item${count === 1 ? '' : 's'}...`, 'info');
+
+  for (let i = 0; i < paths.length; i++) {
+    const p = paths[i];
+    const fileName = p.split('/').pop();
+    const fileObj = (state.files || []).find(f => `${state.currentPath}/${f.name}` === p || f.name === fileName);
+    
+    if (fileObj && !fileObj.isFile) {
+      handleDownloadFolder(null, p);
+    } else {
+      handleDownloadFile(null, p);
+    }
+
+    // 350ms stagger between files so browser download managers queue all files smoothly
+    if (i < paths.length - 1) {
+      await new Promise(r => setTimeout(r, 350));
+    }
+  }
+}
+window.handleBatchDownloadDirect = handleBatchDownloadDirect;
+
+async function handleBatchDownloadZip() {
   const paths = Array.from(state.selectedPaths);
   if (paths.length === 0) return;
 
   if (paths.length === 1) {
     const p = paths[0];
-    const fileObj = state.files.find(f => `${state.currentPath}/${f.name}` === p);
+    const fileObj = (state.files || []).find(f => `${state.currentPath}/${f.name}` === p || f.name === p.split('/').pop());
     if (fileObj && !fileObj.isFile) {
       handleDownloadFolder(null, p);
     } else {
@@ -1724,8 +1752,7 @@ async function handleBatchDownload() {
     return;
   }
 
-  // Multi-item ZIP download
-  showToast('Preparing ZIP download for selected items...', 'info');
+  showToast(`Preparing ZIP archive with ${paths.length} items...`, 'info');
   try {
     const response = await fetch('/api/files/download-batch', {
       method: 'POST',
@@ -1740,16 +1767,21 @@ async function handleBatchDownload() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `sakura_batch_${Date.now()}.zip`;
+    const currentFolder = state.currentPath.split('/').filter(Boolean).pop() || 'media';
+    a.download = `${currentFolder}_batch_${Date.now()}.zip`;
     document.body.appendChild(a);
     a.click();
-    a.remove();
-    window.URL.revokeObjectURL(url);
+    setTimeout(() => {
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    }, 500);
+    showToast('ZIP archive downloaded successfully', 'success');
   } catch (err) {
-    showToast(`Failed to download: ${err.message}`, 'error');
+    showToast(`Failed to download ZIP: ${err.message}`, 'error');
   }
 }
-window.handleBatchDownload = handleBatchDownload;
+window.handleBatchDownloadZip = handleBatchDownloadZip;
+window.handleBatchDownload = handleBatchDownloadZip;
 
 async function handlePasteClipboard() {
   if (!state.clipboard || !state.clipboard.paths || state.clipboard.paths.length === 0) return;
