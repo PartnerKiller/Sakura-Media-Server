@@ -1057,19 +1057,33 @@ public class FileController {
         return ResponseEntity.ok(resp);
     }
 
-    @PostMapping("/download-batch")
-    public void downloadBatch(HttpServletRequest request, HttpServletResponse response, @RequestBody Map<String, Object> body) throws IOException {
+    @RequestMapping(value = "/download-batch", method = {RequestMethod.GET, RequestMethod.POST})
+    public void downloadBatch(HttpServletRequest request, 
+                              HttpServletResponse response, 
+                              @RequestBody(required = false) Map<String, Object> body,
+                              @RequestParam(value = "paths", required = false) List<String> paramPaths) throws IOException {
         User user = (User) request.getAttribute("user");
-        Object pathsObj = body.get("paths");
-        if (pathsObj == null) {
-            response.sendError(400, "Paths required");
-            return;
+        List<String> paths = new ArrayList<>();
+        
+        if (body != null && body.get("paths") != null) {
+            Object pathsObj = body.get("paths");
+            if (pathsObj instanceof List<?>) {
+                for (Object item : (List<?>) pathsObj) {
+                    if (item != null) paths.add(item.toString());
+                }
+            }
+        }
+        
+        if (paths.isEmpty() && paramPaths != null) {
+            paths.addAll(paramPaths);
         }
 
-        List<String> paths = new ArrayList<>();
-        if (pathsObj instanceof List<?>) {
-            for (Object item : (List<?>) pathsObj) {
-                if (item != null) paths.add(item.toString());
+        if (paths.isEmpty()) {
+            String[] reqPaths = request.getParameterValues("paths");
+            if (reqPaths != null) {
+                for (String p : reqPaths) {
+                    if (p != null && !p.trim().isEmpty()) paths.add(p);
+                }
             }
         }
 
@@ -1079,8 +1093,21 @@ public class FileController {
         }
 
         response.setContentType("application/zip");
+        String folderName = "media";
+        try {
+            if (!paths.isEmpty()) {
+                String firstPath = paths.get(0);
+                File f = new File(firstPath);
+                File parent = f.getParentFile();
+                if (parent != null && !parent.getName().isEmpty()) {
+                    folderName = parent.getName();
+                }
+            }
+        } catch (Exception ignored) {}
+
+        String zipName = folderName + "_batch_" + System.currentTimeMillis() + ".zip";
         org.springframework.http.ContentDisposition contentDisposition = org.springframework.http.ContentDisposition.attachment()
-                .filename("sakura_batch_" + System.currentTimeMillis() + ".zip", java.nio.charset.StandardCharsets.UTF_8)
+                .filename(zipName, java.nio.charset.StandardCharsets.UTF_8)
                 .build();
         response.setHeader(HttpHeaders.CONTENT_DISPOSITION, contentDisposition.toString());
 
@@ -1097,7 +1124,7 @@ public class FileController {
                 } else {
                     zos.putNextEntry(new ZipEntry(file.getName()));
                     try (FileInputStream fis = new FileInputStream(file)) {
-                        byte[] buffer = new byte[8192];
+                        byte[] buffer = new byte[65536];
                         int len;
                         while ((len = fis.read(buffer)) > 0) {
                             zos.write(buffer, 0, len);
@@ -1107,7 +1134,7 @@ public class FileController {
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            // Client disconnect or stream finished
         }
     }
 

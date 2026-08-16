@@ -203,11 +203,11 @@
                     <i data-lucide="folder-input" style="width: 13px; height: 13px;"></i>
                     <span>Move</span>
                   </button>
-                  <button id="btn-batch-download-direct" class="btn-batch btn-batch-download" title="Direct Download: download all selected files directly" style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; height: 28px; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 16px; color: #38bdf8; font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap;">
+                  <button id="btn-batch-download-direct" class="btn-batch btn-batch-download" onclick="handleBatchDownloadDirect(event)" title="Direct Download: download all selected files directly" style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; height: 28px; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 16px; color: #38bdf8; font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap;">
                     <i data-lucide="download" style="width: 13px; height: 13px;"></i>
                     <span>Direct</span>
                   </button>
-                  <button id="btn-batch-download-zip" class="btn-batch btn-batch-download-zip" title="ZIP Download: package all selected items into a single ZIP archive" style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; height: 28px; background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 16px; color: #c084fc; font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap;">
+                  <button id="btn-batch-download-zip" class="btn-batch btn-batch-download-zip" onclick="handleBatchDownloadZip(event)" title="ZIP Download: package all selected items into a single ZIP archive" style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; height: 28px; background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 16px; color: #c084fc; font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap;">
                     <i data-lucide="archive" style="width: 13px; height: 13px;"></i>
                     <span>ZIP</span>
                   </button>
@@ -1403,6 +1403,6 @@
     </div>
   </div>
 
-  <script src="/app-v4.js?v=4.18"></script>
+  <script src="/app-v4.js?v=4.30"></script>
 </body>
 </html>

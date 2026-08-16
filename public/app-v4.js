@@ -1454,14 +1454,13 @@ function handleDownloadFile(e, filePath) {
     e.stopPropagation();
   }
   const fileName = filePath.split('/').pop() || 'download';
-  const url = `/api/files/download?path=${encodeURIComponent(filePath)}&token=${state.token}`;
+  const url = `/api/files/download?path=${encodeURIComponent(filePath)}&token=${encodeURIComponent(state.token)}`;
   const a = document.createElement('a');
   a.href = url;
   a.download = fileName;
-  a.target = '_blank';
   document.body.appendChild(a);
   a.click();
-  setTimeout(() => a.remove(), 200);
+  setTimeout(() => a.remove(), 250);
 }
 window.handleDownloadFile = handleDownloadFile;
 
@@ -1471,14 +1470,13 @@ function handleDownloadFolder(e, filePath) {
     e.stopPropagation();
   }
   const folderName = filePath.split('/').filter(Boolean).pop() || 'folder';
-  const url = `/api/files/download-folder?path=${encodeURIComponent(filePath)}&token=${state.token}`;
+  const url = `/api/files/download-folder?path=${encodeURIComponent(filePath)}&token=${encodeURIComponent(state.token)}`;
   const a = document.createElement('a');
   a.href = url;
   a.download = `${folderName}.zip`;
-  a.target = '_blank';
   document.body.appendChild(a);
   a.click();
-  setTimeout(() => a.remove(), 200);
+  setTimeout(() => a.remove(), 250);
 }
 window.handleDownloadFolder = handleDownloadFolder;
 
@@ -1711,12 +1709,16 @@ async function handleBatchDelete() {
 }
 window.handleBatchDelete = handleBatchDelete;
 
-async function handleBatchDownloadDirect() {
+async function handleBatchDownloadDirect(e) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
   const paths = Array.from(state.selectedPaths);
   if (paths.length === 0) return;
 
   const count = paths.length;
-  showToast(`Initiating direct download for ${count} item${count === 1 ? '' : 's'}...`, 'info');
+  showToast(`Downloading ${count} item${count === 1 ? '' : 's'} directly...`, 'info');
 
   for (let i = 0; i < paths.length; i++) {
     const p = paths[i];
@@ -1729,15 +1731,18 @@ async function handleBatchDownloadDirect() {
       handleDownloadFile(null, p);
     }
 
-    // 350ms stagger between files so browser download managers queue all files smoothly
     if (i < paths.length - 1) {
-      await new Promise(r => setTimeout(r, 350));
+      await new Promise(r => setTimeout(r, 300));
     }
   }
 }
 window.handleBatchDownloadDirect = handleBatchDownloadDirect;
 
-async function handleBatchDownloadZip() {
+function handleBatchDownloadZip(e) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
   const paths = Array.from(state.selectedPaths);
   if (paths.length === 0) return;
 
@@ -1753,32 +1758,24 @@ async function handleBatchDownloadZip() {
   }
 
   showToast(`Preparing ZIP archive with ${paths.length} items...`, 'info');
-  try {
-    const response = await fetch('/api/files/download-batch', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${state.token}`
-      },
-      body: JSON.stringify({ paths })
-    });
-    if (!response.ok) throw new Error('Download failed');
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    const currentFolder = state.currentPath.split('/').filter(Boolean).pop() || 'media';
-    a.download = `${currentFolder}_batch_${Date.now()}.zip`;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-      a.remove();
-      window.URL.revokeObjectURL(url);
-    }, 500);
-    showToast('ZIP archive downloaded successfully', 'success');
-  } catch (err) {
-    showToast(`Failed to download ZIP: ${err.message}`, 'error');
-  }
+
+  // Submit hidden form to trigger browser native stream download immediately without memory buffering
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = `/api/files/download-batch?token=${encodeURIComponent(state.token)}`;
+  form.style.display = 'none';
+
+  paths.forEach(p => {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'paths';
+    input.value = p;
+    form.appendChild(input);
+  });
+
+  document.body.appendChild(form);
+  form.submit();
+  setTimeout(() => form.remove(), 1000);
 }
 window.handleBatchDownloadZip = handleBatchDownloadZip;
 window.handleBatchDownload = handleBatchDownloadZip;
