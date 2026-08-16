@@ -97,7 +97,7 @@ public class FileController {
         for (Permission p : perms) {
             if (isSubPath(p.getPath(), resolved)) {
                 if ("read".equals(type) && p.isAllowRead()) return true;
-                if ("write".equals(type) && (p.isAllowWrite() || p.isAllowRead())) return true;
+                if ("write".equals(type) && p.isAllowWrite()) return true;
             }
         }
         return false;
@@ -301,7 +301,7 @@ public class FileController {
                     HttpRange range = ranges.get(0);
                     long start = range.getRangeStart(fileLength);
                     long end = range.getRangeEnd(fileLength);
-                    long rangeLength = end - start + 1;
+                    long rangeLength = Math.min(1024 * 1024 * 5, end - start + 1); // 5MB chunk for smooth streaming & seeking
 
                     ResourceRegion region = new ResourceRegion(resource, start, rangeLength);
 
@@ -380,12 +380,12 @@ public class FileController {
         try {
             byte[] decoded = java.util.Base64.getUrlDecoder().decode(base64Path);
             String raw = new String(decoded, java.nio.charset.StandardCharsets.UTF_8);
-            return java.net.URLDecoder.decode(raw, java.nio.charset.StandardCharsets.UTF_8);
+            return resolvePath(raw);
         } catch (Exception e) {
             try {
                 byte[] decoded = java.util.Base64.getDecoder().decode(base64Path);
                 String raw = new String(decoded, java.nio.charset.StandardCharsets.UTF_8);
-                return java.net.URLDecoder.decode(raw, java.nio.charset.StandardCharsets.UTF_8);
+                return resolvePath(raw);
             } catch (Exception ignored) {}
         }
         return null;
@@ -408,8 +408,8 @@ public class FileController {
             return;
         }
 
-        String targetPath = Paths.get(path).toAbsolutePath().normalize().toString().replace("\\", "/");
-        if (targetPath.equals(SAKURA_ROOT) || targetPath.equals(STORAGE_ROOT) || targetPath.equals(HDD_ROOT) || targetPath.equals(GDRIVE_ROOT)) {
+        String targetPath = resolvePath(path);
+        if (targetPath == null || targetPath.equals(SAKURA_ROOT) || targetPath.equals(STORAGE_ROOT) || targetPath.equals(HDD_ROOT) || targetPath.equals(GDRIVE_ROOT)) {
             response.sendError(403, "Cannot download root directories directly");
             return;
         }
