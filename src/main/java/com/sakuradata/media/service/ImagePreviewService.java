@@ -35,8 +35,8 @@ public class ImagePreviewService {
     private static final Logger log = LoggerFactory.getLogger(ImagePreviewService.class);
     private final File cacheDir;
     private final ConcurrentHashMap<String, Object> lockMap = new ConcurrentHashMap<>();
-    // Concurrency limiter: Maximum 2 concurrent image decodes to strictly prevent heap exhaustion
-    private final Semaphore resizeSemaphore = new Semaphore(2);
+    // Concurrency limiter: Maximum 4 concurrent image decodes for parallel thumbnail processing
+    private final Semaphore resizeSemaphore = new Semaphore(4);
 
     public ImagePreviewService() {
         String homeDir = System.getProperty("user.home", "/tmp");

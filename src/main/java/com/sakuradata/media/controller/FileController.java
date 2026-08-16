@@ -431,10 +431,14 @@ public class FileController {
                 .build();
         response.setHeader(HttpHeaders.CONTENT_DISPOSITION, contentDisposition.toString());
 
-        try (ZipOutputStream zos = new ZipOutputStream(response.getOutputStream())) {
+        try (java.io.BufferedOutputStream bos = new java.io.BufferedOutputStream(response.getOutputStream(), 131072);
+             ZipOutputStream zos = new ZipOutputStream(bos)) {
+            zos.setLevel(java.util.zip.Deflater.BEST_SPEED);
             zipFolder(folder, folder.getName(), zos);
+            zos.finish();
+            zos.flush();
         } catch (Exception e) {
-            e.printStackTrace();
+            // Client disconnect or finished
         }
     }
 
@@ -1114,7 +1118,9 @@ public class FileController {
                 .build();
         response.setHeader(HttpHeaders.CONTENT_DISPOSITION, contentDisposition.toString());
 
-        try (ZipOutputStream zos = new ZipOutputStream(response.getOutputStream())) {
+        try (java.io.BufferedOutputStream bos = new java.io.BufferedOutputStream(response.getOutputStream(), 131072);
+             ZipOutputStream zos = new ZipOutputStream(bos)) {
+            zos.setLevel(java.util.zip.Deflater.BEST_SPEED);
             for (String pStr : paths) {
                 String targetPath = resolvePath(pStr);
                 if (targetPath == null || !hasPermission(user, targetPath, "read")) continue;
@@ -1136,6 +1142,8 @@ public class FileController {
                     zos.closeEntry();
                 }
             }
+            zos.finish();
+            zos.flush();
         } catch (Exception e) {
             // Client disconnect or stream finished
         }
