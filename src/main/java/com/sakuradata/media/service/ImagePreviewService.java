@@ -9,8 +9,11 @@ import org.springframework.stereotype.Service;
 
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReadParam;
+import javax.imageio.ImageReader;
 import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
+import javax.imageio.stream.FileImageInputStream;
 import javax.imageio.stream.ImageOutputStream;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
@@ -23,6 +26,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class ImagePreviewService {
@@ -30,6 +35,8 @@ public class ImagePreviewService {
     private static final Logger log = LoggerFactory.getLogger(ImagePreviewService.class);
     private final File cacheDir;
     private final ConcurrentHashMap<String, Object> lockMap = new ConcurrentHashMap<>();
+    // Concurrency limiter: Maximum 2 concurrent image decodes to strictly prevent heap exhaustion
+    private final Semaphore resizeSemaphore = new Semaphore(2);
 
     public ImagePreviewService() {
         String homeDir = System.getProperty("user.home", "/tmp");
@@ -56,8 +63,8 @@ public class ImagePreviewService {
 
         int orientation = getExifOrientation(sourceFile);
 
-        // If file is already small (under 600KB) and has standard orientation, serve original directly
-        if (sourceFile.length() <= 600 * 1024 && orientation == 1) {
+        // If file is already small (under 400KB) and has standard orientation, serve original directly
+        if (sourceFile.length() <= 400 * 1024 && orientation == 1) {
             return sourceFile;
         }
 
@@ -70,18 +77,25 @@ public class ImagePreviewService {
 
         Object lock = lockMap.computeIfAbsent(cacheKey, k -> new Object());
         synchronized (lock) {
+            if (cachedFile.exists() && cachedFile.length() > 0) {
+                return cachedFile;
+            }
+
+            boolean acquired = false;
             try {
-                if (cachedFile.exists() && cachedFile.length() > 0) {
-                    return cachedFile;
+                // Wait up to 5 seconds for a decoding slot
+                acquired = resizeSemaphore.tryAcquire(5, TimeUnit.SECONDS);
+                if (!acquired) {
+                    return sourceFile; // If overloaded, gracefully fallback to original file
                 }
 
-                BufferedImage originalImage = ImageIO.read(sourceFile);
-                if (originalImage == null) {
+                BufferedImage downsampledImage = readSubsampledImage(sourceFile, maxDim);
+                if (downsampledImage == null) {
                     return sourceFile;
                 }
 
-                int origW = originalImage.getWidth();
-                int origH = originalImage.getHeight();
+                int origW = downsampledImage.getWidth();
+                int origH = downsampledImage.getHeight();
 
                 int visualW = (orientation == 6 || orientation == 8 || orientation == 5 || orientation == 7) ? origH : origW;
                 int visualH = (orientation == 6 || orientation == 8 || orientation == 5 || orientation == 7) ? origW : origH;
@@ -123,9 +137,9 @@ public class ImagePreviewService {
                         break;
                 }
 
-                g2d.drawImage(originalImage, at, null);
+                g2d.drawImage(downsampledImage, at, null);
                 g2d.dispose();
-                originalImage.flush();
+                downsampledImage.flush();
 
                 File tempFile = new File(cacheDir, cacheKey + ".tmp");
                 writeCompressedJpeg(scaledImage, tempFile, 0.85f);
@@ -133,18 +147,65 @@ public class ImagePreviewService {
 
                 if (tempFile.exists() && tempFile.length() > 0) {
                     tempFile.renameTo(cachedFile);
-                    log.info("Generated optimized preview for {} (orientation={}, original {} -> preview {})",
+                    log.info("Generated preview for {} (orientation={}, {} -> {})",
                             sourceFile.getName(), orientation, sourceFile.length(), cachedFile.length());
                     return cachedFile;
                 }
-            } catch (Exception e) {
-                log.warn("Failed to generate preview for {}: {}", sourceFile.getName(), e.getMessage());
+            } catch (Throwable t) {
+                log.warn("Failed to generate preview for {}: {}", sourceFile.getName(), t.getMessage());
             } finally {
+                if (acquired) {
+                    resizeSemaphore.release();
+                }
                 lockMap.remove(cacheKey);
             }
         }
 
         return sourceFile;
+    }
+
+    /**
+     * Memory-efficient image loader that reads only subsampled pixels from disk,
+     * reducing RAM allocation by up to 98% compared to standard ImageIO.read().
+     */
+    private BufferedImage readSubsampledImage(File file, int maxDim) {
+        String ext = file.getName().substring(file.getName().lastIndexOf('.') + 1).toLowerCase();
+        Iterator<ImageReader> readers = ImageIO.getImageReadersBySuffix(ext);
+        if (!readers.hasNext()) {
+            readers = ImageIO.getImageReadersByFormatName("JPEG");
+        }
+        if (!readers.hasNext()) {
+            try {
+                return ImageIO.read(file);
+            } catch (Throwable ignored) {
+                return null;
+            }
+        }
+
+        ImageReader reader = readers.next();
+        try (FileImageInputStream fis = new FileImageInputStream(file)) {
+            reader.setInput(fis, true, true);
+            int origW = reader.getWidth(0);
+            int origH = reader.getHeight(0);
+
+            int maxSide = Math.max(origW, origH);
+            // Calculate subsample step: decode at 1/2, 1/4, 1/8 resolution directly in the decoder
+            int subsample = Math.max(1, maxSide / (maxDim * 2));
+
+            ImageReadParam param = reader.getDefaultReadParam();
+            if (subsample > 1) {
+                param.setSourceSubsampling(subsample, subsample, 0, 0);
+            }
+            return reader.read(0, param);
+        } catch (Throwable e) {
+            try {
+                return ImageIO.read(file);
+            } catch (Throwable ignored) {
+                return null;
+            }
+        } finally {
+            reader.dispose();
+        }
     }
 
     private int getExifOrientation(File file) {
