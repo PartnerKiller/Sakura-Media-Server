@@ -484,12 +484,16 @@ public class FileController {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid characters in new folder name"));
         }
 
-        String targetDir = Paths.get(pathParam).toAbsolutePath().normalize().toString().replace("\\", "/");
-        if (!hasPermission(user, targetDir, "write")) {
+        String targetDir = resolvePath(pathParam);
+        if (targetDir == null || !hasPermission(user, targetDir, "write")) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Permission denied"));
         }
 
-        Path newFolderPath = Paths.get(targetDir, name);
+        Path newFolderPath = Paths.get(targetDir, name.trim());
+        if (Files.exists(newFolderPath)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "A folder with this name already exists"));
+        }
+
         try {
             Files.createDirectories(newFolderPath);
             SseController.broadcast("fs-change", Map.of("userId", user.getId(), "parentPath", targetDir));
@@ -526,7 +530,12 @@ public class FileController {
             cleanRelativePath = cleanRelativePath.substring(1);
         }
 
-        String finalFileDestination = Paths.get(targetDirectory, cleanRelativePath).toAbsolutePath().normalize().toString().replace("\\", "/");
+        String resolvedTargetDir = resolvePath(targetDirectory);
+        if (resolvedTargetDir == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid target directory"));
+        }
+
+        String finalFileDestination = Paths.get(resolvedTargetDir, cleanRelativePath).toAbsolutePath().normalize().toString().replace("\\", "/");
         String finalDirDestination = Paths.get(finalFileDestination).getParent().toString().replace("\\", "/");
 
         if (!hasPermission(user, finalDirDestination, "write")) {
@@ -559,12 +568,8 @@ public class FileController {
                     }
                 }
 
-                // Delete chunks folder recursively
-                try (java.util.stream.Stream<Path> stream = Files.walk(chunkFolder)) {
-                    stream.sorted(Comparator.reverseOrder())
-                            .map(Path::toFile)
-                            .forEach(File::delete);
-                }
+                // Delete temp chunks folder after merging
+                deleteRecursively(chunkFolder);
 
                 String parentPath = finalPath.getParent().toAbsolutePath().normalize().toString().replace("\\", "/");
                 SseController.broadcast("fs-change", Map.of("userId", user.getId(), "parentPath", parentPath));
@@ -606,7 +611,12 @@ public class FileController {
             cleanRelativePath = cleanRelativePath.substring(1);
         }
 
-        String finalFileDestination = Paths.get(targetDirectory, cleanRelativePath).toAbsolutePath().normalize().toString().replace("\\", "/");
+        String resolvedTargetDir = resolvePath(targetDirectory);
+        if (resolvedTargetDir == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid target directory"));
+        }
+
+        String finalFileDestination = Paths.get(resolvedTargetDir, cleanRelativePath).toAbsolutePath().normalize().toString().replace("\\", "/");
         String finalDirDestination = Paths.get(finalFileDestination).getParent().toString().replace("\\", "/");
 
         if (!hasPermission(user, finalDirDestination, "write")) {
@@ -641,8 +651,8 @@ public class FileController {
             return ResponseEntity.badRequest().body(Map.of("error", "Path is required"));
         }
 
-        String targetPath = Paths.get(path).toAbsolutePath().normalize().toString().replace("\\", "/");
-        if (!hasPermission(user, targetPath, "write")) {
+        String targetPath = resolvePath(path);
+        if (targetPath == null || !hasPermission(user, targetPath, "write")) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Permission denied"));
         }
 
@@ -711,8 +721,8 @@ public class FileController {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid characters in new name"));
         }
 
-        String targetPath = Paths.get(path).toAbsolutePath().normalize().toString().replace("\\", "/");
-        if (!hasPermission(user, targetPath, "write")) {
+        String targetPath = resolvePath(path);
+        if (targetPath == null || !hasPermission(user, targetPath, "write")) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Permission denied"));
         }
 
@@ -722,7 +732,7 @@ public class FileController {
         }
 
         File parentDir = file.getParentFile();
-        File destFile = new File(parentDir, newName);
+        File destFile = new File(parentDir, newName.trim());
 
         if (destFile.exists()) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "A file or folder with the new name already exists"));
