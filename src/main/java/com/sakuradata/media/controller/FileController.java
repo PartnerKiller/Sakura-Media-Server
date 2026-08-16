@@ -1059,31 +1059,34 @@ public class FileController {
 
     @RequestMapping(value = "/download-batch", method = {RequestMethod.GET, RequestMethod.POST})
     public void downloadBatch(HttpServletRequest request, 
-                              HttpServletResponse response, 
-                              @RequestBody(required = false) Map<String, Object> body,
-                              @RequestParam(value = "paths", required = false) List<String> paramPaths) throws IOException {
+                              HttpServletResponse response) throws IOException {
         User user = (User) request.getAttribute("user");
         List<String> paths = new ArrayList<>();
         
-        if (body != null && body.get("paths") != null) {
-            Object pathsObj = body.get("paths");
-            if (pathsObj instanceof List<?>) {
-                for (Object item : (List<?>) pathsObj) {
-                    if (item != null) paths.add(item.toString());
-                }
+        // 1. Check form / query parameters
+        String[] reqPaths = request.getParameterValues("paths");
+        if (reqPaths != null) {
+            for (String p : reqPaths) {
+                if (p != null && !p.trim().isEmpty()) paths.add(p);
             }
         }
-        
-        if (paths.isEmpty() && paramPaths != null) {
-            paths.addAll(paramPaths);
-        }
 
+        // 2. If empty and JSON content-type, parse from request input stream
         if (paths.isEmpty()) {
-            String[] reqPaths = request.getParameterValues("paths");
-            if (reqPaths != null) {
-                for (String p : reqPaths) {
-                    if (p != null && !p.trim().isEmpty()) paths.add(p);
-                }
+            String contentType = request.getContentType();
+            if (contentType != null && contentType.toLowerCase().contains("application/json")) {
+                try {
+                    com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                    Map<String, Object> body = mapper.readValue(request.getInputStream(), Map.class);
+                    if (body != null && body.get("paths") != null) {
+                        Object pathsObj = body.get("paths");
+                        if (pathsObj instanceof List<?>) {
+                            for (Object item : (List<?>) pathsObj) {
+                                if (item != null) paths.add(item.toString());
+                            }
+                        }
+                    }
+                } catch (Exception ignored) {}
             }
         }
 

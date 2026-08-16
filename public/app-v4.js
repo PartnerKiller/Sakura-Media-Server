@@ -1776,9 +1776,19 @@ function handleBatchDownloadZip(e) {
 
   showToast(`Preparing ZIP archive with ${paths.length} items...`, 'info');
 
-  // Submit hidden form to trigger browser native stream download immediately without memory buffering
+  // Submit via a hidden iframe so the current browser page is NEVER navigated/redirected
+  let iframe = document.getElementById('batch-download-iframe');
+  if (!iframe) {
+    iframe = document.createElement('iframe');
+    iframe.id = 'batch-download-iframe';
+    iframe.name = 'batch_download_frame';
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+  }
+
   const form = document.createElement('form');
   form.method = 'POST';
+  form.target = 'batch_download_frame';
   form.action = `/api/files/download-batch?token=${encodeURIComponent(state.token)}`;
   form.style.display = 'none';
 
@@ -1792,7 +1802,7 @@ function handleBatchDownloadZip(e) {
 
   document.body.appendChild(form);
   form.submit();
-  setTimeout(() => form.remove(), 1000);
+  setTimeout(() => form.remove(), 2000);
 }
 window.handleBatchDownloadZip = handleBatchDownloadZip;
 window.handleBatchDownload = handleBatchDownloadZip;
