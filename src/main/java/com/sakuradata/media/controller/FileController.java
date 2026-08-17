@@ -281,9 +281,16 @@ public class FileController {
             maxBytesPerSec = (long) (user.getDownloadBandwidthLimit() * 1024 * 1024);
         }
 
-        try (RandomAccessFile raf = new RandomAccessFile(file, "r");
-             OutputStream os = new BufferedOutputStream(response.getOutputStream(), 131072)) {
-            raf.seek(start);
+        try (InputStream is = new BufferedInputStream(new FileInputStream(file), 262144);
+             OutputStream os = response.getOutputStream()) {
+            if (start > 0) {
+                long skipped = 0;
+                while (skipped < start) {
+                    long s = is.skip(start - skipped);
+                    if (s <= 0) break;
+                    skipped += s;
+                }
+            }
             byte[] buffer = new byte[131072]; // 128KB buffer
             long remaining = contentLength;
             long bytesSentThisSecond = 0;
@@ -291,7 +298,7 @@ public class FileController {
 
             while (remaining > 0) {
                 int readLen = (int) Math.min(buffer.length, remaining);
-                int bytesRead = raf.read(buffer, 0, readLen);
+                int bytesRead = is.read(buffer, 0, readLen);
                 if (bytesRead == -1) break;
                 os.write(buffer, 0, bytesRead);
                 remaining -= bytesRead;
