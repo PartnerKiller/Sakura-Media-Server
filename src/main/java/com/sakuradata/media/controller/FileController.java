@@ -40,6 +40,9 @@ public class FileController {
     @Autowired
     private com.sakuradata.media.service.ImagePreviewService imagePreviewService;
 
+    @Autowired
+    private com.sakuradata.media.service.ImportService importService;
+
     @jakarta.annotation.PostConstruct
     public void initTempDirectories() {
         try {
@@ -1390,5 +1393,67 @@ public class FileController {
                 ));
             } catch (Throwable ignored) {}
         }
+    }
+
+    @PostMapping("/import-url")
+    public ResponseEntity<?> importUrl(HttpServletRequest request, @RequestBody Map<String, String> body) {
+        User user = (User) request.getAttribute("user");
+        String url = body.get("url");
+        String targetPath = body.get("targetPath");
+        String customFileName = body.get("customFileName");
+
+        if (url == null || url.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "URL is required"));
+        }
+        if (targetPath == null || targetPath.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Target path is required"));
+        }
+
+        String resolved = resolvePath(targetPath);
+        if (resolved == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid target path"));
+        }
+
+        if (!hasPermission(user, resolved, "write")) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Write permission denied for target directory"));
+        }
+
+        File targetDir = new File(resolved);
+        if (!targetDir.exists() || !targetDir.isDirectory()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Target directory does not exist"));
+        }
+
+        try {
+            com.sakuradata.media.service.ImportService.ImportTask task = importService.startImport(url, resolved, customFileName);
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "taskId", task.getTaskId(),
+                    "status", task.getStatus(),
+                    "fileName", task.getFileName(),
+                    "targetPath", task.getTargetPath()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage() != null ? e.getMessage() : "Failed to start import"));
+        }
+    }
+
+    @GetMapping("/import-status/{taskId}")
+    public ResponseEntity<?> getImportStatus(@PathVariable String taskId) {
+        com.sakuradata.media.service.ImportService.ImportTask task = importService.getTask(taskId);
+        if (task == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Task not found"));
+        }
+        return ResponseEntity.ok(task);
+    }
+
+    @PostMapping("/import-cancel/{taskId}")
+    public ResponseEntity<?> cancelImport(@PathVariable String taskId) {
+        boolean cancelled = importService.cancelTask(taskId);
+        return ResponseEntity.ok(Map.of("success", cancelled));
+    }
+
+    @GetMapping("/import-tasks")
+    public ResponseEntity<?> getAllImportTasks() {
+        return ResponseEntity.ok(importService.getAllTasks());
     }
 }

@@ -127,9 +127,13 @@
             <i data-lucide="upload"></i>
             <span>Upload File</span>
           </button>
-          <button id="btn-upload-folder-trigger" class="btn-primary">
+          <button id="btn-upload-folder-trigger" class="btn-secondary">
             <i data-lucide="folder-up"></i>
             <span>Upload Folder</span>
+          </button>
+          <button id="btn-import-url-trigger" class="btn-primary" title="Import / Download files from Google Drive or links directly to this folder">
+            <i data-lucide="link"></i>
+            <span>Import Link</span>
           </button>
           <input type="file" id="file-input" multiple style="display: none;">
           <input type="file" id="folder-input" webkitdirectory directory multiple style="display: none;">
@@ -1403,6 +1407,91 @@
     </div>
   </div>
 
-  <script src="/app-v4.js?v=4.32"></script>
+  <!-- IMPORT FROM LINK / URL MODAL -->
+  <div id="modal-import-url" class="modal-backdrop" style="z-index: 1100;">
+    <div class="modal" style="max-width: 520px; width: 92%;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="download-cloud" style="color: var(--primary); width: 20px; height: 20px;"></i>
+          <h3 style="margin: 0;">Import File from Link</h3>
+        </div>
+        <button class="btn-close-modal" id="btn-close-import-url">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 14px;">
+        
+        <!-- Target Destination Badge -->
+        <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 10px 14px; display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
+            <i data-lucide="folder" style="color: var(--primary); width: 16px; height: 16px; flex-shrink: 0;"></i>
+            <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted);">Save to:</span>
+            <span id="import-target-path-display" style="font-size: 13px; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">/</span>
+          </div>
+        </div>
+
+        <!-- URL Input -->
+        <div class="input-group" style="margin-bottom: 0;">
+          <label for="import-url-input" style="font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
+            <span>File or Media Link</span>
+            <span style="font-size: 11px; color: var(--primary); font-weight: 500;">Google Drive / Direct URL / Video</span>
+          </label>
+          <textarea id="import-url-input" rows="3" placeholder="Paste Google Drive link, direct file download URL, or media link..." style="width: 100%; box-sizing: border-box; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 10px 12px; background: rgba(0, 0, 0, 0.25); color: var(--text-primary); font-size: 13px; font-family: inherit; resize: vertical; outline: none;"></textarea>
+        </div>
+
+        <!-- Custom Filename Input (Optional) -->
+        <div class="input-group" style="margin-bottom: 0;">
+          <label for="import-filename-input" style="font-size: 12px; font-weight: 500; color: var(--text-muted); margin-bottom: 6px; display: block;">
+            Custom Filename (Optional)
+          </label>
+          <input type="text" id="import-filename-input" placeholder="e.g. Movie_2026.mp4 (Auto-detected if left empty)" style="width: 100%; box-sizing: border-box; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 8px 12px; background: rgba(0, 0, 0, 0.25); color: var(--text-primary); font-size: 13px; outline: none;">
+        </div>
+
+        <!-- Supported Services Badges -->
+        <div style="display: flex; flex-wrap: wrap; gap: 6px; padding-top: 2px;">
+          <span style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 12px; font-size: 11px; color: #38bdf8;">
+            <i data-lucide="hard-drive" style="width: 12px; height: 12px;"></i> Google Drive
+          </span>
+          <span style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 12px; font-size: 11px; color: #c084fc;">
+            <i data-lucide="globe" style="width: 12px; height: 12px;"></i> Direct URL (MP4, MKV, ZIP, etc.)
+          </span>
+          <span style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; background: rgba(244, 63, 94, 0.1); border: 1px solid rgba(244, 63, 94, 0.25); border-radius: 12px; font-size: 11px; color: #fb7185;">
+            <i data-lucide="video" style="width: 12px; height: 12px;"></i> Video Sites (yt-dlp)
+          </span>
+        </div>
+
+        <!-- Live Download Progress Card -->
+        <div id="import-progress-card" style="display: none; background: rgba(236, 72, 153, 0.06); border: 1px solid rgba(236, 72, 153, 0.35); border-radius: var(--radius-md); padding: 12px 14px; flex-direction: column; gap: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; flex-direction: column; gap: 2px; overflow: hidden; max-width: 70%;">
+              <span id="import-progress-status-title" style="font-size: 13px; font-weight: 600; color: var(--text-primary);">Downloading...</span>
+              <span id="import-progress-filename" style="font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Detecting filename...</span>
+            </div>
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
+              <span id="import-progress-percent" style="font-size: 14px; font-weight: 700; color: var(--primary);">0%</span>
+              <span id="import-progress-speed" style="font-size: 11px; color: var(--text-muted);">0 KB/s</span>
+            </div>
+          </div>
+          <div style="width: 100%; height: 6px; background: rgba(255, 255, 255, 0.1); border-radius: 3px; overflow: hidden;">
+            <div id="import-progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--primary), var(--secondary)); transition: width 0.2s ease;"></div>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
+            <span id="import-progress-bytes">0 MB / 0 MB</span>
+            <button id="btn-cancel-active-import" type="button" style="background: none; border: none; color: #f87171; font-size: 11px; cursor: pointer; padding: 0; text-decoration: underline;">Cancel Download</button>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer" style="padding: 14px 20px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border-subtle);">
+        <button type="button" class="btn-secondary" id="btn-cancel-import-url">Cancel</button>
+        <button type="button" class="btn-primary" id="btn-confirm-import-url" style="display: inline-flex; align-items: center; gap: 6px;">
+          <i data-lucide="download"></i>
+          <span>Start Download</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app-v4.js?v=4.40"></script>
 </body>
 </html>

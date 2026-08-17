@@ -444,6 +444,13 @@ function initApp() {
     loadPickerDirectory(e.target.value);
   });
 
+  // Import from Link / URL listeners
+  safeAddListener('btn-import-url-trigger', 'click', openImportUrlModal);
+  safeAddListener('btn-close-import-url', 'click', closeImportUrlModal);
+  safeAddListener('btn-cancel-import-url', 'click', closeImportUrlModal);
+  safeAddListener('btn-confirm-import-url', 'click', handleStartImport);
+  safeAddListener('btn-cancel-active-import', 'click', handleCancelActiveImport);
+
   // Batch action bar & clipboard listeners
   safeAddListener('btn-paste', 'click', handlePasteClipboard);
   safeAddListener('btn-paste-dock', 'click', handlePasteClipboard);
@@ -3878,6 +3885,24 @@ function initSse() {
     }
   });
 
+  eventSource.addEventListener('import_progress', (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      if (activeImportTaskId && data.taskId === activeImportTaskId) {
+        updateImportProgressUI(data);
+      }
+    } catch (err) {}
+  });
+
+  eventSource.addEventListener('file_created', (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      if (data.targetPath === state.currentPath || (data.path && data.path.startsWith(state.currentPath + '/'))) {
+        browsePath(state.currentPath);
+      }
+    } catch (err) {}
+  });
+
   eventSource.addEventListener('theme-update', (e) => {
     if (state.user) return;
     try {
@@ -4586,6 +4611,197 @@ setInterval(() => {
     }
   }
 }, 30000);
+
+// ============================================================
+// IMPORT FROM LINK / URL FEATURE
+// ============================================================
+let activeImportTaskId = null;
+let importPollInterval = null;
+
+function openImportUrlModal() {
+  if (!state.currentPath) {
+    showToast('Please open a destination folder first', 'error');
+    return;
+  }
+
+  const targetPathDisplay = document.getElementById('import-target-path-display');
+  if (targetPathDisplay) {
+    targetPathDisplay.innerText = state.currentPath;
+    targetPathDisplay.title = state.currentPath;
+  }
+
+  const urlInput = document.getElementById('import-url-input');
+  if (urlInput) {
+    urlInput.value = '';
+    setTimeout(() => urlInput.focus(), 150);
+  }
+
+  const filenameInput = document.getElementById('import-filename-input');
+  if (filenameInput) filenameInput.value = '';
+
+  const progressCard = document.getElementById('import-progress-card');
+  if (progressCard) progressCard.style.display = 'none';
+
+  const confirmBtn = document.getElementById('btn-confirm-import-url');
+  if (confirmBtn) {
+    confirmBtn.disabled = false;
+    confirmBtn.innerHTML = `<i data-lucide="download"></i><span>Start Download</span>`;
+    if (window.lucide) lucide.createIcons();
+  }
+
+  openModal('modal-import-url');
+}
+window.openImportUrlModal = openImportUrlModal;
+
+function closeImportUrlModal() {
+  closeModal('modal-import-url');
+  if (importPollInterval) {
+    clearInterval(importPollInterval);
+    importPollInterval = null;
+  }
+}
+window.closeImportUrlModal = closeImportUrlModal;
+
+async function handleStartImport() {
+  const urlInput = document.getElementById('import-url-input');
+  const filenameInput = document.getElementById('import-filename-input');
+  const url = urlInput ? urlInput.value.trim() : '';
+  const customFileName = filenameInput ? filenameInput.value.trim() : '';
+
+  if (!url) {
+    showToast('Please enter a valid file or media URL', 'error');
+    if (urlInput) urlInput.focus();
+    return;
+  }
+
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    showToast('URL must start with http:// or https://', 'error');
+    return;
+  }
+
+  const confirmBtn = document.getElementById('btn-confirm-import-url');
+  if (confirmBtn) {
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = `<i data-lucide="loader" class="spin"></i><span>Starting...</span>`;
+    if (window.lucide) lucide.createIcons();
+  }
+
+  const progressCard = document.getElementById('import-progress-card');
+  if (progressCard) {
+    progressCard.style.display = 'flex';
+    document.getElementById('import-progress-status-title').innerText = 'Initiating download...';
+    document.getElementById('import-progress-filename').innerText = customFileName || 'Connecting to remote host...';
+    document.getElementById('import-progress-percent').innerText = '0%';
+    document.getElementById('import-progress-bar').style.width = '0%';
+    document.getElementById('import-progress-bytes').innerText = '0 MB';
+    document.getElementById('import-progress-speed').innerText = '0 KB/s';
+  }
+
+  try {
+    const res = await apiCall('/api/files/import-url', {
+      method: 'POST',
+      body: JSON.stringify({
+        url,
+        targetPath: state.currentPath,
+        customFileName
+      })
+    });
+
+    if (res.success && res.taskId) {
+      activeImportTaskId = res.taskId;
+      showToast('Import started in background', 'info');
+      startImportTracking(res.taskId);
+    } else {
+      throw new Error(res.error || 'Failed to start import');
+    }
+  } catch (err) {
+    showToast(`Import error: ${err.message}`, 'error');
+    if (confirmBtn) {
+      confirmBtn.disabled = false;
+      confirmBtn.innerHTML = `<i data-lucide="download"></i><span>Start Download</span>`;
+      if (window.lucide) lucide.createIcons();
+    }
+  }
+}
+window.handleStartImport = handleStartImport;
+
+function startImportTracking(taskId) {
+  if (importPollInterval) clearInterval(importPollInterval);
+
+  importPollInterval = setInterval(async () => {
+    try {
+      const task = await apiCall(`/api/files/import-status/${taskId}`);
+      updateImportProgressUI(task);
+
+      if (task.status === 'COMPLETED') {
+        clearInterval(importPollInterval);
+        importPollInterval = null;
+        showToast(`Successfully imported: ${task.fileName}`, 'success');
+        setTimeout(() => {
+          closeImportUrlModal();
+          browsePath(state.currentPath);
+        }, 1200);
+      } else if (task.status === 'FAILED') {
+        clearInterval(importPollInterval);
+        importPollInterval = null;
+        showToast(`Import failed: ${task.error || 'Unknown error'}`, 'error');
+        const confirmBtn = document.getElementById('btn-confirm-import-url');
+        if (confirmBtn) {
+          confirmBtn.disabled = false;
+          confirmBtn.innerHTML = `<i data-lucide="download"></i><span>Retry Download</span>`;
+          if (window.lucide) lucide.createIcons();
+        }
+      } else if (task.status === 'CANCELLED') {
+        clearInterval(importPollInterval);
+        importPollInterval = null;
+        showToast('Import cancelled', 'info');
+        closeImportUrlModal();
+      }
+    } catch (err) {
+      // Ignore transient polling drops
+    }
+  }, 700);
+}
+
+function updateImportProgressUI(task) {
+  if (!task) return;
+
+  const titleEl = document.getElementById('import-progress-status-title');
+  const filenameEl = document.getElementById('import-progress-filename');
+  const percentEl = document.getElementById('import-progress-percent');
+  const barEl = document.getElementById('import-progress-bar');
+  const bytesEl = document.getElementById('import-progress-bytes');
+  const speedEl = document.getElementById('import-progress-speed');
+
+  if (titleEl) {
+    if (task.status === 'COMPLETED') titleEl.innerText = 'Download Completed!';
+    else if (task.status === 'FAILED') titleEl.innerText = 'Download Failed';
+    else if (task.status === 'CANCELLED') titleEl.innerText = 'Cancelled';
+    else titleEl.innerText = 'Downloading file...';
+  }
+
+  if (filenameEl && task.fileName) filenameEl.innerText = task.fileName;
+  if (percentEl) percentEl.innerText = `${task.percent || 0}%`;
+  if (barEl) barEl.style.width = `${task.percent || 0}%`;
+  if (speedEl && task.speed) speedEl.innerText = task.speed;
+
+  if (bytesEl) {
+    const downloadedStr = formatBytes(task.downloadedBytes || 0);
+    const totalStr = task.totalBytes && task.totalBytes > 0 ? formatBytes(task.totalBytes) : 'Unknown size';
+    bytesEl.innerText = `${downloadedStr} / ${totalStr}`;
+  }
+}
+
+async function handleCancelActiveImport() {
+  if (!activeImportTaskId) return;
+  try {
+    await apiCall(`/api/files/import-cancel/${activeImportTaskId}`, { method: 'POST' });
+    showToast('Cancelling download...', 'info');
+  } catch (err) {
+    showToast(`Failed to cancel: ${err.message}`, 'error');
+  }
+}
+window.handleCancelActiveImport = handleCancelActiveImport;
 
 
 
