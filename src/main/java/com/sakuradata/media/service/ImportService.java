@@ -86,9 +86,11 @@ public class ImportService {
         public boolean isCancelled() { return cancelled; }
         public void setCancelled(boolean cancelled) { this.cancelled = cancelled; }
 
+        @com.fasterxml.jackson.annotation.JsonIgnore
         public Future<?> getFuture() { return future; }
         public void setFuture(Future<?> future) { this.future = future; }
 
+        @com.fasterxml.jackson.annotation.JsonIgnore
         public Process getProcess() { return process; }
         public void setProcess(Process process) { this.process = process; }
     }
@@ -178,24 +180,34 @@ public class ImportService {
         task.setStatus("DOWNLOADING");
         broadcastProgress(task);
 
-        // 1. Check if it's a media site link supported by yt-dlp (YouTube, TikTok, Vimeo, Twitter, etc.)
+        // 1. Check if it's a Google Drive folder link
+        if (isGoogleDriveFolder(url)) {
+            executeGdownFolderDownload(task);
+            return;
+        }
+
+        // 2. Check if it's a media site link supported by yt-dlp (YouTube, TikTok, Vimeo, Twitter, etc.)
         if (isMediaSite(url) && isYtDlpAvailable()) {
             executeYtDlpDownload(task, customFileName);
             return;
         }
 
-        // 2. Check if it's a Google Drive link
+        // 3. Check if it's a Google Drive single file link
         if (isGoogleDriveLink(url)) {
             executeGoogleDriveDownload(task, customFileName);
             return;
         }
 
-        // 3. Standard Direct HTTP/HTTPS download
+        // 4. Standard Direct HTTP/HTTPS download
         executeHttpDownload(task, url, customFileName);
     }
 
     private boolean isGoogleDriveLink(String url) {
         return url.contains("drive.google.com") || url.contains("docs.google.com");
+    }
+
+    private boolean isGoogleDriveFolder(String url) {
+        return isGoogleDriveLink(url) && (url.contains("/folders/") || url.contains("/drive/folders/"));
     }
 
     private boolean isMediaSite(String url) {
@@ -212,7 +224,6 @@ public class ImportService {
     }
 
     private String extractGoogleDriveFileId(String url) {
-        // Pattern matches: /file/d/{id}/..., id={id}, /d/{id}/...
         Pattern p1 = Pattern.compile("/file/d/([a-zA-Z0-9_-]{20,})");
         Matcher m1 = p1.matcher(url);
         if (m1.find()) return m1.group(1);
@@ -229,7 +240,95 @@ public class ImportService {
         Matcher m4 = p4.matcher(url);
         if (m4.find()) return m4.group(1);
 
+        Pattern p5 = Pattern.compile("(?:/folders/|/drive/folders/)([a-zA-Z0-9_-]{20,})");
+        Matcher m5 = p5.matcher(url);
+        if (m5.find()) return m5.group(1);
+
+        Pattern p6 = Pattern.compile("^([a-zA-Z0-9_-]{25,})$");
+        Matcher m6 = p6.matcher(url.trim());
+        if (m6.find()) return m6.group(1);
+
         return null;
+    }
+
+    private void executeGdownFolderDownload(ImportTask task) throws Exception {
+        String gdownBin = new File("/usr/local/bin/gdown").exists() ? "/usr/local/bin/gdown" : "/home/sakura/.local/bin/gdown";
+        if (!new File(gdownBin).exists()) {
+            gdownBin = "gdown";
+        }
+
+        task.setFileName("Google Drive Folder");
+        task.setStatus("DOWNLOADING");
+        broadcastProgress(task);
+
+        List<String> command = new ArrayList<>(Arrays.asList(
+                gdownBin,
+                "--folder",
+                "--continue",
+                task.getUrl()
+        ));
+
+        ProcessBuilder pb = new ProcessBuilder(command);
+        pb.directory(new File(task.getTargetPath()));
+        pb.redirectErrorStream(true);
+
+        Process process = pb.start();
+        task.setProcess(process);
+
+        StringBuilder outputLog = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+            String line;
+            Pattern progressPattern = Pattern.compile("([0-9.]+)%\\s*\\|.*?\\|\\s*([0-9.]+[A-Za-z/]+)");
+            Pattern filePattern = Pattern.compile("(?:Processing file|Downloading|Saved):?\\s*(.+)");
+
+            long lastBroadcastTime = 0;
+
+            while ((line = reader.readLine()) != null) {
+                if (task.isCancelled()) {
+                    process.destroyForcibly();
+                    return;
+                }
+
+                log.info("[gdown] {}", line);
+                outputLog.append(line).append("\n");
+
+                Matcher fileMatcher = filePattern.matcher(line);
+                if (fileMatcher.find()) {
+                    task.setFileName(new File(fileMatcher.group(1).trim()).getName());
+                }
+
+                Matcher progMatcher = progressPattern.matcher(line);
+                if (progMatcher.find()) {
+                    try {
+                        float pct = Float.parseFloat(progMatcher.group(1));
+                        task.setPercent((int) pct);
+                        task.setSpeed(progMatcher.group(2));
+                    } catch (Exception ignored) {}
+                }
+
+                long now = System.currentTimeMillis();
+                if (now - lastBroadcastTime > 400) {
+                    broadcastProgress(task);
+                    lastBroadcastTime = now;
+                }
+            }
+        }
+
+        int exitCode = process.waitFor();
+        if (exitCode != 0 && !task.isCancelled()) {
+            String outStr = outputLog.toString();
+            if (outStr.contains("404") || outStr.contains("permission") || outStr.contains("Failed to retrieve folder contents")) {
+                throw new IOException("Google Drive folder requires 'Anyone with the link' view permission. Please ensure the link is shared publicly.");
+            }
+            throw new IOException("Folder download failed: " + (outStr.length() > 200 ? outStr.substring(outStr.length() - 200) : outStr));
+        }
+
+        task.setStatus("COMPLETED");
+        task.setPercent(100);
+        task.setEndTime(System.currentTimeMillis());
+        task.setSpeed("Done");
+        broadcastProgress(task);
+        broadcastFileCreated(task);
     }
 
     private void executeGoogleDriveDownload(ImportTask task, String customFileName) throws Exception {
