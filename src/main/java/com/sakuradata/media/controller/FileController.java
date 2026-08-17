@@ -200,44 +200,120 @@ public class FileController {
     }
 
     @GetMapping("/download")
-    public ResponseEntity<Resource> download(HttpServletRequest request, @RequestParam String path) {
+    public void download(HttpServletRequest request, 
+                         HttpServletResponse response, 
+                         @RequestParam String path,
+                         @RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader) throws IOException {
         User user = (User) request.getAttribute("user");
         String targetPath = resolvePath(path);
         if (targetPath == null) {
-            return ResponseEntity.badRequest().build();
+            response.sendError(400, "Path is required");
+            return;
         }
 
         if (!hasPermission(user, targetPath, "read")) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            response.sendError(403, "Permission denied");
+            return;
         }
 
         File file = new File(targetPath);
         if (!file.exists() || !file.isFile()) {
-            return ResponseEntity.notFound().build();
+            response.sendError(404, "File not found");
+            return;
         }
 
-        Resource resource;
-        if (user != null && user.getDownloadBandwidthLimit() != null && user.getDownloadBandwidthLimit() > 0) {
-            resource = new com.sakuradata.media.util.ThrottledFileSystemResource(file, (long) (user.getDownloadBandwidthLimit() * 1024 * 1024));
-        } else {
-            resource = new FileSystemResource(file);
+        long fileLength = file.length();
+        long start = 0;
+        long end = fileLength - 1;
+
+        boolean isRange = false;
+        if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
+            try {
+                String rangeVal = rangeHeader.substring(6).trim();
+                String[] parts = rangeVal.split("-");
+                if (!parts[0].isEmpty()) {
+                    start = Long.parseLong(parts[0]);
+                }
+                if (parts.length > 1 && !parts[1].isEmpty()) {
+                    end = Long.parseLong(parts[1]);
+                }
+                if (end >= fileLength) {
+                    end = fileLength - 1;
+                }
+                if (start <= end && start >= 0) {
+                    isRange = true;
+                }
+            } catch (Exception ignored) {
+                start = 0;
+                end = fileLength - 1;
+                isRange = false;
+            }
         }
-        String contentType;
-        String filenameLower = file.getName().toLowerCase();
-        if (filenameLower.endsWith(".mkv") || filenameLower.contains(".mkv.")) {
-            contentType = "video/x-matroska";
-        } else {
-            contentType = getCustomMimeType(targetPath, request);
+
+        long contentLength = end - start + 1;
+
+        String contentType = getCustomMimeType(targetPath, request);
+        if (contentType == null || contentType.isEmpty()) {
+            contentType = "application/octet-stream";
         }
+
         org.springframework.http.ContentDisposition contentDisposition = org.springframework.http.ContentDisposition.attachment()
                 .filename(file.getName(), java.nio.charset.StandardCharsets.UTF_8)
                 .build();
-        return ResponseEntity.ok()
-                .headers(headers -> headers.setContentDisposition(contentDisposition))
-                .header(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*")
-                .contentLength(file.length())
-                .contentType(MediaType.parseMediaType(contentType))
-                .body(resource);
+
+        response.setHeader(HttpHeaders.ACCEPT_RANGES, "bytes");
+        response.setHeader(HttpHeaders.CONTENT_DISPOSITION, contentDisposition.toString());
+        response.setHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*");
+        response.setHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, "*");
+        response.setContentType(contentType);
+
+        if (isRange) {
+            response.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT);
+            response.setHeader(HttpHeaders.CONTENT_RANGE, "bytes " + start + "-" + end + "/" + fileLength);
+        } else {
+            response.setStatus(HttpServletResponse.SC_OK);
+        }
+        response.setHeader(HttpHeaders.CONTENT_LENGTH, String.valueOf(contentLength));
+
+        // Bandwidth limiter check
+        long maxBytesPerSec = -1;
+        if (user != null && user.getDownloadBandwidthLimit() != null && user.getDownloadBandwidthLimit() > 0) {
+            maxBytesPerSec = (long) (user.getDownloadBandwidthLimit() * 1024 * 1024);
+        }
+
+        try (RandomAccessFile raf = new RandomAccessFile(file, "r");
+             OutputStream os = new BufferedOutputStream(response.getOutputStream(), 131072)) {
+            raf.seek(start);
+            byte[] buffer = new byte[131072]; // 128KB buffer
+            long remaining = contentLength;
+            long bytesSentThisSecond = 0;
+            long secondStart = System.currentTimeMillis();
+
+            while (remaining > 0) {
+                int readLen = (int) Math.min(buffer.length, remaining);
+                int bytesRead = raf.read(buffer, 0, readLen);
+                if (bytesRead == -1) break;
+                os.write(buffer, 0, bytesRead);
+                remaining -= bytesRead;
+
+                if (maxBytesPerSec > 0) {
+                    bytesSentThisSecond += bytesRead;
+                    if (bytesSentThisSecond >= maxBytesPerSec) {
+                        long elapsed = System.currentTimeMillis() - secondStart;
+                        if (elapsed < 1000) {
+                            try {
+                                Thread.sleep(1000 - elapsed);
+                            } catch (InterruptedException ignored) {}
+                        }
+                        bytesSentThisSecond = 0;
+                        secondStart = System.currentTimeMillis();
+                    }
+                }
+            }
+            os.flush();
+        } catch (Exception e) {
+            // Client paused, cancelled download, or socket closed - normal and handled cleanly
+        }
     }
 
     private String getCustomMimeType(String filePath, HttpServletRequest request) {
@@ -304,7 +380,7 @@ public class FileController {
                     HttpRange range = ranges.get(0);
                     long start = range.getRangeStart(fileLength);
                     long end = range.getRangeEnd(fileLength);
-                    long rangeLength = Math.min(1024 * 1024 * 5, end - start + 1); // 5MB chunk for smooth streaming & seeking
+                    long rangeLength = Math.min(1024 * 1024 * 32, end - start + 1); // 32MB chunk for seamless high-bitrate video buffering
 
                     ResourceRegion region = new ResourceRegion(resource, start, rangeLength);
 
@@ -312,6 +388,7 @@ public class FileController {
                             .header(HttpHeaders.ACCEPT_RANGES, "bytes")
                             .header(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*")
                             .header(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, "*")
+                            .header(HttpHeaders.CACHE_CONTROL, "no-transform, public, max-age=3600")
                             .contentType(MediaType.parseMediaType(contentType))
                             .body(region);
                 }
