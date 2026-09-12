@@ -278,6 +278,7 @@ function initApp() {
 
   // Bind Mobile Bottom Navigation
   safeAddListener('mobile-nav-explorer', 'click', () => switchPanel('explorer'));
+  safeAddListener('mobile-nav-shares', 'click', openManageSharesModal);
   safeAddListener('mobile-nav-users', 'click', () => switchPanel('users'));
   safeAddListener('mobile-nav-server', 'click', () => switchPanel('server'));
   safeAddListener('mobile-nav-recycle-bin', 'click', () => switchPanel('recycle-bin'));
@@ -1175,7 +1176,7 @@ function renderFiles(files) {
         </button>
       </div>
       <button type="button" class="btn-mobile-more" onclick="event.stopPropagation(); openMobileActionSheet(event, '${filePath.replace(/'/g, "\\'")}', '${file.name.replace(/'/g, "\\'")}', '${category}', ${file.isFile}, '${formattedSize}', '${formattedDate}')" title="More options" aria-label="More options">
-        <i data-lucide="more-vertical"></i>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="5" r="2.2"></circle><circle cx="12" cy="12" r="2.2"></circle><circle cx="12" cy="19" r="2.2"></circle></svg>
       </button>
     `;
 

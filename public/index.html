@@ -11,7 +11,7 @@
   <!-- Lucide Icons Local -->
   <script src="/lucide.min.js?v=0.453"></script>
   <script src="/chart.min.js"></script>
-  <link rel="stylesheet" href="/style.css?v=8.00">
+  <link rel="stylesheet" href="/style.css?v=9.00">
   <link rel="icon" type="image/jpeg" href="/favicon.jpg">
 </head>
 <body>
@@ -119,9 +119,6 @@
     <main class="main-content">
       <!-- TOP BAR -->
       <header class="topbar">
-        <button type="button" class="btn-mobile-menu" id="btn-mobile-menu" aria-label="Open navigation menu" onclick="openMobileDrawer()" title="Open Navigation Menu">
-          <i data-lucide="menu"></i>
-        </button>
         <div class="search-bar">
           <i data-lucide="search" id="search-icon"></i>
           <input type="text" id="search-input" placeholder="Search files & folders everywhere..." autocomplete="off">
@@ -193,21 +190,25 @@
                 <!-- Dynamic roots populated here -->
               </div>
 
-              <div class="breadcrumb-separator" id="breadcrumb-root-separator" style="display: none;">
-                <i data-lucide="chevron-right"></i>
-              </div>
+              <div class="breadcrumb-subrow" id="breadcrumb-subrow">
+                <div class="breadcrumb-scroll-wrap">
+                  <div class="breadcrumb-separator" id="breadcrumb-root-separator" style="display: none;">
+                    <i data-lucide="chevron-right"></i>
+                  </div>
 
-              <!-- Breadcrumbs -->
-              <div class="breadcrumbs" id="breadcrumbs-container">
-                <!-- Dynamic breadcrumbs -->
-              </div>
-            </div>
+                  <!-- Breadcrumbs -->
+                  <div class="breadcrumbs" id="breadcrumbs-container">
+                    <!-- Dynamic breadcrumbs -->
+                  </div>
+                </div>
 
-            <!-- Open Folder Size -->
-            <div id="open-folder-size" class="open-folder-size-badge">
-              <i data-lucide="info" style="width: 14px; height: 14px; color: var(--accent);"></i>
-              <span style="font-weight: 500;">Size:</span>
-              <span id="open-folder-size-value" style="color: var(--text-primary); font-weight: 600;">Calculating...</span>
+                <!-- Open Folder Size -->
+                <div id="open-folder-size" class="open-folder-size-badge">
+                  <i data-lucide="info" style="width: 13px; height: 13px; color: var(--accent);"></i>
+                  <span style="font-weight: 500;">Size:</span>
+                  <span id="open-folder-size-value" style="color: var(--text-primary); font-weight: 600;">Calculating...</span>
+                </div>
+              </div>
             </div>
 
             <!-- Explorer Controls -->
@@ -1352,6 +1353,10 @@
       <i data-lucide="folder"></i>
       <span>Files</span>
     </button>
+    <button class="mobile-nav-item" id="mobile-nav-shares" onclick="openManageSharesModal()">
+      <i data-lucide="share-2"></i>
+      <span>Shares</span>
+    </button>
     <button class="mobile-nav-item admin-only" id="mobile-nav-users">
       <i data-lucide="users"></i>
       <span>Users</span>
@@ -1695,6 +1700,6 @@
     </div>
   </div>
 
-  <script src="/app-v4.js?v=8.00"></script>
+  <script src="/app-v4.js?v=9.00"></script>
 </body>
 </html>
