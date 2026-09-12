@@ -581,6 +581,12 @@ function initApp() {
   safeAddListener('copy-move-drive-select', 'change', (e) => {
     loadCopyMoveDirectory(e.target.value);
   });
+
+  // Mobile drawer & gesture setup
+  safeAddListener('btn-mobile-menu', 'click', openMobileDrawer);
+  safeAddListener('btn-close-sidebar', 'click', closeMobileDrawer);
+  safeAddListener('sidebar-backdrop', 'click', closeMobileDrawer);
+  setupMobileGestures();
 }
 
 // AUTHENTICATION FLOWS
@@ -1168,12 +1174,31 @@ function renderFiles(files) {
           <i data-lucide="trash-2"></i>
         </button>
       </div>
+      <button type="button" class="btn-mobile-more" onclick="event.stopPropagation(); openMobileActionSheet(event, '${filePath.replace(/'/g, "\\'")}', '${file.name.replace(/'/g, "\\'")}', '${category}', ${file.isFile}, '${formattedSize}', '${formattedDate}')" title="More options" aria-label="More options">
+        <i data-lucide="more-vertical"></i>
+      </button>
     `;
+
+    // Mobile touch feedback & long-press to toggle selection
+    let touchTimer = null;
+    card.addEventListener('touchstart', (e) => {
+      if (e.target.closest('.btn-card-action') || e.target.closest('.file-checkbox-wrapper') || e.target.closest('.btn-mobile-more')) return;
+      touchTimer = setTimeout(() => {
+        toggleCardSelection(filePath, !state.selectedPaths.has(filePath));
+        if (navigator.vibrate) navigator.vibrate(35);
+      }, 480);
+    }, { passive: true });
+    card.addEventListener('touchend', () => {
+      if (touchTimer) clearTimeout(touchTimer);
+    });
+    card.addEventListener('touchmove', () => {
+      if (touchTimer) clearTimeout(touchTimer);
+    });
 
     // Click handler: Double-click / Click to open
     card.addEventListener('click', (e) => {
-      // Prevent action button click or checkbox click from triggering card click
-      if (e.target.closest('.btn-card-action') || e.target.closest('.file-checkbox-wrapper')) return;
+      // Prevent action button click, checkbox click, or mobile more click from opening card
+      if (e.target.closest('.btn-card-action') || e.target.closest('.file-checkbox-wrapper') || e.target.closest('.btn-mobile-more')) return;
       
       if (e.ctrlKey || e.metaKey) {
         toggleCardSelection(filePath, !state.selectedPaths.has(filePath));
@@ -1393,6 +1418,174 @@ window.executeGlobalSearch = executeGlobalSearch;
 window.renderSearchResults = renderSearchResults;
 window.clearGlobalSearch = clearGlobalSearch;
 window.filterFiles = filterFiles;
+
+// ==========================================
+// MOBILE DRAWER & ACTION SHEET HANDLERS
+// ==========================================
+
+function openMobileDrawer() {
+  const sidebar = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebar-backdrop');
+  if (sidebar) sidebar.classList.add('mobile-open');
+  if (backdrop) backdrop.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeMobileDrawer() {
+  const sidebar = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebar-backdrop');
+  if (sidebar) sidebar.classList.remove('mobile-open');
+  if (backdrop) backdrop.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+function openMobileActionSheet(event, filePath, fileName, category, isFile, formattedSize, formattedDate) {
+  if (event && event.stopPropagation) event.stopPropagation();
+
+  const nameEl = document.getElementById('sheet-file-name');
+  const metaEl = document.getElementById('sheet-file-meta');
+  const iconEl = document.getElementById('sheet-file-icon');
+  const downloadTextEl = document.getElementById('sheet-act-download-text');
+  const backdrop = document.getElementById('mobile-action-sheet-backdrop');
+
+  if (nameEl) nameEl.textContent = fileName;
+  if (metaEl) metaEl.textContent = `${isFile ? formattedSize : 'Folder'} • ${formattedDate}`;
+  if (downloadTextEl) downloadTextEl.textContent = isFile ? 'Download File' : 'Download Folder as ZIP';
+
+  if (iconEl) {
+    let iconName = 'file-text';
+    if (!isFile) iconName = 'folder';
+    else if (category === 'video') iconName = 'video';
+    else if (category === 'image') iconName = 'image';
+    else if (category === 'audio') iconName = 'music';
+    else if (category === 'archive') iconName = 'archive';
+    iconEl.innerHTML = `<i data-lucide="${iconName}"></i>`;
+  }
+
+  // Bind Actions
+  const btnDownload = document.getElementById('sheet-act-download');
+  if (btnDownload) {
+    btnDownload.onclick = (e) => {
+      closeMobileActionSheet();
+      if (isFile) {
+        handleDownloadFile(e, filePath);
+      } else {
+        handleDownloadFolder(e, filePath);
+      }
+    };
+  }
+
+  const btnShare = document.getElementById('sheet-act-share');
+  if (btnShare) {
+    btnShare.onclick = (e) => {
+      closeMobileActionSheet();
+      handleShareFile(e, filePath);
+    };
+  }
+
+  const btnCopy = document.getElementById('sheet-act-copy');
+  if (btnCopy) {
+    btnCopy.onclick = (e) => {
+      closeMobileActionSheet();
+      handleCopySingle(e, filePath);
+    };
+  }
+
+  const btnMove = document.getElementById('sheet-act-move');
+  if (btnMove) {
+    btnMove.onclick = (e) => {
+      closeMobileActionSheet();
+      handleMoveSingle(e, filePath);
+    };
+  }
+
+  const btnRename = document.getElementById('sheet-act-rename');
+  if (btnRename) {
+    btnRename.onclick = (e) => {
+      closeMobileActionSheet();
+      handleRenameFile(e, filePath, fileName);
+    };
+  }
+
+  const btnDelete = document.getElementById('sheet-act-delete');
+  if (btnDelete) {
+    btnDelete.onclick = (e) => {
+      closeMobileActionSheet();
+      handleDeleteFile(e, filePath);
+    };
+  }
+
+  if (backdrop) {
+    backdrop.classList.add('active');
+  }
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function closeMobileActionSheet() {
+  const backdrop = document.getElementById('mobile-action-sheet-backdrop');
+  if (backdrop) {
+    backdrop.classList.remove('active');
+  }
+}
+
+// Touch swipe navigation for Image Viewer modal
+let touchStartX = 0;
+let touchStartY = 0;
+let touchEndX = 0;
+let touchEndY = 0;
+
+function setupMobileGestures() {
+  const imgViewer = document.getElementById('modal-image-viewer');
+  if (imgViewer) {
+    imgViewer.addEventListener('touchstart', (e) => {
+      if (!e.touches || e.touches.length === 0) return;
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    imgViewer.addEventListener('touchend', (e) => {
+      if (!e.changedTouches || e.changedTouches.length === 0) return;
+      touchEndX = e.changedTouches[0].clientX;
+      touchEndY = e.changedTouches[0].clientY;
+      handleImageSwipe();
+    }, { passive: true });
+  }
+
+  // Also close mobile drawer when any navigation item is clicked
+  const navItems = document.querySelectorAll('.sidebar-nav .nav-item');
+  navItems.forEach(item => {
+    item.addEventListener('click', () => {
+      closeMobileDrawer();
+    });
+  });
+}
+
+function handleImageSwipe() {
+  const diffX = touchEndX - touchStartX;
+  const diffY = touchEndY - touchStartY;
+  const absX = Math.abs(diffX);
+  const absY = Math.abs(diffY);
+
+  // Horizontal swipe (next / prev image)
+  if (absX > 50 && absX > absY * 1.5) {
+    if (diffX < 0) {
+      // Swipe left -> next image
+      navigateMedia(1);
+    } else {
+      // Swipe right -> prev image
+      navigateMedia(-1);
+    }
+  } else if (diffY > 120 && absY > absX * 1.8) {
+    // Swipe down -> dismiss image viewer
+    closeModal('modal-image-viewer');
+  }
+}
+
+window.openMobileDrawer = openMobileDrawer;
+window.closeMobileDrawer = closeMobileDrawer;
+window.openMobileActionSheet = openMobileActionSheet;
+window.closeMobileActionSheet = closeMobileActionSheet;
 
 // MEDIA HANDLERS & NAVIGATION
 function updateMediaNavUI() {

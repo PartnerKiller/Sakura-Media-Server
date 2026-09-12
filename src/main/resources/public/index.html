@@ -11,7 +11,7 @@
   <!-- Lucide Icons Local -->
   <script src="/lucide.min.js?v=0.453"></script>
   <script src="/chart.min.js"></script>
-  <link rel="stylesheet" href="/style.css?v=7.00">
+  <link rel="stylesheet" href="/style.css?v=8.00">
   <link rel="icon" type="image/jpeg" href="/favicon.jpg">
 </head>
 <body>
@@ -61,10 +61,15 @@
   <!-- DASHBOARD CONTAINER -->
   <div id="dashboard-container" class="page-container">
     <!-- SIDEBAR -->
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
-        <img src="/favicon.jpg" class="logo" alt="Sakura Logo">
-        <h2>Sakura Media</h2>
+        <div class="sidebar-brand">
+          <img src="/favicon.jpg" class="logo" alt="Sakura Logo">
+          <h2>Sakura Media</h2>
+        </div>
+        <button type="button" class="btn-close-sidebar" id="btn-close-sidebar" aria-label="Close menu" onclick="closeMobileDrawer()">
+          <i data-lucide="x"></i>
+        </button>
       </div>
       <nav class="sidebar-nav">
         <button class="nav-item active" id="nav-explorer">
@@ -107,10 +112,16 @@
       </div>
     </aside>
 
+    <!-- MOBILE SIDEBAR BACKDROP OVERLAY -->
+    <div id="sidebar-backdrop" class="sidebar-backdrop" onclick="closeMobileDrawer()"></div>
+
     <!-- MAIN CONTENT -->
     <main class="main-content">
       <!-- TOP BAR -->
       <header class="topbar">
+        <button type="button" class="btn-mobile-menu" id="btn-mobile-menu" aria-label="Open navigation menu" onclick="openMobileDrawer()" title="Open Navigation Menu">
+          <i data-lucide="menu"></i>
+        </button>
         <div class="search-bar">
           <i data-lucide="search" id="search-icon"></i>
           <input type="text" id="search-input" placeholder="Search files & folders everywhere..." autocomplete="off">
@@ -1640,6 +1651,50 @@
     </div>
   </div>
 
-  <script src="/app-v4.js?v=5.00"></script>
+  <!-- MOBILE ACTION SHEET (Native slide-up menu for touch devices) -->
+  <div class="mobile-sheet-backdrop" id="mobile-action-sheet-backdrop" onclick="closeMobileActionSheet()">
+    <div class="mobile-action-sheet" id="mobile-action-sheet" onclick="event.stopPropagation()">
+      <div class="sheet-handle-bar"><div class="sheet-handle"></div></div>
+      <div class="sheet-header">
+        <div class="sheet-file-icon" id="sheet-file-icon"><i data-lucide="file"></i></div>
+        <div class="sheet-file-info">
+          <div class="sheet-file-name" id="sheet-file-name">File Name</div>
+          <div class="sheet-file-meta" id="sheet-file-meta">Size &bull; Date</div>
+        </div>
+        <button type="button" class="sheet-close-btn" onclick="closeMobileActionSheet()" aria-label="Close">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="sheet-actions-list">
+        <button type="button" class="sheet-action-item" id="sheet-act-download">
+          <i data-lucide="download"></i>
+          <span id="sheet-act-download-text">Download</span>
+        </button>
+        <button type="button" class="sheet-action-item" id="sheet-act-share">
+          <i data-lucide="share-2"></i>
+          <span>Share Direct Link</span>
+        </button>
+        <button type="button" class="sheet-action-item" id="sheet-act-copy">
+          <i data-lucide="copy"></i>
+          <span>Copy</span>
+        </button>
+        <button type="button" class="sheet-action-item" id="sheet-act-move">
+          <i data-lucide="folder-input"></i>
+          <span>Move</span>
+        </button>
+        <button type="button" class="sheet-action-item" id="sheet-act-rename">
+          <i data-lucide="edit-3"></i>
+          <span>Rename</span>
+        </button>
+        <div class="sheet-divider"></div>
+        <button type="button" class="sheet-action-item text-danger" id="sheet-act-delete">
+          <i data-lucide="trash-2"></i>
+          <span>Delete</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app-v4.js?v=8.00"></script>
 </body>
 </html>
