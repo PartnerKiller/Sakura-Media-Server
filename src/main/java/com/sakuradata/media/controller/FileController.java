@@ -199,6 +199,131 @@ public class FileController {
         ));
     }
 
+    @GetMapping("/search")
+    public ResponseEntity<?> search(
+            HttpServletRequest request,
+            @RequestParam(value = "q", required = false) String query,
+            @RequestParam(value = "root", required = false) String rootParam,
+            @RequestParam(value = "scope", defaultValue = "all") String scope
+    ) {
+        User user = (User) request.getAttribute("user");
+        if (query == null || query.trim().isEmpty()) {
+            return ResponseEntity.ok(Map.of("query", "", "count", 0, "results", Collections.emptyList()));
+        }
+
+        String trimmedQuery = query.trim().toLowerCase();
+        List<Map<String, Object>> authorizedRoots = getAuthorizedRoots(user);
+        List<Path> targetRoots = new ArrayList<>();
+
+        // If a specific root was requested and scope is not all
+        if (rootParam != null && !rootParam.trim().isEmpty() && !"all".equalsIgnoreCase(scope)) {
+            String resolvedRoot = resolvePath(rootParam);
+            if (resolvedRoot != null && hasPermission(user, resolvedRoot, "read")) {
+                targetRoots.add(Paths.get(resolvedRoot));
+            }
+        }
+
+        // Default: search all authorized roots
+        if (targetRoots.isEmpty()) {
+            for (Map<String, Object> r : authorizedRoots) {
+                String p = (String) r.get("path");
+                if (p != null) {
+                    targetRoots.add(Paths.get(p));
+                }
+            }
+        }
+
+        List<Map<String, Object>> matches = new ArrayList<>();
+        final int MAX_RESULTS = 250;
+
+        for (Path rootPath : targetRoots) {
+            if (!Files.exists(rootPath) || !Files.isDirectory(rootPath)) {
+                continue;
+            }
+
+            try {
+                Files.walkFileTree(rootPath, EnumSet.noneOf(FileVisitOption.class), 12, new SimpleFileVisitor<Path>() {
+                    @Override
+                    public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+                        String dirName = dir.getFileName() != null ? dir.getFileName().toString() : "";
+                        // Prune noisy/system/hidden folders
+                        if (dirName.startsWith(".") || dirName.equals(".recycle-bin") ||
+                            dirName.equalsIgnoreCase("node_modules") || dirName.equalsIgnoreCase("venv") ||
+                            dirName.equalsIgnoreCase(".git") || dirName.equalsIgnoreCase(".cache")) {
+                            return FileVisitResult.SKIP_SUBTREE;
+                        }
+
+                        // Check if folder name matches query
+                        if (!dir.equals(rootPath) && dirName.toLowerCase().contains(trimmedQuery)) {
+                            Map<String, Object> item = new HashMap<>();
+                            item.put("name", dirName);
+                            item.put("path", dir.toAbsolutePath().normalize().toString().replace("\\", "/"));
+                            item.put("parentPath", dir.getParent() != null ? dir.getParent().toAbsolutePath().normalize().toString().replace("\\", "/") : "");
+                            item.put("isFile", false);
+                            item.put("size", 0L);
+                            item.put("mtime", attrs.lastModifiedTime().toMillis());
+                            matches.add(item);
+
+                            if (matches.size() >= MAX_RESULTS) {
+                                return FileVisitResult.TERMINATE;
+                            }
+                        }
+                        return FileVisitResult.CONTINUE;
+                    }
+
+                    @Override
+                    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                        String fileName = file.getFileName().toString();
+                        if (fileName.startsWith(".")) {
+                            return FileVisitResult.CONTINUE;
+                        }
+
+                        if (fileName.toLowerCase().contains(trimmedQuery)) {
+                            Map<String, Object> item = new HashMap<>();
+                            item.put("name", fileName);
+                            item.put("path", file.toAbsolutePath().normalize().toString().replace("\\", "/"));
+                            item.put("parentPath", file.getParent() != null ? file.getParent().toAbsolutePath().normalize().toString().replace("\\", "/") : "");
+                            item.put("isFile", attrs.isRegularFile());
+                            item.put("size", attrs.size());
+                            item.put("mtime", attrs.lastModifiedTime().toMillis());
+                            matches.add(item);
+
+                            if (matches.size() >= MAX_RESULTS) {
+                                return FileVisitResult.TERMINATE;
+                            }
+                        }
+                        return FileVisitResult.CONTINUE;
+                    }
+
+                    @Override
+                    public FileVisitResult visitFileFailed(Path file, IOException exc) {
+                        return FileVisitResult.CONTINUE;
+                    }
+                });
+            } catch (Exception ignored) {}
+
+            if (matches.size() >= MAX_RESULTS) {
+                break;
+            }
+        }
+
+        // Sort: folders first, then files alphabetically
+        matches.sort((a, b) -> {
+            boolean aIsFile = (boolean) a.get("isFile");
+            boolean bIsFile = (boolean) b.get("isFile");
+            if (aIsFile != bIsFile) {
+                return aIsFile ? 1 : -1;
+            }
+            return ((String) a.get("name")).compareToIgnoreCase((String) b.get("name"));
+        });
+
+        return ResponseEntity.ok(Map.of(
+                "query", query,
+                "count", matches.size(),
+                "results", matches
+        ));
+    }
+
     @GetMapping("/download")
     public void download(HttpServletRequest request, 
                          HttpServletResponse response, 

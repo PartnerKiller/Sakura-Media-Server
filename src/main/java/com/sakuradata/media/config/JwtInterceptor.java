@@ -54,6 +54,8 @@ public class JwtInterceptor implements HandlerInterceptor {
             path.startsWith("/api/users/avatar/") ||
             ((path.equals("/api/theme") || path.equals("/api/ui-style")) && "GET".equalsIgnoreCase(request.getMethod())) || 
             path.startsWith("/h2-console") || 
+            path.startsWith("/d/") || 
+            path.startsWith("/api/public/") || 
             !path.startsWith("/api/")) {
             return true;
         }

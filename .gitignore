@@ -20,3 +20,10 @@ temp-chunks/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Backups and rollback scripts
+backup_classic_ui/
+revert_to_classic_ui.bat
+revert_to_classic_ui.sh
+*.bak
+*.jar

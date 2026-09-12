@@ -11,7 +11,7 @@
   <!-- Lucide Icons Local -->
   <script src="/lucide.min.js?v=0.453"></script>
   <script src="/chart.min.js"></script>
-  <link rel="stylesheet" href="/style.css?v=6.80">
+  <link rel="stylesheet" href="/style.css?v=7.00">
   <link rel="icon" type="image/jpeg" href="/favicon.jpg">
 </head>
 <body>
@@ -83,6 +83,10 @@
           <i data-lucide="trash-2"></i>
           <span>Recycle Bin</span>
         </button>
+        <button class="nav-item" id="nav-shares" onclick="openManageSharesModal()">
+          <i data-lucide="share-2"></i>
+          <span>Shared Links</span>
+        </button>
         <button class="nav-item user-only" id="nav-profile">
           <i data-lucide="user"></i>
           <span>Profile Settings</span>
@@ -108,33 +112,59 @@
       <!-- TOP BAR -->
       <header class="topbar">
         <div class="search-bar">
-          <i data-lucide="search"></i>
-          <input type="text" id="search-input" placeholder="Search files in current folder...">
+          <i data-lucide="search" id="search-icon"></i>
+          <input type="text" id="search-input" placeholder="Search files & folders everywhere..." autocomplete="off">
+          <button type="button" id="btn-clear-search" class="btn-clear-search" title="Clear Search" style="display: none;" onclick="clearGlobalSearch()">
+            <i data-lucide="x"></i>
+          </button>
         </div>
         <div class="topbar-actions" id="explorer-actions">
           <button id="btn-paste" class="btn-primary" style="display: none;" title="Paste copied/cut items into this folder">
             <i data-lucide="clipboard-paste"></i>
             <span id="btn-paste-label">Paste (0)</span>
           </button>
-          <button id="btn-refresh-explorer" class="btn-secondary" title="Refresh folder">
+          <button id="btn-refresh-explorer" class="btn-secondary btn-icon-only" title="Refresh folder">
             <i data-lucide="refresh-cw"></i>
           </button>
-          <button id="btn-new-folder" class="btn-secondary">
-            <i data-lucide="folder-plus"></i>
-            <span>New Folder</span>
+
+          <!-- Consolidated + New / Upload Dropdown Button -->
+          <div class="dropdown" id="dropdown-new-actions">
+            <button type="button" id="btn-new-upload-hub" class="btn-primary btn-new-upload-hub" title="Create or Upload">
+              <i data-lucide="plus"></i>
+              <span>New / Upload</span>
+              <i data-lucide="chevron-down" class="dropdown-chevron"></i>
+            </button>
+            <div class="dropdown-menu" id="menu-new-actions">
+              <button type="button" class="dropdown-item" id="menu-item-new-folder">
+                <i data-lucide="folder-plus"></i>
+                <span>New Folder</span>
+              </button>
+              <button type="button" class="dropdown-item" id="menu-item-upload-file">
+                <i data-lucide="upload"></i>
+                <span>Upload File</span>
+              </button>
+              <button type="button" class="dropdown-item" id="menu-item-upload-folder">
+                <i data-lucide="folder-up"></i>
+                <span>Upload Folder</span>
+              </button>
+              <div class="dropdown-divider"></div>
+              <button type="button" class="dropdown-item" id="menu-item-import-url">
+                <i data-lucide="link"></i>
+                <span>Import Link</span>
+              </button>
+            </div>
+          </div>
+
+          <button id="btn-manage-shares-trigger" class="btn-secondary" title="View active shared direct download links" onclick="openManageSharesModal()">
+            <i data-lucide="share-2"></i>
+            <span>Shared Links</span>
           </button>
-          <button id="btn-upload-trigger" class="btn-secondary">
-            <i data-lucide="upload"></i>
-            <span>Upload File</span>
-          </button>
-          <button id="btn-upload-folder-trigger" class="btn-secondary">
-            <i data-lucide="folder-up"></i>
-            <span>Upload Folder</span>
-          </button>
-          <button id="btn-import-url-trigger" class="btn-primary" title="Import / Download files from Google Drive or links directly to this folder">
-            <i data-lucide="link"></i>
-            <span>Import Link</span>
-          </button>
+
+          <!-- Legacy buttons hidden to preserve all listeners & triggers -->
+          <button id="btn-new-folder" class="btn-secondary" style="display: none;"></button>
+          <button id="btn-upload-trigger" class="btn-secondary" style="display: none;"></button>
+          <button id="btn-upload-folder-trigger" class="btn-secondary" style="display: none;"></button>
+          <button id="btn-import-url-trigger" class="btn-primary" style="display: none;"></button>
           <input type="file" id="file-input" multiple style="display: none;">
           <input type="file" id="folder-input" webkitdirectory directory multiple style="display: none;">
         </div>
@@ -206,6 +236,10 @@
                   <button id="btn-batch-move" class="btn-batch" title="Move selected items" style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; height: 28px; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 16px; color: #ffffff; font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap;">
                     <i data-lucide="folder-input" style="width: 13px; height: 13px;"></i>
                     <span>Move</span>
+                  </button>
+                  <button id="btn-batch-share" class="btn-batch" onclick="handleBatchShare(event)" title="Share Direct Download Link: create a 1-click download link for selected item" style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; height: 28px; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 16px; color: #38bdf8; font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap;">
+                    <i data-lucide="share-2" style="width: 13px; height: 13px;"></i>
+                    <span>Share Link</span>
                   </button>
                   <button id="btn-batch-download-direct" class="btn-batch btn-batch-download" onclick="handleBatchDownloadDirect(event)" title="Direct Download: download all selected files directly" style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; height: 28px; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 16px; color: #38bdf8; font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap;">
                     <i data-lucide="download" style="width: 13px; height: 13px;"></i>
@@ -305,6 +339,18 @@
           </div>
 
 
+
+          <!-- Search Results Banner -->
+          <div id="search-results-banner" class="search-results-banner" style="display: none;">
+            <div class="search-banner-left">
+              <i data-lucide="search"></i>
+              <span>Results for "<strong id="search-query-display"></strong>" &bull; <span id="search-count-display">0</span> items found across all drives</span>
+            </div>
+            <button type="button" id="btn-exit-search" class="btn-exit-search" onclick="clearGlobalSearch()">
+              <i data-lucide="x"></i>
+              <span>Exit Search</span>
+            </button>
+          </div>
 
           <!-- Grid of items -->
           <div class="files-grid" id="files-grid-container">
@@ -1232,6 +1278,10 @@
             <i data-lucide="download" style="width: 16px; height: 16px;"></i>
             <span>Download</span>
           </a>
+          <button id="btn-share-video-link" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px;" title="Share Direct Download Link">
+            <i data-lucide="share-2" style="width: 16px; height: 16px;"></i>
+            <span>Share Link</span>
+          </button>
           <a id="btn-stream-vlc-m3u" href="#" class="btn btn-primary" style="display: flex; align-items: center; gap: 6px;">
             <i data-lucide="play-circle" style="width: 16px; height: 16px;"></i>
             <span>Stream in VLC (M3U)</span>
@@ -1271,10 +1321,16 @@
             <i data-lucide="chevron-right" style="width: 15px; height: 15px;"></i>
           </button>
         </div>
-        <a id="btn-download-image" href="#" class="btn btn-primary" download style="display: flex; align-items: center; gap: 6px;">
-          <i data-lucide="download" style="width: 16px; height: 16px;"></i>
-          <span>Download</span>
-        </a>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button id="btn-share-image-link" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px;" title="Share Direct Download Link">
+            <i data-lucide="share-2" style="width: 16px; height: 16px;"></i>
+            <span>Share Link</span>
+          </button>
+          <a id="btn-download-image" href="#" class="btn btn-primary" download style="display: flex; align-items: center; gap: 6px;">
+            <i data-lucide="download" style="width: 16px; height: 16px;"></i>
+            <span>Download</span>
+          </a>
+        </div>
       </div>
     </div>
   </div>
@@ -1492,6 +1548,98 @@
     </div>
   </div>
 
-  <script src="/app-v4.js?v=4.41"></script>
+  <!-- DIRECT DOWNLOAD SHARE MODAL -->
+  <div class="modal-backdrop" id="modal-share-link" style="z-index: 1100;">
+    <div class="modal" style="max-width: 480px; width: 92%;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="share-2" style="color: var(--primary); width: 20px; height: 20px;"></i>
+          <h3 id="share-modal-title" style="margin: 0; font-size: 16px; font-weight: 600;">Direct Download Link</h3>
+        </div>
+        <button class="btn-close-modal" onclick="closeModal('modal-share-link')">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 16px;">
+        <!-- File preview card -->
+        <div style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: rgba(255,255,255,0.04); border: 1px solid var(--border-subtle); border-radius: 12px;">
+          <div id="share-file-icon" style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px; background: rgba(236,72,153,0.12); color: var(--primary); flex-shrink: 0;">
+            <i data-lucide="file" style="width: 22px; height: 22px;"></i>
+          </div>
+          <div style="overflow: hidden; flex: 1;">
+            <div id="share-file-name" style="font-weight: 600; font-size: 14px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">filename.ext</div>
+            <div id="share-file-meta" style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">0 MB</div>
+          </div>
+        </div>
+
+        <!-- 1-Click direct info banner -->
+        <div style="display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; background: rgba(56,189,248,0.08); border: 1px solid rgba(56,189,248,0.25); border-radius: 10px; font-size: 12.5px; color: #7dd3fc; line-height: 1.4;">
+          <i data-lucide="zap" style="width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; color: #38bdf8;"></i>
+          <span><strong>1-Click Instant Download:</strong> Anyone who opens this link will download the file directly in 1 click. No login or extra steps required.</span>
+        </div>
+
+        <!-- Direct Download Link Input with Copy Button -->
+        <div>
+          <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Direct Download URL</label>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="share-link-input" readonly style="flex: 1; padding: 9px 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-main); font-size: 13px; font-family: monospace; outline: none;" onclick="this.select();">
+            <button id="btn-copy-share-url" class="btn btn-primary" style="display: flex; align-items: center; gap: 6px; padding: 0 16px; flex-shrink: 0;" onclick="copyShareLink()">
+              <i data-lucide="copy" style="width: 15px; height: 15px;"></i>
+              <span id="btn-copy-share-text">Copy</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Expiration options -->
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+          <div>
+            <label style="font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 4px;">Link Expiration</label>
+            <select id="share-expiry-select" onchange="updateShareExpiration()" style="padding: 7px 10px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-main); font-size: 12.5px; outline: none; cursor: pointer;">
+              <option value="never">Never expires</option>
+              <option value="1h">Expires in 1 hour</option>
+              <option value="24h">Expires in 24 hours</option>
+              <option value="7d">Expires in 7 days</option>
+              <option value="30d">Expires in 30 days</option>
+            </select>
+          </div>
+          <div id="share-stats-badge" style="font-size: 12px; color: var(--text-secondary); background: rgba(255,255,255,0.06); padding: 5px 10px; border-radius: 8px; border: 1px solid var(--border-subtle);">
+            0 downloads
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-subtle);">
+        <button type="button" class="btn btn-secondary" onclick="openManageSharesModal()" style="display: flex; align-items: center; gap: 6px; font-size: 12px;">
+          <i data-lucide="list" style="width: 14px; height: 14px;"></i>
+          <span>My Shared Links</span>
+        </button>
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-share-link')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MANAGE SHARED LINKS MODAL -->
+  <div class="modal-backdrop" id="modal-manage-shares" style="z-index: 1100;">
+    <div class="modal modal-lg" style="max-width: 720px; width: 94%;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="share-2" style="color: var(--primary); width: 20px; height: 20px;"></i>
+          <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Active Shared Direct Links</h3>
+        </div>
+        <button class="btn-close-modal" onclick="closeModal('modal-manage-shares')">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body" style="padding: 16px 20px; max-height: 480px; overflow-y: auto;">
+        <div id="manage-shares-list" style="display: flex; flex-direction: column; gap: 8px;">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+      <div class="modal-footer" style="padding: 12px 20px; display: flex; justify-content: flex-end; border-top: 1px solid var(--border-subtle);">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-manage-shares')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app-v4.js?v=5.00"></script>
 </body>
 </html>

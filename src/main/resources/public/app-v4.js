@@ -43,7 +43,9 @@ let state = {
   copyMoveTarget: '',
   currentMediaList: [],
   currentMediaIndex: -1,
-  currentMediaCategory: null
+  currentMediaCategory: null,
+  isGlobalSearchActive: false,
+  preSearchFiles: null
 };
 
 function safeBase64Encode(str) {
@@ -300,6 +302,48 @@ function initApp() {
     lucide.createIcons();
   });
 
+  // Consolidated New / Upload Hub Dropdown
+  const hubBtn = document.getElementById('btn-new-upload-hub');
+  const hubMenu = document.getElementById('menu-new-actions');
+  if (hubBtn && hubMenu) {
+    hubBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      hubMenu.classList.toggle('active');
+    });
+    
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#dropdown-new-actions')) {
+        hubMenu.classList.remove('active');
+      }
+    });
+
+    safeAddListener('menu-item-new-folder', 'click', () => {
+      hubMenu.classList.remove('active');
+      openModal('modal-new-folder');
+    });
+
+    safeAddListener('menu-item-upload-file', 'click', () => {
+      hubMenu.classList.remove('active');
+      const fi = document.getElementById('file-input');
+      if (fi) fi.click();
+    });
+
+    safeAddListener('menu-item-upload-folder', 'click', () => {
+      hubMenu.classList.remove('active');
+      const fo = document.getElementById('folder-input');
+      if (fo) fo.click();
+    });
+
+    safeAddListener('menu-item-import-url', 'click', () => {
+      hubMenu.classList.remove('active');
+      if (typeof openImportUrlModal === 'function') {
+        openImportUrlModal();
+      } else {
+        openModal('modal-import-url');
+      }
+    });
+  }
+
   // Bind Explorer Controls
   safeAddListener('btn-new-folder', 'click', () => openModal('modal-new-folder'));
   safeAddListener('new-folder-form', 'submit', handleCreateFolder);
@@ -317,7 +361,13 @@ function initApp() {
   }
 
   // Search input
-  safeAddListener('search-input', 'input', filterFiles);
+  safeAddListener('search-input', 'input', handleSearchInput);
+  safeAddListener('search-input', 'keydown', (e) => {
+    if (e.key === 'Escape') {
+      clearGlobalSearch();
+      e.target.blur();
+    }
+  });
 
   // View toggles
   safeAddListener('view-grid', 'click', () => {
@@ -822,15 +872,19 @@ function selectRoot(root) {
 
 function updateUploadActionsVisibility() {
   const isWritable = state.user.role === 'admin' || (state.currentRoot && state.currentRoot.allowWrite);
-  const displayStyle = isWritable ? 'flex' : 'none';
   
+  const dropdownHub = document.getElementById('dropdown-new-actions');
+  if (dropdownHub) dropdownHub.style.display = isWritable ? 'inline-block' : 'none';
+
   const btnNewFolder = document.getElementById('btn-new-folder');
   const btnUpload = document.getElementById('btn-upload-trigger');
   const btnUploadFolder = document.getElementById('btn-upload-folder-trigger');
+  const btnImport = document.getElementById('btn-import-url-trigger');
   
-  if (btnNewFolder) btnNewFolder.style.display = displayStyle;
-  if (btnUpload) btnUpload.style.display = displayStyle;
-  if (btnUploadFolder) btnUploadFolder.style.display = displayStyle;
+  if (btnNewFolder) btnNewFolder.style.display = 'none';
+  if (btnUpload) btnUpload.style.display = 'none';
+  if (btnUploadFolder) btnUploadFolder.style.display = 'none';
+  if (btnImport) btnImport.style.display = 'none';
 }
 
 async function browsePath(targetPath) {
@@ -838,7 +892,16 @@ async function browsePath(targetPath) {
   state.selectedPaths.clear();
   updateBatchActionBar();
   updatePasteButton();
-  document.getElementById('search-input').value = ''; // clear search
+  
+  // Reset search UI if active
+  const searchInput = document.getElementById('search-input');
+  if (searchInput) searchInput.value = '';
+  const clearBtn = document.getElementById('btn-clear-search');
+  if (clearBtn) clearBtn.style.display = 'none';
+  const banner = document.getElementById('search-results-banner');
+  if (banner) banner.style.display = 'none';
+  state.isGlobalSearchActive = false;
+  
   updateUploadActionsVisibility();
   
   const sizeDisplay = document.getElementById('open-folder-size');
@@ -907,10 +970,13 @@ function updateViewButtons() {
 function processAndRenderFiles() {
   let files = [...state.files];
 
-  // 1. Search filter
-  const searchVal = document.getElementById('search-input').value.toLowerCase();
-  if (searchVal) {
-    files = files.filter(f => f.name.toLowerCase().includes(searchVal));
+  // 1. Search filter (only for local folder filtering if global search is not active)
+  if (!state.isGlobalSearchActive) {
+    const searchInput = document.getElementById('search-input');
+    const searchVal = (searchInput ? searchInput.value : '').trim().toLowerCase();
+    if (searchVal) {
+      files = files.filter(f => f.name.toLowerCase().includes(searchVal));
+    }
   }
 
   // 2. Type filter
@@ -975,7 +1041,7 @@ function processAndRenderFiles() {
       else if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) category = 'image';
       else if (['mp3', 'wav', 'ogg', 'flac', 'm4a'].includes(ext)) category = 'audio';
       
-      const filePath = `${state.currentPath}/${fileToOpen.name}`;
+      const filePath = fileToOpen.path || `${state.currentPath}/${fileToOpen.name}`;
       openMedia(filePath, fileName, category);
     }
   }
@@ -1008,7 +1074,7 @@ function renderFiles(files) {
   files.forEach(file => {
     const card = document.createElement('div');
     card.className = 'file-card';
-    const filePath = `${state.currentPath}/${file.name}`;
+    const filePath = file.path ? file.path : `${state.currentPath}/${file.name}`;
     const isSelected = state.selectedPaths.has(filePath);
     if (isSelected) {
       card.classList.add('selected');
@@ -1067,6 +1133,12 @@ function renderFiles(files) {
       </div>
       <div class="file-card-info">
         <div class="file-name" title="${file.name}">${file.name}</div>
+        ${file.parentPath ? `
+          <div class="file-search-path" title="Go to folder: ${file.parentPath}" onclick="event.stopPropagation(); clearGlobalSearch(); browsePath('${file.parentPath.replace(/'/g, "\\'")}');">
+            <i data-lucide="folder" style="width: 12px; height: 12px;"></i>
+            <span>in ${file.parentPath}</span>
+          </div>
+        ` : ''}
         <div class="file-meta-size">${file.isFile ? formattedSize : 'Folder'}</div>
         <div class="file-meta-date">${formattedDate}</div>
       </div>
@@ -1076,6 +1148,9 @@ function renderFiles(files) {
         </button>
         <button class="btn-card-action btn-move" onclick="handleMoveSingle(event, '${filePath.replace(/'/g, "\\'")}')" title="Move">
           <i data-lucide="folder-input"></i>
+        </button>
+        <button class="btn-card-action btn-share" onclick="handleShareFile(event, '${filePath.replace(/'/g, "\\'")}')" title="Share Direct Download Link">
+          <i data-lucide="share-2"></i>
         </button>
         ${file.isFile ? `
           <button class="btn-card-action btn-download" onclick="handleDownloadFile(event, '${filePath.replace(/'/g, "\\'")}')" title="Download">
@@ -1106,6 +1181,9 @@ function renderFiles(files) {
       }
 
       if (!file.isFile) {
+        if (state.isGlobalSearchActive) {
+          clearGlobalSearch();
+        }
         browsePath(filePath);
       } else {
         openMedia(filePath, file.name, category);
@@ -1175,9 +1253,146 @@ function renderBreadcrumbs() {
   lucide.createIcons();
 }
 
-function filterFiles() {
-  processAndRenderFiles();
+// GLOBAL SEARCH & FILTERING
+let searchDebounceTimer = null;
+let searchAbortController = null;
+
+function handleSearchInput(e) {
+  const query = (e && e.target ? e.target.value : (document.getElementById('search-input')?.value || '')).trim();
+  const clearBtn = document.getElementById('btn-clear-search');
+  if (clearBtn) {
+    clearBtn.style.display = query.length > 0 ? 'inline-flex' : 'none';
+  }
+
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = null;
+  }
+
+  if (!query) {
+    if (state.isGlobalSearchActive) {
+      clearGlobalSearch();
+    } else {
+      processAndRenderFiles();
+    }
+    return;
+  }
+
+  // If query is 1 character, do quick local folder filtering
+  if (query.length < 2) {
+    if (state.isGlobalSearchActive) {
+      clearGlobalSearch();
+    } else {
+      processAndRenderFiles();
+    }
+    return;
+  }
+
+  // Trigger recursive search across all accessible roots with 300ms debounce
+  searchDebounceTimer = setTimeout(() => {
+    executeGlobalSearch(query);
+  }, 300);
 }
+
+async function executeGlobalSearch(query) {
+  if (searchAbortController) {
+    searchAbortController.abort();
+  }
+  searchAbortController = new AbortController();
+
+  const searchIcon = document.getElementById('search-icon');
+  if (searchIcon) {
+    searchIcon.classList.add('animate-spin');
+  }
+
+  try {
+    const res = await apiCall(`/api/files/search?q=${encodeURIComponent(query)}`, {
+      signal: searchAbortController.signal
+    });
+
+    if (res && Array.isArray(res.results)) {
+      renderSearchResults(query, res.results);
+    }
+  } catch (err) {
+    if (err.name !== 'AbortError') {
+      console.error('Global search error:', err);
+    }
+  } finally {
+    if (searchIcon) {
+      searchIcon.classList.remove('animate-spin');
+    }
+  }
+}
+
+function renderSearchResults(query, results) {
+  if (!state.isGlobalSearchActive) {
+    state.preSearchFiles = [...state.files];
+  }
+  state.isGlobalSearchActive = true;
+  state.files = results;
+
+  // Update banner
+  const banner = document.getElementById('search-results-banner');
+  const queryDisplay = document.getElementById('search-query-display');
+  const countDisplay = document.getElementById('search-count-display');
+  
+  if (banner) {
+    if (queryDisplay) queryDisplay.textContent = query;
+    if (countDisplay) countDisplay.textContent = results.length;
+    banner.style.display = 'flex';
+  }
+
+  // Clear batch selection
+  state.selectedPaths.clear();
+  updateBatchActionBar();
+
+  processAndRenderFiles();
+  lucide.createIcons();
+}
+
+function clearGlobalSearch() {
+  if (searchAbortController) {
+    searchAbortController.abort();
+    searchAbortController = null;
+  }
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = null;
+  }
+
+  const searchInput = document.getElementById('search-input');
+  if (searchInput) searchInput.value = '';
+  
+  const clearBtn = document.getElementById('btn-clear-search');
+  if (clearBtn) clearBtn.style.display = 'none';
+
+  const banner = document.getElementById('search-results-banner');
+  if (banner) banner.style.display = 'none';
+
+  const searchIcon = document.getElementById('search-icon');
+  if (searchIcon) searchIcon.classList.remove('animate-spin');
+
+  state.isGlobalSearchActive = false;
+
+  if (state.preSearchFiles) {
+    state.files = state.preSearchFiles;
+    state.preSearchFiles = null;
+    processAndRenderFiles();
+  } else if (state.currentPath) {
+    browsePath(state.currentPath);
+  }
+}
+
+function filterFiles() {
+  handleSearchInput({ target: document.getElementById('search-input') });
+}
+
+// Ensure functions are accessible to inline HTML onclick handlers
+window.handleSearchInput = handleSearchInput;
+window.executeGlobalSearch = executeGlobalSearch;
+window.renderSearchResults = renderSearchResults;
+window.clearGlobalSearch = clearGlobalSearch;
+window.filterFiles = filterFiles;
 
 // MEDIA HANDLERS & NAVIGATION
 function updateMediaNavUI() {
@@ -1213,7 +1428,7 @@ function preloadAdjacentMediaImages() {
     const targetIdx = (cur + offset + total) % total;
     const fileObj = state.currentMediaList[targetIdx];
     if (fileObj) {
-      const p = `${state.currentPath}/${fileObj.name}`;
+      const p = fileObj.path || `${state.currentPath}/${fileObj.name}`;
       const preloadUrl = `/api/files/preview?path=${encodeURIComponent(p)}&token=${state.token}&maxDim=1600`;
       const preloader = new Image();
       preloader.src = preloadUrl;
@@ -1235,7 +1450,7 @@ function navigateMedia(delta) {
   const nextFile = state.currentMediaList[newIndex];
   if (!nextFile) return;
   
-  const nextFilePath = `${state.currentPath}/${nextFile.name}`;
+  const nextFilePath = nextFile.path || `${state.currentPath}/${nextFile.name}`;
   openMedia(nextFilePath, nextFile.name, state.currentMediaCategory);
 }
 window.navigateMedia = navigateMedia;
@@ -1258,7 +1473,7 @@ function openMedia(filePath, fileName, category) {
   
   state.currentMediaList = targetList;
   state.currentMediaCategory = category;
-  state.currentMediaIndex = targetList.findIndex(f => `${state.currentPath}/${f.name}` === filePath || f.name === fileName);
+  state.currentMediaIndex = targetList.findIndex(f => (f.path || `${state.currentPath}/${f.name}`) === filePath || f.name === fileName);
   if (state.currentMediaIndex === -1 && targetList.length > 0) {
     state.currentMediaIndex = 0;
   }
@@ -1328,6 +1543,13 @@ function openMedia(filePath, fileName, category) {
       };
     }
 
+    const shareVideoBtn = document.getElementById('btn-share-video-link');
+    if (shareVideoBtn) {
+      shareVideoBtn.onclick = (e) => {
+        handleShareFile(e, filePath);
+      };
+    }
+
     // Configure VLC Streaming Options
     const absoluteStreamUrl = window.location.origin + relativeStreamUrl;
 
@@ -1372,6 +1594,13 @@ function openMedia(filePath, fileName, category) {
       downloadBtn.setAttribute('download', fileName);
       downloadBtn.onclick = (e) => {
         handleDownloadFile(e, filePath);
+      };
+    }
+
+    const shareImageBtn = document.getElementById('btn-share-image-link');
+    if (shareImageBtn) {
+      shareImageBtn.onclick = (e) => {
+        handleShareFile(e, filePath);
       };
     }
     
@@ -1485,6 +1714,257 @@ function handleDownloadFolder(e, filePath) {
 window.handleDownloadFolder = handleDownloadFolder;
 
 // ============================================================
+// DIRECT DOWNLOAD SHARE LINK SYSTEM (1-Click Instant Downloads)
+// ============================================================
+let currentShareData = null;
+
+async function handleShareFile(e, filePath) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  if (!filePath) return;
+
+  const fileName = filePath.split('/').filter(Boolean).pop() || 'file';
+
+  try {
+    showToast('Generating direct download link...', 'info');
+    const res = await apiCall('/api/shares/create', {
+      method: 'POST',
+      body: JSON.stringify({ path: filePath, expiresIn: 'never' })
+    });
+
+    if (!res.success) {
+      showToast(res.error || 'Failed to generate share link', 'error');
+      return;
+    }
+
+    currentShareData = { ...res, filePath };
+    const directUrl = `${window.location.origin}/d/${res.code}`;
+
+    // Auto-copy direct link to clipboard immediately!
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(directUrl);
+        showToast('✓ Direct download link copied to clipboard!', 'success');
+      } else {
+        showToast('Direct download link ready!', 'success');
+      }
+    } catch (clipErr) {
+      showToast('Direct download link ready!', 'success');
+    }
+
+    // Populate modal elements
+    const nameEl = document.getElementById('share-file-name');
+    const metaEl = document.getElementById('share-file-meta');
+    const inputEl = document.getElementById('share-link-input');
+    const statsEl = document.getElementById('share-stats-badge');
+    const expirySelect = document.getElementById('share-expiry-select');
+    const iconWrapper = document.getElementById('share-file-icon');
+
+    if (nameEl) nameEl.innerText = res.fileName || fileName;
+    if (metaEl) {
+      const isDir = res.isDirectory;
+      const sizeStr = res.fileSize ? formatBytes(res.fileSize) : (isDir ? 'Folder (auto-zipped on 1-click download)' : '');
+      metaEl.innerText = sizeStr;
+    }
+    if (inputEl) {
+      inputEl.value = directUrl;
+    }
+    if (statsEl) {
+      const count = res.downloadCount || 0;
+      statsEl.innerText = `${count} download${count === 1 ? '' : 's'}`;
+    }
+    if (expirySelect) {
+      expirySelect.value = 'never';
+    }
+    if (iconWrapper) {
+      const isDir = res.isDirectory;
+      iconWrapper.innerHTML = `<i data-lucide="${isDir ? 'folder' : 'file'}" style="width: 22px; height: 22px;"></i>`;
+    }
+
+    openModal('modal-share-link');
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  } catch (err) {
+    showToast('Error generating share link: ' + (err.message || err), 'error');
+  }
+}
+window.handleShareFile = handleShareFile;
+
+function handleBatchShare(e) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  const paths = Array.from(state.selectedPaths);
+  if (paths.length === 0) return;
+  handleShareFile(e, paths[0]);
+}
+window.handleBatchShare = handleBatchShare;
+
+async function copyShareLink() {
+  const inputEl = document.getElementById('share-link-input');
+  if (!inputEl || !inputEl.value) return;
+
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(inputEl.value);
+    } else {
+      inputEl.select();
+      document.execCommand('copy');
+    }
+    const copyBtnText = document.getElementById('btn-copy-share-text');
+    if (copyBtnText) copyBtnText.innerText = 'Copied!';
+    showToast('✓ Link copied to clipboard!', 'success');
+    setTimeout(() => {
+      if (copyBtnText) copyBtnText.innerText = 'Copy';
+    }, 2000);
+  } catch (err) {
+    inputEl.select();
+    document.execCommand('copy');
+    showToast('✓ Link copied!', 'success');
+  }
+}
+window.copyShareLink = copyShareLink;
+
+async function updateShareExpiration() {
+  if (!currentShareData || !currentShareData.filePath) return;
+  const expirySelect = document.getElementById('share-expiry-select');
+  if (!expirySelect) return;
+  const expiry = expirySelect.value;
+  try {
+    const res = await apiCall('/api/shares/create', {
+      method: 'POST',
+      body: JSON.stringify({ path: currentShareData.filePath, expiresIn: expiry })
+    });
+    if (res.success) {
+      currentShareData = { ...res, filePath: currentShareData.filePath };
+      showToast('Link expiration updated', 'success');
+    }
+  } catch (err) {
+    showToast('Failed to update expiration', 'error');
+  }
+}
+window.updateShareExpiration = updateShareExpiration;
+
+async function openManageSharesModal() {
+  closeModal('modal-share-link');
+  openModal('modal-manage-shares');
+  const listEl = document.getElementById('manage-shares-list');
+  if (listEl) {
+    listEl.innerHTML = '<div style="text-align: center; padding: 25px; color: var(--text-secondary);">Loading shared links...</div>';
+  }
+
+  try {
+    const shares = await apiCall('/api/shares/my');
+    if (!Array.isArray(shares) || shares.length === 0) {
+      if (listEl) {
+        listEl.innerHTML = `
+          <div style="text-align: center; padding: 40px 20px; color: var(--text-secondary);">
+            <div style="display: flex; justify-content: center; margin-bottom: 12px; opacity: 0.5;">
+              <i data-lucide="share-2" style="width: 42px; height: 42px;"></i>
+            </div>
+            <p style="margin: 0; font-size: 14px; font-weight: 500; color: var(--text-main);">No active shared links found</p>
+            <p style="margin: 6px 0 0; font-size: 12px; opacity: 0.8;">Select any file or folder and click the Share icon to generate a 1-click direct download link.</p>
+          </div>`;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+      }
+      return;
+    }
+
+    if (listEl) {
+      listEl.innerHTML = shares.map(s => {
+        const directUrl = `${window.location.origin}/d/${s.code}`;
+        const isExpired = s.expiresAt && new Date(s.expiresAt) < new Date();
+        const statusBadge = !s.isActive 
+          ? '<span style="color: #ef4444; font-size: 11px; font-weight: 600; background: rgba(239,68,68,0.12); padding: 2px 8px; border-radius: 12px;">Revoked</span>'
+          : (isExpired 
+            ? '<span style="color: #f59e0b; font-size: 11px; font-weight: 600; background: rgba(245,158,11,0.12); padding: 2px 8px; border-radius: 12px;">Expired</span>'
+            : '<span style="color: #10b981; font-size: 11px; font-weight: 600; background: rgba(16,185,129,0.12); padding: 2px 8px; border-radius: 12px;">Active</span>');
+
+        const expiryText = s.expiresAt ? `Expires: ${new Date(s.expiresAt).toLocaleDateString()}` : 'Never expires';
+        const formattedSize = s.fileSize ? formatBytes(s.fileSize) : (s.isDirectory ? 'Folder' : '');
+
+        return `
+          <div class="share-item-card" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: 12px;">
+            <div style="display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1;">
+              <div style="display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 8px; background: rgba(56,189,248,0.12); color: #38bdf8; flex-shrink: 0;">
+                <i data-lucide="${s.isDirectory ? 'folder' : 'file'}" style="width: 18px; height: 18px;"></i>
+              </div>
+              <div style="min-width: 0; flex: 1;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-weight: 600; font-size: 13.5px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px;" title="${s.fileName}">${s.fileName}</span>
+                  ${statusBadge}
+                </div>
+                <div style="font-size: 11.5px; color: var(--text-secondary); margin-top: 3px; display: flex; gap: 12px; flex-wrap: wrap;">
+                  <span>${formattedSize}</span>
+                  <span>•</span>
+                  <span>${s.downloadCount || 0} downloads</span>
+                  <span>•</span>
+                  <span>${expiryText}</span>
+                </div>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+              ${s.isActive && !isExpired ? `
+                <button class="btn btn-secondary" style="padding: 5px 10px; font-size: 12px; display: flex; align-items: center; gap: 4px;" onclick="copyDirectLinkText('${directUrl}')" title="Copy 1-Click Link">
+                  <i data-lucide="copy" style="width: 13px; height: 13px;"></i>
+                  <span>Copy</span>
+                </button>
+                <button class="btn btn-secondary" style="padding: 5px 8px; font-size: 12px; color: #ef4444; border-color: rgba(239,68,68,0.3);" onclick="revokeShareLink('${s.code}')" title="Revoke Link">
+                  <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
+                </button>
+              ` : `
+                <button class="btn btn-secondary" style="padding: 5px 8px; font-size: 12px; color: var(--text-secondary);" onclick="revokeShareLink('${s.code}')" title="Delete Link">
+                  <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
+                </button>
+              `}
+            </div>
+          </div>
+        `;
+      }).join('');
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+  } catch (err) {
+    if (listEl) {
+      listEl.innerHTML = `<div style="color: #ef4444; text-align: center; padding: 20px;">Failed to load shared links: ${err.message || err}</div>`;
+    }
+  }
+}
+window.openManageSharesModal = openManageSharesModal;
+
+async function copyDirectLinkText(url) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(url);
+    } else {
+      prompt('Direct download link:', url);
+      return;
+    }
+    showToast('✓ Direct link copied to clipboard!', 'success');
+  } catch (err) {
+    prompt('Direct download link:', url);
+  }
+}
+window.copyDirectLinkText = copyDirectLinkText;
+
+async function revokeShareLink(code) {
+  if (!confirm('Are you sure you want to revoke this direct download link? Anyone using it will no longer be able to download.')) return;
+  try {
+    const res = await apiCall(`/api/shares/${code}`, { method: 'DELETE' });
+    if (res.success) {
+      showToast('Share link revoked', 'info');
+      openManageSharesModal();
+    } else {
+      showToast(res.error || 'Failed to revoke link', 'error');
+    }
+  } catch (err) {
+    showToast('Error revoking link', 'error');
+  }
+}
+window.revokeShareLink = revokeShareLink;
+
+// ============================================================
 // TOAST NOTIFICATIONS & SELECTION & BATCH ACTIONS & COPY/MOVE
 // ============================================================
 
@@ -1585,6 +2065,11 @@ function updateBatchActionBar() {
     const totalFiles = state.files.length;
     selectAllCb.checked = totalFiles > 0 && count === totalFiles;
     selectAllCb.indeterminate = count > 0 && count < totalFiles;
+  }
+
+  const shareBtn = document.getElementById('btn-batch-share');
+  if (shareBtn) {
+    shareBtn.style.display = (count === 1) ? 'inline-flex' : 'none';
   }
 }
 window.updateBatchActionBar = updateBatchActionBar;

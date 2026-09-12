@@ -17,6 +17,7 @@ Designed to easily stream media files and manage server resources with friends u
 - **Dynamic Breadcrumbs**: Smooth folder-hierarchy navigation relative to authorized root directories.
 - **Multi-Root Storage Boundaries**: Authorized file system roots are dynamically allocated per user (e.g., Home root, Storage root, and HDD root) with strict boundary traversal checks.
 - **Folder Downloads**: Pack and download entire directories as ZIP archives on the fly.
+- **1-Click Direct Download Share Links**: Generate secure, unguessable public direct download links (`/d/{code}`) for files and folders. Recipients download immediately in a single click with zero login, no intermediary landing page, and full HTTP Byte-Range resumable support. Includes active share link management, configurable expirations (1h, 24h, 7d, 30d, or never), and download hit counters.
 
 ### 🎬 Media Playback
 - **Responsive Video Player**: Browser-native HTML5 video streaming modal with dynamic portrait/vertical aspect ratio scaling.
