@@ -171,6 +171,11 @@ function closeAllMediaViewersSilently() {
 }
 
 function initApp() {
+  if ('scrollRestoration' in history) {
+    try {
+      history.scrollRestoration = 'manual';
+    } catch (e) {}
+  }
   applyTheme();
   applyUiStyle();
   lucide.createIcons();
@@ -718,6 +723,7 @@ function switchPanel(panelName) {
   document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
   document.querySelectorAll('.mobile-nav-item').forEach(btn => btn.classList.remove('active'));
   document.querySelectorAll('.content-panel').forEach(panel => panel.classList.remove('active'));
+  resetExplorerScroll();
 
   if (panelName === 'explorer') {
     document.getElementById('nav-explorer').classList.add('active');
@@ -726,7 +732,7 @@ function switchPanel(panelName) {
     document.getElementById('panel-explorer').classList.add('active');
     document.getElementById('explorer-actions').style.display = '';
     if (state.currentPath) {
-      browsePath(state.currentPath);
+      browsePath(state.currentPath, true);
     }
   } else if (panelName === 'users') {
     document.getElementById('nav-users').classList.add('active');
@@ -840,6 +846,41 @@ async function loadRoots() {
   }
 }
 
+function resetExplorerScroll() {
+  try {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  } catch (e) {
+    window.scrollTo(0, 0);
+  }
+  if (document.documentElement) {
+    document.documentElement.scrollTop = 0;
+  }
+  if (document.body) {
+    document.body.scrollTop = 0;
+  }
+
+  const mainContent = document.querySelector('.main-content');
+  if (mainContent) {
+    mainContent.scrollTop = 0;
+  }
+
+  const panelContainer = document.querySelector('.panel-container');
+  if (panelContainer) {
+    panelContainer.scrollTop = 0;
+  }
+
+  const panelExplorer = document.getElementById('panel-explorer');
+  if (panelExplorer) {
+    panelExplorer.scrollTop = 0;
+  }
+
+  const filesGrid = document.getElementById('files-grid-container');
+  if (filesGrid) {
+    filesGrid.scrollTop = 0;
+  }
+}
+window.resetExplorerScroll = resetExplorerScroll;
+
 function renderRoots() {
   const container = document.getElementById('roots-container');
   if (!container) return;
@@ -868,13 +909,21 @@ function renderRoots() {
     container.appendChild(badge);
   });
   if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  const activeBadge = container.querySelector('.root-badge.active');
+  if (activeBadge) {
+    try {
+      activeBadge.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    } catch (e) {}
+  }
 }
 
 function selectRoot(root) {
   state.currentRoot = root;
   state.currentPath = root.path;
   renderRoots();
-  browsePath(root.path);
+  resetExplorerScroll();
+  browsePath(root.path, true);
 }
 
 function updateUploadActionsVisibility() {
@@ -894,7 +943,9 @@ function updateUploadActionsVisibility() {
   if (btnImport) btnImport.style.display = 'none';
 }
 
-async function browsePath(targetPath) {
+async function browsePath(targetPath, forceResetScroll = false) {
+  const previousPath = state.currentPath;
+  const isNavigatingToNewLocation = forceResetScroll || (previousPath !== targetPath);
   state.currentPath = targetPath;
   state.selectedPaths.clear();
   updateBatchActionBar();
@@ -918,12 +969,26 @@ async function browsePath(targetPath) {
     window.location.hash = targetPath;
   }
   
+  if (isNavigatingToNewLocation) {
+    resetExplorerScroll();
+  }
+  
   try {
     const res = await apiCall(`/api/files/browse?path=${encodeURIComponent(targetPath)}`);
     state.files = res.files;
     processAndRenderFiles();
     renderBreadcrumbs();
     
+    if (isNavigatingToNewLocation) {
+      resetExplorerScroll();
+      requestAnimationFrame(() => {
+        resetExplorerScroll();
+      });
+      setTimeout(() => {
+        resetExplorerScroll();
+      }, 30);
+    }
+
     if (sizeDisplay) {
       const sizeValue = document.getElementById('open-folder-size-value');
       if (sizeValue && res.folderSize !== undefined && res.folderSize !== null) {
@@ -1373,6 +1438,7 @@ function renderSearchResults(query, results) {
   updateBatchActionBar();
 
   processAndRenderFiles();
+  resetExplorerScroll();
   lucide.createIcons();
 }
 

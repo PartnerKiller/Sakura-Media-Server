@@ -533,6 +533,7 @@ button, .btn {
   flex-direction: column;
   height: 100vh;
   overflow-y: auto;
+  overflow-anchor: none;
   background: var(--bg-main);
 }
 
@@ -938,6 +939,7 @@ button, .btn {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 20px;
+  overflow-anchor: none;
 }
 
 /* FILE / FOLDER CARD */
@@ -2125,6 +2127,7 @@ video {
     min-height: 100vh !important;
     min-height: 100dvh !important;
     overflow-y: auto !important;
+    overflow-anchor: none !important;
     -webkit-overflow-scrolling: touch !important;
   }
 
