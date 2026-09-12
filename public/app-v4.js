@@ -2105,11 +2105,15 @@ async function openManageSharesModal() {
                   <i data-lucide="copy" style="width: 13px; height: 13px;"></i>
                   <span>Copy</span>
                 </button>
-                <button class="btn btn-secondary" style="padding: 5px 8px; font-size: 12px; color: #ef4444; border-color: rgba(239,68,68,0.3);" onclick="revokeShareLink('${s.code}')" title="Revoke Link">
+                <button class="btn btn-secondary" style="padding: 5px 8px; font-size: 12px; color: #ef4444; border-color: rgba(239,68,68,0.3);" onclick="deleteShareLink('${s.code}')" title="Delete Link">
                   <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
                 </button>
               ` : `
-                <button class="btn btn-secondary" style="padding: 5px 8px; font-size: 12px; color: var(--text-secondary);" onclick="revokeShareLink('${s.code}')" title="Delete Link">
+                <button class="btn btn-secondary" style="padding: 5px 10px; font-size: 12px; color: #10b981; border-color: rgba(16,185,129,0.3); display: flex; align-items: center; gap: 4px;" onclick="reactivateShareLink('${s.code}')" title="Reactivate Link">
+                  <i data-lucide="rotate-ccw" style="width: 13px; height: 13px;"></i>
+                  <span>Reactivate</span>
+                </button>
+                <button class="btn btn-secondary" style="padding: 5px 8px; font-size: 12px; color: #ef4444; border-color: rgba(239,68,68,0.3);" onclick="deleteShareLink('${s.code}')" title="Delete Link">
                   <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
                 </button>
               `}
@@ -2142,21 +2146,37 @@ async function copyDirectLinkText(url) {
 }
 window.copyDirectLinkText = copyDirectLinkText;
 
-async function revokeShareLink(code) {
-  if (!confirm('Are you sure you want to revoke this direct download link? Anyone using it will no longer be able to download.')) return;
+async function deleteShareLink(code) {
+  if (!confirm('Are you sure you want to delete this shared link?')) return;
   try {
     const res = await apiCall(`/api/shares/${code}`, { method: 'DELETE' });
     if (res.success) {
-      showToast('Share link revoked', 'info');
+      showToast('Share link deleted', 'info');
       openManageSharesModal();
     } else {
-      showToast(res.error || 'Failed to revoke link', 'error');
+      showToast(res.error || 'Failed to delete link', 'error');
     }
   } catch (err) {
-    showToast('Error revoking link', 'error');
+    showToast('Error deleting link', 'error');
   }
 }
-window.revokeShareLink = revokeShareLink;
+window.deleteShareLink = deleteShareLink;
+window.revokeShareLink = deleteShareLink;
+
+async function reactivateShareLink(code) {
+  try {
+    const res = await apiCall(`/api/shares/${code}/reactivate`, { method: 'POST' });
+    if (res.success) {
+      showToast('✓ Share link reactivated!', 'success');
+      openManageSharesModal();
+    } else {
+      showToast(res.error || 'Failed to reactivate link', 'error');
+    }
+  } catch (err) {
+    showToast('Error reactivating link', 'error');
+  }
+}
+window.reactivateShareLink = reactivateShareLink;
 
 // ============================================================
 // TOAST NOTIFICATIONS & SELECTION & BATCH ACTIONS & COPY/MOVE

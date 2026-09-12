@@ -14,6 +14,8 @@ public interface ShareLinkRepository extends JpaRepository<ShareLink, Long> {
 
     Optional<ShareLink> findByFilePathAndUserIdAndIsActiveTrue(String filePath, Long userId);
 
+    Optional<ShareLink> findByFilePathAndUserId(String filePath, Long userId);
+
     List<ShareLink> findByUserIdOrderByCreatedAtDesc(Long userId);
 
     List<ShareLink> findAllByOrderByCreatedAtDesc();

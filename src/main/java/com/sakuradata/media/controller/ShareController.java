@@ -7,6 +7,7 @@ import com.sakuradata.media.model.User;
 import com.sakuradata.media.repository.AuditLogRepository;
 import com.sakuradata.media.repository.PermissionRepository;
 import com.sakuradata.media.repository.ShareLinkRepository;
+import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,6 +42,19 @@ public class ShareController {
 
     @Autowired
     private AuditLogRepository auditLogRepository;
+
+    @PostConstruct
+    public void unrevokeExistingShares() {
+        try {
+            List<ShareLink> shares = shareLinkRepository.findAll();
+            for (ShareLink s : shares) {
+                if (Boolean.FALSE.equals(s.getIsActive())) {
+                    s.setIsActive(true);
+                    shareLinkRepository.save(s);
+                }
+            }
+        } catch (Exception ignored) {}
+    }
 
     private boolean isSubPath(String parentStr, String childStr) {
         try {
@@ -162,11 +176,13 @@ public class ShareController {
             expiresAt = LocalDateTime.now().plusDays(30);
         }
 
-        // Check if an active, non-expired share already exists for this user and path
-        Optional<ShareLink> existingOpt = shareLinkRepository.findByFilePathAndUserIdAndIsActiveTrue(targetPath, user.getId());
+        // Check if a share already exists for this user and path
+        Optional<ShareLink> existingOpt = shareLinkRepository.findByFilePathAndUserId(targetPath, user.getId());
         ShareLink share;
         if (existingOpt.isPresent()) {
             share = existingOpt.get();
+            // ALWAYS ensure it is active - NEVER revoked!
+            share.setIsActive(true);
             if (expiresAt != null || share.getExpiresAt() != null) {
                 share.setExpiresAt(expiresAt);
             }
@@ -184,6 +200,7 @@ public class ShareController {
                     user.getUsername(),
                     expiresAt
             );
+            share.setIsActive(true);
             share = shareLinkRepository.save(share);
 
             try {
@@ -226,10 +243,10 @@ public class ShareController {
     }
 
     /**
-     * Revoke or delete a share link.
+     * Permanently delete a share link.
      */
     @DeleteMapping("/api/shares/{code}")
-    public ResponseEntity<?> revokeShare(HttpServletRequest request, @PathVariable String code) {
+    public ResponseEntity<?> deleteShare(HttpServletRequest request, @PathVariable String code) {
         User user = (User) request.getAttribute("user");
         if (user == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Unauthorized"));
@@ -245,14 +262,44 @@ public class ShareController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Permission denied"));
         }
 
-        share.setIsActive(false);
+        // Permanently delete so it does not linger in a broken 'Revoked' state
+        shareLinkRepository.delete(share);
+
+        try {
+            auditLogRepository.save(new AuditLog(user.getUsername(), "DELETE_SHARE_LINK: " + share.getFileName(), request.getRemoteAddr()));
+        } catch (Exception ignored) {}
+
+        return ResponseEntity.ok(Map.of("success", true, "message", "Share link deleted successfully"));
+    }
+
+    /**
+     * Reactivate an inactive share link.
+     */
+    @PostMapping("/api/shares/{code}/reactivate")
+    public ResponseEntity<?> reactivateShare(HttpServletRequest request, @PathVariable String code) {
+        User user = (User) request.getAttribute("user");
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Unauthorized"));
+        }
+
+        Optional<ShareLink> shareOpt = shareLinkRepository.findByCode(code);
+        if (shareOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Share link not found"));
+        }
+
+        ShareLink share = shareOpt.get();
+        if (!"admin".equals(user.getRole()) && !share.getUserId().equals(user.getId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Permission denied"));
+        }
+
+        share.setIsActive(true);
         shareLinkRepository.save(share);
 
         try {
-            auditLogRepository.save(new AuditLog(user.getUsername(), "REVOKE_SHARE_LINK: " + share.getFileName(), request.getRemoteAddr()));
+            auditLogRepository.save(new AuditLog(user.getUsername(), "REACTIVATE_SHARE_LINK: " + share.getFileName(), request.getRemoteAddr()));
         } catch (Exception ignored) {}
 
-        return ResponseEntity.ok(Map.of("success", true, "message", "Share link revoked successfully"));
+        return ResponseEntity.ok(Map.of("success", true, "message", "Share link reactivated successfully"));
     }
 
     /**
