@@ -468,7 +468,8 @@ public class FileController {
         if (filename.endsWith(".ts")) return "video/mp2t";
         if (filename.endsWith(".3gp")) return "video/3gpp";
         if (filename.endsWith(".ogv")) return "video/ogg";
-        if (filename.endsWith(".m3u8")) return "application/x-mpegurl";
+        if (filename.endsWith(".m3u8")) return "application/vnd.apple.mpegurl";
+        if (filename.endsWith(".m3u")) return "application/x-mpegurl";
         if (filename.endsWith(".mp3")) return "audio/mpeg";
         if (filename.endsWith(".flac")) return "audio/flac";
         if (filename.endsWith(".aac")) return "audio/aac";

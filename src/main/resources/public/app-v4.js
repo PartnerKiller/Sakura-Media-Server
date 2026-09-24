@@ -146,6 +146,12 @@ function safeAddListener(id, event, callback) {
 }
 
 function closeAllMediaViewersSilently() {
+  if (state.hlsInstance) {
+    try {
+      state.hlsInstance.destroy();
+    } catch (e) {}
+    state.hlsInstance = null;
+  }
   const player = document.getElementById('html5-video-player');
   if (player) {
     player.pause();
@@ -203,9 +209,9 @@ function initApp() {
           if (fileToOpen) {
             const ext = fileToOpen.name.split('.').pop().toLowerCase();
             let category = 'file';
-            if (['mp4', 'mkv', 'webm', 'avi', 'mov'].includes(ext)) category = 'video';
-            else if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) category = 'image';
-            else if (['mp3', 'wav', 'ogg', 'flac', 'm4a'].includes(ext)) category = 'audio';
+            if (['mp4', 'mkv', 'webm', 'avi', 'mov', 'flv', 'wmv', 'm4v', 'ts', '3gp', 'm3u8', 'm3u', 'ogv'].includes(ext)) category = 'video';
+            else if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'tiff'].includes(ext)) category = 'image';
+            else if (['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac', 'opus', 'wma', 'alac'].includes(ext)) category = 'audio';
             openMedia(decoded, fileToOpen.name, category);
           }
         } else {
@@ -1058,7 +1064,7 @@ function processAndRenderFiles() {
       const ext = file.name.split('.').pop().toLowerCase();
       if (!file.isFile) {
         category = 'folder';
-      } else if (['mp4', 'mkv', 'webm', 'avi', 'mov', 'flv', 'wmv', 'm4v', 'ts', '3gp'].includes(ext)) {
+      } else if (['mp4', 'mkv', 'webm', 'avi', 'mov', 'flv', 'wmv', 'm4v', 'ts', '3gp', 'm3u8', 'm3u', 'ogv'].includes(ext)) {
         category = 'video';
       } else if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'tiff'].includes(ext)) {
         category = 'image';
@@ -1109,9 +1115,9 @@ function processAndRenderFiles() {
     if (fileToOpen) {
       const ext = fileToOpen.name.split('.').pop().toLowerCase();
       let category = 'file';
-      if (['mp4', 'mkv', 'webm', 'avi', 'mov'].includes(ext)) category = 'video';
-      else if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) category = 'image';
-      else if (['mp3', 'wav', 'ogg', 'flac', 'm4a'].includes(ext)) category = 'audio';
+      if (['mp4', 'mkv', 'webm', 'avi', 'mov', 'flv', 'wmv', 'm4v', 'ts', '3gp', 'm3u8', 'm3u', 'ogv'].includes(ext)) category = 'video';
+      else if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'tiff'].includes(ext)) category = 'image';
+      else if (['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac', 'opus', 'wma', 'alac'].includes(ext)) category = 'audio';
       
       const filePath = fileToOpen.path || `${state.currentPath}/${fileToOpen.name}`;
       openMedia(filePath, fileName, category);
@@ -1165,7 +1171,7 @@ function renderFiles(files) {
     if (!file.isFile) {
       category = 'folder';
       icon = 'folder';
-    } else if (['mp4', 'mkv', 'webm', 'avi', 'mov', 'flv', 'wmv', 'm4v', 'ts', '3gp'].includes(ext)) {
+    } else if (['mp4', 'mkv', 'webm', 'avi', 'mov', 'flv', 'wmv', 'm4v', 'ts', '3gp', 'm3u8', 'm3u', 'ogv'].includes(ext)) {
       category = 'video';
       icon = 'video';
     } else if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'tiff'].includes(ext)) {
@@ -1722,7 +1728,7 @@ function openMedia(filePath, fileName, category) {
 
   // Populate media list for previous/next navigation
   const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'tiff'];
-  const videoExts = ['mp4', 'mkv', 'webm', 'avi', 'mov', 'flv', 'wmv', 'm4v', 'ts', '3gp'];
+  const videoExts = ['mp4', 'mkv', 'webm', 'avi', 'mov', 'flv', 'wmv', 'm4v', 'ts', '3gp', 'm3u8', 'm3u', 'ogv'];
   
   let targetList = [];
   if (category === 'image') {
@@ -1748,7 +1754,59 @@ function openMedia(filePath, fileName, category) {
     player.style.display = 'block';
     
     const relativeStreamUrl = `/api/files/stream-media/${safeBase64Encode(filePath)}?token=${state.token}`;
-    player.src = relativeStreamUrl;
+    const isHlsStream = fileName.toLowerCase().endsWith('.m3u8');
+
+    // Destroy previous HLS.js instance if any
+    if (state.hlsInstance) {
+      try {
+        state.hlsInstance.destroy();
+      } catch (e) {}
+      state.hlsInstance = null;
+    }
+
+    if (isHlsStream && window.Hls && Hls.isSupported()) {
+      try {
+        const hls = new Hls({
+          enableWorker: true,
+          lowLatencyMode: true,
+          backBufferLength: 90
+        });
+        hls.loadSource(relativeStreamUrl);
+        hls.attachMedia(player);
+        state.hlsInstance = hls;
+
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          player.play().catch(e => console.log('HLS Autoplay prevented:', e));
+        });
+
+        hls.on(Hls.Events.ERROR, (event, data) => {
+          if (data.fatal) {
+            switch (data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                hls.startLoad();
+                break;
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                hls.recoverMediaError();
+                break;
+              default:
+                hls.destroy();
+                state.hlsInstance = null;
+                player.style.display = 'none';
+                if (errorBanner) {
+                  errorBanner.style.display = 'block';
+                  lucide.createIcons();
+                }
+                break;
+            }
+          }
+        });
+      } catch (err) {
+        console.warn('Failed to initialize Hls.js, falling back to direct video src:', err);
+        player.src = relativeStreamUrl;
+      }
+    } else {
+      player.src = relativeStreamUrl;
+    }
 
     if (state.videoWatchdog) {
       clearTimeout(state.videoWatchdog);
@@ -1810,15 +1868,39 @@ function openMedia(filePath, fileName, category) {
       };
     }
 
-    // Configure VLC Streaming Options
+    // Configure VLC Streaming Options (UTF-8 M3U8)
     const absoluteStreamUrl = window.location.origin + relativeStreamUrl;
 
-    // 1. M3U playlist file generation
+    // 1. Single-file UTF-8 M3U8 playlist file generation
     const m3uBtn = document.getElementById('btn-stream-vlc-m3u');
-    const m3uContent = `#EXTM3U\n#EXTINF:-1,${fileName}\n${absoluteStreamUrl}`;
-    const blob = new Blob([m3uContent], { type: 'application/x-mpegurl' });
-    m3uBtn.href = URL.createObjectURL(blob);
-    m3uBtn.download = fileName.substring(0, fileName.lastIndexOf('.')) + ".m3u";
+    if (m3uBtn) {
+      const m3uContent = `#EXTM3U\n#EXTINF:-1,${fileName}\n${absoluteStreamUrl}\n`;
+      const blob = new Blob([m3uContent], { type: 'application/vnd.apple.mpegurl;charset=utf-8' });
+      m3uBtn.href = URL.createObjectURL(blob);
+      const baseName = fileName.includes('.') ? fileName.substring(0, fileName.lastIndexOf('.')) : fileName;
+      m3uBtn.download = `${baseName}.m3u8`;
+    }
+
+    // 2. Multi-file / Folder UTF-8 M3U8 playlist file generation (e.g. for anime series / movie folders)
+    const folderM3uBtn = document.getElementById('btn-stream-vlc-folder-m3u');
+    if (folderM3uBtn) {
+      if (targetList && targetList.length > 1) {
+        let playlistLines = ['#EXTM3U'];
+        targetList.forEach(item => {
+          const itemPath = item.path || (state.currentPath ? `${state.currentPath}/${item.name}` : item.name);
+          const itemStreamUrl = `${window.location.origin}/api/files/stream-media/${safeBase64Encode(itemPath)}?token=${state.token}`;
+          playlistLines.push(`#EXTINF:-1,${item.name}`);
+          playlistLines.push(itemStreamUrl);
+        });
+        const folderBlob = new Blob([playlistLines.join('\n') + '\n'], { type: 'application/vnd.apple.mpegurl;charset=utf-8' });
+        folderM3uBtn.href = URL.createObjectURL(folderBlob);
+        const folderName = (state.currentPath || 'playlist').split('/').filter(Boolean).pop() || 'playlist';
+        folderM3uBtn.download = `${folderName}.m3u8`;
+        folderM3uBtn.style.display = 'inline-flex';
+      } else {
+        folderM3uBtn.style.display = 'none';
+      }
+    }
 
     // 3. Copy Stream URL action
     const copyBtn = document.getElementById('btn-copy-stream-link');
@@ -2578,6 +2660,37 @@ function handleBatchDownloadZip(e) {
 }
 window.handleBatchDownloadZip = handleBatchDownloadZip;
 window.handleBatchDownload = handleBatchDownloadZip;
+
+function handleBatchStreamM3U8(e) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  const paths = Array.from(state.selectedPaths);
+  if (paths.length === 0) {
+    showToast('Select one or more media files to generate M3U8 playlist', 'warning');
+    return;
+  }
+
+  let playlistLines = ['#EXTM3U'];
+  paths.forEach(p => {
+    const name = p.split('/').pop() || 'media';
+    const streamUrl = `${window.location.origin}/api/files/stream-media/${safeBase64Encode(p)}?token=${state.token}`;
+    playlistLines.push(`#EXTINF:-1,${name}`);
+    playlistLines.push(streamUrl);
+  });
+
+  const blob = new Blob([playlistLines.join('\n') + '\n'], { type: 'application/vnd.apple.mpegurl;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const folderName = (state.currentPath || 'playlist').split('/').filter(Boolean).pop() || 'playlist';
+  a.download = `${folderName}_selected.m3u8`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => a.remove(), 250);
+  showToast(`Downloaded M3U8 playlist (${paths.length} items) for VLC streaming`, 'success');
+}
+window.handleBatchStreamM3U8 = handleBatchStreamM3U8;
 
 async function handlePasteClipboard() {
   if (!state.clipboard || !state.clipboard.paths || state.clipboard.paths.length === 0) return;

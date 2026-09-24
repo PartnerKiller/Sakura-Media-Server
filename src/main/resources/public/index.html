@@ -11,6 +11,7 @@
   <!-- Lucide Icons Local -->
   <script src="/lucide.min.js?v=0.453"></script>
   <script src="/chart.min.js"></script>
+  <script src="/hls.min.js"></script>
   <link rel="stylesheet" href="/style.css?v=9.01">
   <link rel="icon" type="image/jpeg" href="/favicon.jpg">
 </head>
@@ -260,6 +261,10 @@
                   <button id="btn-batch-download-zip" class="btn-batch btn-batch-download-zip" onclick="handleBatchDownloadZip(event)" title="ZIP Download: package all selected items into a single ZIP archive" style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; height: 28px; background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 16px; color: #c084fc; font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap;">
                     <i data-lucide="archive" style="width: 13px; height: 13px;"></i>
                     <span>ZIP</span>
+                  </button>
+                  <button id="btn-batch-stream-m3u8" class="btn-batch btn-batch-m3u8" onclick="handleBatchStreamM3U8(event)" title="Stream M3U8: generate a unified UTF-8 M3U8 playlist for selected media to open in VLC" style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; height: 28px; background: rgba(34, 197, 94, 0.12); border: 1px solid rgba(34, 197, 94, 0.35); border-radius: 16px; color: #4ade80; font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap;">
+                    <i data-lucide="play-circle" style="width: 13px; height: 13px;"></i>
+                    <span>M3U8</span>
                   </button>
                   <button id="btn-batch-delete" class="btn-batch btn-batch-danger" title="Move selected items to Recycle Bin" style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; height: 28px; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(248, 113, 113, 0.35); border-radius: 16px; color: #f87171; font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap;">
                     <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
@@ -1270,7 +1275,7 @@
           <i data-lucide="alert-triangle" style="width: 42px; height: 42px; color: #ffb703; margin-bottom: 12px;"></i>
           <h4 style="color: #fff; margin-bottom: 8px; font-size: 1.1rem; font-weight: 600;">Unsupported Browser Video Codec</h4>
           <p style="font-size: 0.88rem; max-width: 500px; margin: 0 auto 18px auto; line-height: 1.5; color: var(--text-secondary);">
-            Your browser cannot decode this video's specific codec (such as HEVC / x265 or AC3 audio). Click <strong>Stream in VLC (M3U)</strong> below to stream it seamlessly in VLC Media Player, or <strong>Download</strong> the file.
+            Your browser cannot decode this video's specific codec (such as HEVC / x265 or AC3 audio). Click <strong>Stream in VLC (M3U8)</strong> below to stream it seamlessly in VLC Media Player, or <strong>Download</strong> the file.
           </p>
         </div>
       </div>
@@ -1294,9 +1299,13 @@
             <i data-lucide="share-2" style="width: 16px; height: 16px;"></i>
             <span>Share Link</span>
           </button>
-          <a id="btn-stream-vlc-m3u" href="#" class="btn btn-primary" style="display: flex; align-items: center; gap: 6px;">
+          <a id="btn-stream-vlc-m3u" href="#" class="btn btn-primary" style="display: flex; align-items: center; gap: 6px;" title="Stream current video in VLC with UTF-8 M3U8 playlist">
             <i data-lucide="play-circle" style="width: 16px; height: 16px;"></i>
-            <span>Stream in VLC (M3U)</span>
+            <span>Stream in VLC (M3U8)</span>
+          </a>
+          <a id="btn-stream-vlc-folder-m3u" href="#" class="btn btn-secondary" style="display: none; align-items: center; gap: 6px;" title="Stream all videos in this folder as a multi-episode playlist in VLC">
+            <i data-lucide="list-video" style="width: 16px; height: 16px;"></i>
+            <span>Stream All (M3U8)</span>
           </a>
           <button id="btn-copy-stream-link" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px;">
             <i data-lucide="copy" style="width: 16px; height: 16px;"></i>
@@ -1700,6 +1709,6 @@
     </div>
   </div>
 
-  <script src="/app-v4.js?v=9.01"></script>
+  <script src="/app-v4.js?v=9.02"></script>
 </body>
 </html>
