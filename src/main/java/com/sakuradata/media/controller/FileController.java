@@ -675,15 +675,22 @@ public class FileController {
             }
             return;
         }
-        try (FileInputStream fis = new FileInputStream(fileToZip)) {
-            ZipEntry zipEntry = new ZipEntry(fileName);
-            zipOut.putNextEntry(zipEntry);
-            byte[] bytes = new byte[65536];
-            int length;
-            while ((length = fis.read(bytes)) >= 0) {
-                zipOut.write(bytes, 0, length);
+        try {
+            if (!fileToZip.exists() || !fileToZip.canRead()) {
+                return;
             }
-            zipOut.closeEntry();
+            try (FileInputStream fis = new FileInputStream(fileToZip)) {
+                ZipEntry zipEntry = new ZipEntry(fileName);
+                zipOut.putNextEntry(zipEntry);
+                byte[] bytes = new byte[65536];
+                int length;
+                while ((length = fis.read(bytes)) >= 0) {
+                    zipOut.write(bytes, 0, length);
+                }
+                zipOut.closeEntry();
+            }
+        } catch (Exception e) {
+            System.err.println("Warning: Skipping unreadable file during zip compression: " + fileToZip.getAbsolutePath() + " - " + e.getMessage());
         }
     }
 
@@ -769,29 +776,44 @@ public class FileController {
             }
             Files.copy(inputStream, chunkFile, StandardCopyOption.REPLACE_EXISTING);
 
-            // Check if all chunks have been uploaded
-            File[] uploadedChunks = new File(chunkFolder.toString()).listFiles();
-            int uploadedCount = (uploadedChunks != null) ? uploadedChunks.length : 0;
-
-            if (uploadedCount == totalChunks) {
-                // Merge chunks synchronously to complete action before request termination
-                Path finalPath = Paths.get(finalFileDestination);
-                Files.createDirectories(finalPath.getParent());
-
-                try (BufferedOutputStream destStream = new BufferedOutputStream(new FileOutputStream(finalPath.toFile()))) {
-                    for (int i = 0; i < totalChunks; i++) {
-                        Path partFile = chunkFolder.resolve(String.valueOf(i));
-                        Files.copy(partFile, destStream);
-                    }
+            // Check and merge atomically per uploadId
+            synchronized (uploadId.intern()) {
+                if (!Files.exists(chunkFolder)) {
+                    // Already merged and cleaned up by another thread
+                    return ResponseEntity.ok(Map.of("success", true, "merged", true));
                 }
 
-                // Delete temp chunks folder after merging
-                deleteRecursively(chunkFolder);
+                File[] uploadedChunks = chunkFolder.toFile().listFiles();
+                int uploadedCount = (uploadedChunks != null) ? uploadedChunks.length : 0;
 
-                String parentPath = finalPath.getParent().toAbsolutePath().normalize().toString().replace("\\", "/");
-                SseController.broadcast("fs-change", Map.of("userId", user.getId(), "parentPath", parentPath));
+                if (uploadedCount == totalChunks) {
+                    Path finalPath = Paths.get(finalFileDestination);
+                    if (finalPath.getParent() != null) {
+                        Files.createDirectories(finalPath.getParent());
+                    }
 
-                return ResponseEntity.ok(Map.of("success", true, "merged", true));
+                    // Write to temp file then atomic move to prevent corruption or partial file reads
+                    Path tempMerged = chunkFolder.resolve("merged.tmp");
+                    try (BufferedOutputStream destStream = new BufferedOutputStream(new FileOutputStream(tempMerged.toFile()))) {
+                        for (int i = 0; i < totalChunks; i++) {
+                            Path partFile = chunkFolder.resolve(String.valueOf(i));
+                            if (Files.exists(partFile)) {
+                                Files.copy(partFile, destStream);
+                            }
+                        }
+                        destStream.flush();
+                    }
+
+                    Files.move(tempMerged, finalPath, StandardCopyOption.REPLACE_EXISTING);
+
+                    // Delete temp chunks folder after merging
+                    deleteRecursively(chunkFolder);
+
+                    String parentPath = finalPath.getParent() != null ? finalPath.getParent().toAbsolutePath().normalize().toString().replace("\\", "/") : "";
+                    SseController.broadcast("fs-change", Map.of("userId", user != null ? user.getId() : 0, "parentPath", parentPath));
+
+                    return ResponseEntity.ok(Map.of("success", true, "merged", true));
+                }
             }
 
             return ResponseEntity.ok(Map.of("success", true, "merged", false));
@@ -1344,15 +1366,21 @@ public class FileController {
                 if (file.isDirectory()) {
                     zipFolder(file, file.getName(), zos);
                 } else {
-                    zos.putNextEntry(new ZipEntry(file.getName()));
-                    try (FileInputStream fis = new FileInputStream(file)) {
-                        byte[] buffer = new byte[65536];
-                        int len;
-                        while ((len = fis.read(buffer)) > 0) {
-                            zos.write(buffer, 0, len);
+                    try {
+                        if (file.canRead()) {
+                            zos.putNextEntry(new ZipEntry(file.getName()));
+                            try (FileInputStream fis = new FileInputStream(file)) {
+                                byte[] buffer = new byte[65536];
+                                int len;
+                                while ((len = fis.read(buffer)) > 0) {
+                                    zos.write(buffer, 0, len);
+                                }
+                            }
+                            zos.closeEntry();
                         }
+                    } catch (Exception e) {
+                        System.err.println("Warning: Skipping unreadable file in batch zip: " + file.getAbsolutePath());
                     }
-                    zos.closeEntry();
                 }
             }
             zos.finish();

@@ -28,18 +28,9 @@ public class JwtInterceptor implements HandlerInterceptor {
     private com.sakuradata.media.service.UserActivityService userActivityService;
 
     private DecodedJWT verifyToken(String token) {
-        try {
-            Algorithm algorithm = Algorithm.HMAC256(JWT_SECRET);
-            JWTVerifier verifier = JWT.require(algorithm).build();
-            return verifier.verify(token);
-        } catch (Exception e) {
-            try {
-                Algorithm legacyAlgo = Algorithm.HMAC256("sakura-media-server-secret-key-2026");
-                JWTVerifier legacyVerifier = JWT.require(legacyAlgo).build();
-                return legacyVerifier.verify(token);
-            } catch (Exception ignored) {}
-            throw e;
-        }
+        Algorithm algorithm = Algorithm.HMAC256(JWT_SECRET);
+        JWTVerifier verifier = JWT.require(algorithm).build();
+        return verifier.verify(token);
     }
 
     @Override

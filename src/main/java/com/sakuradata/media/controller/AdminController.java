@@ -23,6 +23,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -51,6 +52,11 @@ public class AdminController {
     private com.sakuradata.media.service.UserActivityService userActivityService;
 
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+    private final ExecutorService storageStatsExecutor = Executors.newFixedThreadPool(4, r -> {
+        Thread t = new Thread(r, "storage-stats-worker");
+        t.setDaemon(true);
+        return t;
+    });
 
     private static Map<String, Object> cachedStorageStats = null;
     private static long lastStorageStatsUpdate = 0;
@@ -429,12 +435,10 @@ public class AdminController {
         File hddFile = new File("/media/hdd");
         File gdriveFile = new File("/media/gdrive");
 
-        java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newFixedThreadPool(4);
-
-        java.util.concurrent.Future<Map<String, Object>> homeFuture = executor.submit(() -> getStatsForFile(homeFile, "local", "/home/sakura"));
-        java.util.concurrent.Future<Map<String, Object>> storageFuture = executor.submit(() -> getStatsForFile(storageFile, "storage", "/media/storage"));
-        java.util.concurrent.Future<Map<String, Object>> hddFuture = executor.submit(() -> getStatsForFile(hddFile, "hdd", "/media/hdd"));
-        java.util.concurrent.Future<Map<String, Object>> gdriveFuture = executor.submit(() -> getStatsForFile(gdriveFile, "gdrive", "/media/gdrive"));
+        java.util.concurrent.Future<Map<String, Object>> homeFuture = storageStatsExecutor.submit(() -> getStatsForFile(homeFile, "local", "/home/sakura"));
+        java.util.concurrent.Future<Map<String, Object>> storageFuture = storageStatsExecutor.submit(() -> getStatsForFile(storageFile, "storage", "/media/storage"));
+        java.util.concurrent.Future<Map<String, Object>> hddFuture = storageStatsExecutor.submit(() -> getStatsForFile(hddFile, "hdd", "/media/hdd"));
+        java.util.concurrent.Future<Map<String, Object>> gdriveFuture = storageStatsExecutor.submit(() -> getStatsForFile(gdriveFile, "gdrive", "/media/gdrive"));
 
         Map<String, Object> response = new HashMap<>();
 
@@ -482,7 +486,6 @@ public class AdminController {
             gdriveFuture.cancel(true);
         }
 
-        executor.shutdown();
         return response;
     }
 
@@ -869,9 +872,33 @@ public class AdminController {
         }
 
         int port = portObj;
+        if (port < 1 || port > 65535) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Port must be between 1 and 65535"));
+        }
+
+        protocol = protocol.trim().toLowerCase();
+        if (!protocol.matches("^(tcp|udp|both)$")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Protocol must be tcp, udp, or both"));
+        }
+
+        action = action.trim().toLowerCase();
+        if (!action.matches("^(allow|deny|reject|limit)$")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Action must be allow, deny, reject, or limit"));
+        }
+
+        if (sourceIp != null && !sourceIp.trim().isEmpty()) {
+            sourceIp = sourceIp.trim();
+            // Validate IPv4, IPv6 or CIDR notation strictly
+            if (!sourceIp.matches("^[a-fA-F0-9.:/]{1,45}$")) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Invalid source IP or CIDR subnet format"));
+            }
+        } else {
+            sourceIp = null;
+        }
+
         String protoSuffix = "both".equalsIgnoreCase(protocol) ? "" : "/" + protocol;
         String ufwCmd = "echo sakura | sudo -S ufw " + action + " " + port + protoSuffix;
-        if (sourceIp != null && !sourceIp.trim().isEmpty()) {
+        if (sourceIp != null) {
             String protoPart = "both".equalsIgnoreCase(protocol) ? "" : " proto " + protocol;
             ufwCmd = "echo sakura | sudo -S ufw " + action + " from " + sourceIp + " to any port " + port + protoPart;
         }
@@ -900,11 +927,23 @@ public class AdminController {
         }
 
         FirewallRule rule = ruleOpt.get();
-        String protoSuffix = "both".equalsIgnoreCase(rule.getProtocol()) ? "" : "/" + rule.getProtocol();
-        String ufwCmd = "echo sakura | sudo -S ufw delete " + rule.getAction() + " " + rule.getPort() + protoSuffix;
-        if (rule.getSourceIp() != null && !rule.getSourceIp().isEmpty()) {
-            String protoPart = "both".equalsIgnoreCase(rule.getProtocol()) ? "" : " proto " + rule.getProtocol();
-            ufwCmd = "echo sakura | sudo -S ufw delete " + rule.getAction() + " from " + rule.getSourceIp() + " to any port " + rule.getPort() + protoPart;
+        int port = rule.getPort();
+        String protocol = rule.getProtocol() != null ? rule.getProtocol().trim().toLowerCase() : "both";
+        String action = rule.getAction() != null ? rule.getAction().trim().toLowerCase() : "allow";
+        String sourceIp = rule.getSourceIp() != null ? rule.getSourceIp().trim() : null;
+
+        if (port < 1 || port > 65535 || !protocol.matches("^(tcp|udp|both)$") || !action.matches("^(allow|deny|reject|limit)$")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid rule parameters in database"));
+        }
+        if (sourceIp != null && !sourceIp.matches("^[a-fA-F0-9.:/]{1,45}$")) {
+            sourceIp = null;
+        }
+
+        String protoSuffix = "both".equalsIgnoreCase(protocol) ? "" : "/" + protocol;
+        String ufwCmd = "echo sakura | sudo -S ufw delete " + action + " " + port + protoSuffix;
+        if (sourceIp != null && !sourceIp.isEmpty()) {
+            String protoPart = "both".equalsIgnoreCase(protocol) ? "" : " proto " + protocol;
+            ufwCmd = "echo sakura | sudo -S ufw delete " + action + " from " + sourceIp + " to any port " + port + protoPart;
         }
 
         logAudit(request, "Deleted firewall rule: " + rule.getPort() + "/" + rule.getProtocol());
@@ -1000,7 +1039,11 @@ public class AdminController {
 
         String cmd = "apt list --upgradable 2>/dev/null | head -n 100";
         if (search != null && !search.trim().isEmpty()) {
-            cmd = "apt-cache search \"" + search + "\" | head -n 100";
+            String sanitizedSearch = search.trim();
+            if (!sanitizedSearch.matches("^[a-zA-Z0-9.+~ -]{1,64}$")) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Invalid search query"));
+            }
+            cmd = "apt-cache search \"" + sanitizedSearch.replace("\"", "") + "\" | head -n 100";
         }
 
         Map<String, Object> res = runSystemCommand(new String[]{"sh", "-c", cmd});
@@ -1041,16 +1084,27 @@ public class AdminController {
 
         String pkgName = body.get("pkgName");
         String action = body.get("action");
-        if (pkgName == null || action == null) {
+        if (action == null || (!"upgrade".equals(action.trim().toLowerCase()) && (pkgName == null || pkgName.trim().isEmpty()))) {
             return ResponseEntity.badRequest().body(Map.of("error", "Package and action are required"));
         }
 
-        String cmd = "echo sakura | sudo -S apt-get " + action + " -y " + pkgName;
-        if ("upgrade".equals(action)) {
-            cmd = "echo sakura | sudo -S apt-get update && echo sakura | sudo -S apt-get upgrade -y";
+        action = action.trim().toLowerCase();
+        if (!action.matches("^(install|remove|purge|upgrade)$")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid action: must be install, remove, purge, or upgrade"));
         }
 
-        logAudit(request, "Triggered APT package action: " + action + " on " + pkgName);
+        String cmd;
+        if ("upgrade".equals(action)) {
+            cmd = "echo sakura | sudo -S apt-get update && echo sakura | sudo -S apt-get upgrade -y";
+            logAudit(request, "Triggered APT system upgrade");
+        } else {
+            pkgName = pkgName.trim();
+            if (!pkgName.matches("^[a-zA-Z0-9.+~:-]{1,128}$")) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Invalid package name format"));
+            }
+            cmd = "echo sakura | sudo -S apt-get " + action + " -y " + pkgName;
+            logAudit(request, "Triggered APT package action: " + action + " on " + pkgName);
+        }
         
         final String execCmd = cmd;
         scheduler.schedule(() -> {

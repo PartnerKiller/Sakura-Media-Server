@@ -29,7 +29,9 @@ public class RecycleBinController {
         if (user == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        List<RecycleItem> items = recycleItemRepository.findByUserId(user.getId());
+        List<RecycleItem> items = "admin".equals(user.getRole())
+                ? recycleItemRepository.findAll()
+                : recycleItemRepository.findByUserId(user.getId());
         return ResponseEntity.ok(items);
     }
 
@@ -46,7 +48,7 @@ public class RecycleBinController {
         }
 
         RecycleItem item = itemOpt.get();
-        if (!item.getUserId().equals(user.getId())) {
+        if (!"admin".equals(user.getRole()) && !item.getUserId().equals(user.getId())) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Access denied"));
         }
 
@@ -106,7 +108,7 @@ public class RecycleBinController {
         }
 
         RecycleItem item = itemOpt.get();
-        if (!item.getUserId().equals(user.getId())) {
+        if (!"admin".equals(user.getRole()) && !item.getUserId().equals(user.getId())) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Access denied"));
         }
 
@@ -126,7 +128,9 @@ public class RecycleBinController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        List<RecycleItem> items = recycleItemRepository.findByUserId(user.getId());
+        List<RecycleItem> items = "admin".equals(user.getRole())
+                ? recycleItemRepository.findAll()
+                : recycleItemRepository.findByUserId(user.getId());
         for (RecycleItem item : items) {
             File file = new File(item.getTempPath());
             if (file.exists()) {

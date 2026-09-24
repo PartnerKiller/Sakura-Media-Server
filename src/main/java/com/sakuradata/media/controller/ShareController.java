@@ -43,18 +43,6 @@ public class ShareController {
     @Autowired
     private AuditLogRepository auditLogRepository;
 
-    @PostConstruct
-    public void unrevokeExistingShares() {
-        try {
-            List<ShareLink> shares = shareLinkRepository.findAll();
-            for (ShareLink s : shares) {
-                if (Boolean.FALSE.equals(s.getIsActive())) {
-                    s.setIsActive(true);
-                    shareLinkRepository.save(s);
-                }
-            }
-        } catch (Exception ignored) {}
-    }
 
     private boolean isSubPath(String parentStr, String childStr) {
         try {
@@ -339,14 +327,12 @@ public class ShareController {
             return;
         }
 
-        // Increment download counter
-        try {
-            share.setDownloadCount(share.getDownloadCount() + 1);
-            shareLinkRepository.save(share);
-        } catch (Exception ignored) {}
-
         // Handle Folder Download as ZIP
         if (file.isDirectory()) {
+            try {
+                share.setDownloadCount(share.getDownloadCount() + 1);
+                shareLinkRepository.save(share);
+            } catch (Exception ignored) {}
             downloadFolderAsZip(file, response);
             return;
         }
@@ -378,6 +364,14 @@ public class ShareController {
                 end = fileLength - 1;
                 isRange = false;
             }
+        }
+
+        // Increment download counter only on full downloads or initial streaming requests (not range seeks / multi-chunks)
+        if (!isRange) {
+            try {
+                share.setDownloadCount(share.getDownloadCount() + 1);
+                shareLinkRepository.save(share);
+            } catch (Exception ignored) {}
         }
 
         long contentLength = end - start + 1;
@@ -465,15 +459,22 @@ public class ShareController {
             }
             return;
         }
-        try (FileInputStream fis = new FileInputStream(fileToZip)) {
-            ZipEntry zipEntry = new ZipEntry(fileName);
-            zipOut.putNextEntry(zipEntry);
-            byte[] bytes = new byte[65536];
-            int length;
-            while ((length = fis.read(bytes)) >= 0) {
-                zipOut.write(bytes, 0, length);
+        try {
+            if (!fileToZip.exists() || !fileToZip.canRead()) {
+                return;
             }
-            zipOut.closeEntry();
+            try (FileInputStream fis = new FileInputStream(fileToZip)) {
+                ZipEntry zipEntry = new ZipEntry(fileName);
+                zipOut.putNextEntry(zipEntry);
+                byte[] bytes = new byte[65536];
+                int length;
+                while ((length = fis.read(bytes)) >= 0) {
+                    zipOut.write(bytes, 0, length);
+                }
+                zipOut.closeEntry();
+            }
+        } catch (Exception e) {
+            System.err.println("Warning: Skipping unreadable file during share zip compression: " + fileToZip.getAbsolutePath() + " - " + e.getMessage());
         }
     }
 

@@ -404,6 +404,25 @@ public class ImportService {
             response = client.send(confirmRequest, HttpResponse.BodyHandlers.ofInputStream());
         }
 
+        int finalStatus = response.statusCode();
+        if (finalStatus >= 400) {
+            throw new IOException("Google Drive returned HTTP " + finalStatus + " error");
+        }
+
+        String postContentType = response.headers().firstValue("Content-Type").orElse("");
+        String postDisposition = response.headers().firstValue("Content-Disposition").orElse("");
+        if (postContentType.toLowerCase().contains("text/html") && !postDisposition.contains("filename")) {
+            InputStream is = response.body();
+            String errHtml = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+            if (errHtml.contains("quota") || errHtml.contains("exceeded")) {
+                throw new IOException("Google Drive download quota exceeded for this file. Please try again later or verify link permissions.");
+            }
+            if (errHtml.contains("Access denied") || errHtml.contains("permission")) {
+                throw new IOException("Google Drive file requires permission. Ensure link is shared with 'Anyone with the link'.");
+            }
+            throw new IOException("Google Drive returned an HTML error page instead of the requested file.");
+        }
+
         // Extract filename
         String finalFileName = resolveFileName(customFileName, response.headers().firstValue("Content-Disposition").orElse(null), task.getUrl(), "gdrive_" + fileId);
         task.setFileName(finalFileName);
@@ -589,9 +608,16 @@ public class ImportService {
             return;
         }
 
-        // Atomic rename to final file
+        // Atomic move to final file
         if (partFile.exists()) {
-            partFile.renameTo(finalFile);
+            try {
+                Files.move(partFile.toPath(), finalFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            } catch (Exception e) {
+                boolean renamed = partFile.renameTo(finalFile);
+                if (!renamed && !finalFile.exists()) {
+                    throw new IOException("Failed to move completed part file to final destination: " + e.getMessage());
+                }
+            }
         }
 
         task.setStatus("COMPLETED");

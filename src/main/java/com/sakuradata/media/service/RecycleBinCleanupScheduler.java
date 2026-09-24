@@ -23,17 +23,22 @@ public class RecycleBinCleanupScheduler {
         for (RecycleItem item : expired) {
             try {
                 File file = new File(item.getTempPath());
+                boolean deleted = true;
                 if (file.exists()) {
-                    deleteRecursively(file);
+                    deleted = deleteRecursively(file);
                 }
-                recycleItemRepository.delete(item);
+                if (deleted || !file.exists()) {
+                    recycleItemRepository.delete(item);
+                } else {
+                    System.err.println("Could not delete physical file for expired recycle item: " + item.getTempPath());
+                }
             } catch (Exception e) {
-                System.err.println("Failed to permanently delete expired recycle item: " + item.getTempPath());
+                System.err.println("Failed to permanently delete expired recycle item: " + item.getTempPath() + " - " + e.getMessage());
             }
         }
     }
 
-    private void deleteRecursively(File file) {
+    private boolean deleteRecursively(File file) {
         if (file.isDirectory()) {
             File[] entries = file.listFiles();
             if (entries != null) {
@@ -42,6 +47,6 @@ public class RecycleBinCleanupScheduler {
                 }
             }
         }
-        file.delete();
+        return file.delete();
     }
 }
