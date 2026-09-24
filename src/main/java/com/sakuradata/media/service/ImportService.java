@@ -186,19 +186,25 @@ public class ImportService {
             return;
         }
 
-        // 2. Check if it's a media site link supported by yt-dlp (YouTube, TikTok, Vimeo, Twitter, etc.)
+        // 2. Check if it's an M3U8 / HLS stream link
+        if (isM3u8Link(url)) {
+            executeM3u8Download(task, customFileName);
+            return;
+        }
+
+        // 3. Check if it's a media site link supported by yt-dlp (YouTube, TikTok, Vimeo, Twitter, etc.)
         if (isMediaSite(url) && isYtDlpAvailable()) {
             executeYtDlpDownload(task, customFileName);
             return;
         }
 
-        // 3. Check if it's a Google Drive single file link
+        // 4. Check if it's a Google Drive single file link
         if (isGoogleDriveLink(url)) {
             executeGoogleDriveDownload(task, customFileName);
             return;
         }
 
-        // 4. Standard Direct HTTP/HTTPS download
+        // 5. Standard Direct HTTP/HTTPS download
         executeHttpDownload(task, url, customFileName);
     }
 
@@ -208,6 +214,13 @@ public class ImportService {
 
     private boolean isGoogleDriveFolder(String url) {
         return isGoogleDriveLink(url) && (url.contains("/folders/") || url.contains("/drive/folders/"));
+    }
+
+    private boolean isM3u8Link(String url) {
+        if (url == null || url.trim().isEmpty()) return false;
+        String lower = url.trim().toLowerCase();
+        return lower.contains(".m3u8") || lower.contains(".m3u")
+                || lower.contains("/hls/") || lower.contains("m3u8=true") || lower.contains("format=m3u8");
     }
 
     private boolean isMediaSite(String url) {
@@ -463,6 +476,233 @@ public class ImportService {
         streamToFile(response.body(), task);
     }
 
+    private void executeM3u8Download(ImportTask task, String customFileName) throws Exception {
+        String url = task.getUrl();
+        log.info("Executing M3U8 stream download for task {} with URL: {}", task.getTaskId(), url);
+
+        // Resolve clean MP4 filename
+        String finalFileName;
+        if (customFileName != null && !customFileName.trim().isEmpty()) {
+            String sanitized = sanitizeFileName(customFileName.trim());
+            if (!sanitized.toLowerCase().endsWith(".mp4") && !sanitized.toLowerCase().endsWith(".mkv") && !sanitized.toLowerCase().endsWith(".ts")) {
+                sanitized += ".mp4";
+            }
+            finalFileName = sanitized;
+        } else {
+            finalFileName = resolveM3u8FileNameFromUrl(url);
+        }
+
+        task.setFileName(finalFileName);
+        task.setStatus("DOWNLOADING");
+        broadcastProgress(task);
+
+        if (isYtDlpAvailable()) {
+            try {
+                executeYtDlpM3u8Download(task, finalFileName);
+                return;
+            } catch (Exception e) {
+                log.warn("yt-dlp M3U8 download failed for task {}, attempting ffmpeg fallback: {}", task.getTaskId(), e.getMessage());
+            }
+        }
+
+        // Fallback to native ffmpeg remuxer
+        executeFfmpegM3u8Download(task, finalFileName);
+    }
+
+    private String resolveM3u8FileNameFromUrl(String url) {
+        try {
+            URI uri = URI.create(url);
+            String path = uri.getPath();
+            if (path != null && path.contains("/")) {
+                String[] segments = path.split("/");
+                for (int i = segments.length - 1; i >= 0; i--) {
+                    String seg = segments[i].trim();
+                    if (seg.isEmpty()) continue;
+                    String lower = seg.toLowerCase();
+                    if (lower.equals("master.m3u8") || lower.equals("index.m3u8") || lower.equals("playlist.m3u8")
+                            || lower.equals("stream.m3u8") || lower.equals("live.m3u8") || lower.equals("prog_index.m3u8")
+                            || lower.equals("chunks.m3u8")) {
+                        continue;
+                    }
+                    if (lower.endsWith(".m3u8") || lower.endsWith(".m3u")) {
+                        String base = seg.substring(0, seg.lastIndexOf('.'));
+                        if (!base.isEmpty()) {
+                            return sanitizeFileName(base) + ".mp4";
+                        }
+                    } else if (i < segments.length - 1) {
+                        return sanitizeFileName(seg) + ".mp4";
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return "stream_" + System.currentTimeMillis() + ".mp4";
+    }
+
+    private void executeYtDlpM3u8Download(ImportTask task, String targetFileName) throws Exception {
+        String ytdlpBin = new File("/usr/local/bin/yt-dlp").exists() ? "/usr/local/bin/yt-dlp" : "/usr/bin/yt-dlp";
+
+        List<String> command = new ArrayList<>(Arrays.asList(
+                ytdlpBin,
+                "--newline",
+                "--no-colors",
+                "--no-playlist",
+                "--concurrent-fragments", "4",
+                "--hls-use-mpegts",
+                "--remux-video", "mp4",
+                "-o", targetFileName,
+                task.getUrl()
+        ));
+
+        ProcessBuilder pb = new ProcessBuilder(command);
+        pb.directory(new File(task.getTargetPath()));
+        pb.redirectErrorStream(true);
+
+        Process process = pb.start();
+        task.setProcess(process);
+
+        Pattern progressPattern = Pattern.compile("\\[download\\]\\s+([0-9.]+)%\\s+of\\s+~?\\s*([0-9.]+[A-Za-z]+)(?:\\s+at\\s+([0-9.]+[A-Za-z/]+))?");
+        Pattern fragPattern = Pattern.compile("\\(frag\\s+([0-9]+)/([0-9]+)\\)");
+        Pattern destPattern = Pattern.compile("\\[(?:download|FixupM3u8|VideoRemuxer|ffmpeg|Merger)\\]\\s+(?:Destination:|Fixing MPEG-TS in MP4 container of \"?|Merging formats into \"?|Writing video to \"?)\\s*([^\"\\n\\r]+)");
+
+        long lastBroadcastTime = 0;
+
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (task.isCancelled()) {
+                    process.destroyForcibly();
+                    return;
+                }
+
+                log.info("[m3u8-ytdlp] {}", line);
+
+                Matcher destMatcher = destPattern.matcher(line);
+                if (destMatcher.find()) {
+                    String extracted = destMatcher.group(1).trim().replace("\"", "");
+                    task.setFileName(new File(extracted).getName());
+                }
+
+                Matcher progMatcher = progressPattern.matcher(line);
+                if (progMatcher.find()) {
+                    try {
+                        float pct = Float.parseFloat(progMatcher.group(1));
+                        task.setPercent((int) pct);
+                        if (progMatcher.group(3) != null) {
+                            task.setSpeed(progMatcher.group(3).trim());
+                        }
+                    } catch (Exception ignored) {}
+                }
+
+                Matcher fragMatcher = fragPattern.matcher(line);
+                if (fragMatcher.find()) {
+                    try {
+                        int curr = Integer.parseInt(fragMatcher.group(1));
+                        int tot = Integer.parseInt(fragMatcher.group(2));
+                        if (tot > 0) {
+                            int pct = (curr * 100) / tot;
+                            if (pct > task.getPercent()) {
+                                task.setPercent(pct);
+                            }
+                        }
+                    } catch (Exception ignored) {}
+                }
+
+                long now = System.currentTimeMillis();
+                if (now - lastBroadcastTime > 400) {
+                    broadcastProgress(task);
+                    lastBroadcastTime = now;
+                }
+            }
+        }
+
+        int exitCode = process.waitFor();
+        if (exitCode != 0 && !task.isCancelled()) {
+            throw new IOException("yt-dlp M3U8 download exited with code " + exitCode);
+        }
+
+        File targetFile = new File(task.getTargetPath(), task.getFileName());
+        if (!targetFile.exists()) {
+            File namedFile = new File(task.getTargetPath(), targetFileName);
+            if (namedFile.exists()) {
+                task.setFileName(namedFile.getName());
+            }
+        }
+
+        task.setStatus("COMPLETED");
+        task.setPercent(100);
+        task.setEndTime(System.currentTimeMillis());
+        task.setSpeed("Done");
+        broadcastProgress(task);
+        broadcastFileCreated(task);
+    }
+
+    private void executeFfmpegM3u8Download(ImportTask task, String targetFileName) throws Exception {
+        File targetDir = new File(task.getTargetPath());
+        File outputFile = new File(targetDir, targetFileName);
+
+        task.setFileName(outputFile.getName());
+        task.setStatus("DOWNLOADING");
+        broadcastProgress(task);
+
+        List<String> command = new ArrayList<>(Arrays.asList(
+                "ffmpeg",
+                "-y",
+                "-i", task.getUrl(),
+                "-c", "copy",
+                "-bsf:a", "aac_adtstoasc",
+                outputFile.getAbsolutePath()
+        ));
+
+        ProcessBuilder pb = new ProcessBuilder(command);
+        pb.directory(targetDir);
+        pb.redirectErrorStream(true);
+
+        Process process = pb.start();
+        task.setProcess(process);
+
+        Pattern timePattern = Pattern.compile("time=([0-9:.]+)");
+        Pattern speedPattern = Pattern.compile("speed=\\s*([0-9.]+x)");
+
+        long lastBroadcast = 0;
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (task.isCancelled()) {
+                    process.destroyForcibly();
+                    if (outputFile.exists()) outputFile.delete();
+                    return;
+                }
+
+                Matcher timeMatcher = timePattern.matcher(line);
+                Matcher spdMatcher = speedPattern.matcher(line);
+                if (timeMatcher.find()) {
+                    String timeStr = timeMatcher.group(1);
+                    String spd = spdMatcher.find() ? spdMatcher.group(1) : "";
+                    task.setSpeed(!spd.isEmpty() ? spd : "Downloading stream...");
+                }
+
+                long now = System.currentTimeMillis();
+                if (now - lastBroadcast > 500) {
+                    broadcastProgress(task);
+                    lastBroadcast = now;
+                }
+            }
+        }
+
+        int exitCode = process.waitFor();
+        if (exitCode != 0 && !task.isCancelled()) {
+            if (outputFile.exists()) outputFile.delete();
+            throw new IOException("ffmpeg M3U8 download exited with code " + exitCode);
+        }
+
+        task.setStatus("COMPLETED");
+        task.setPercent(100);
+        task.setEndTime(System.currentTimeMillis());
+        task.setSpeed("Done");
+        broadcastProgress(task);
+        broadcastFileCreated(task);
+    }
+
     private void executeYtDlpDownload(ImportTask task, String customFileName) throws Exception {
         String ytdlpBin = new File("/usr/local/bin/yt-dlp").exists() ? "/usr/local/bin/yt-dlp" : "/usr/bin/yt-dlp";
 
@@ -490,8 +730,8 @@ public class ImportService {
 
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
             String line;
-            Pattern progressPattern = Pattern.compile("\\[download\\]\\s+([0-9.]+)%\\s+of\\s+~?([0-9.]+[A-Za-z]+)\\s+at\\s+([0-9.]+[A-Za-z/]+)");
-            Pattern destPattern = Pattern.compile("\\[download\\] Destination:\\s+(.+)");
+            Pattern progressPattern = Pattern.compile("\\[download\\]\\s+([0-9.]+)%\\s+of\\s+~?\\s*([0-9.]+[A-Za-z]+)(?:\\s+at\\s+([0-9.]+[A-Za-z/]+))?");
+            Pattern destPattern = Pattern.compile("\\[(?:download|FixupM3u8|VideoRemuxer|ffmpeg|Merger)\\]\\s+(?:Destination:|Fixing MPEG-TS in MP4 container of \"?|Merging formats into \"?|Writing video to \"?)\\s*([^\"\\n\\r]+)");
             Pattern mergingPattern = Pattern.compile("\\[Merger\\] Merging formats into \"([^\"]+)\"");
 
             long lastBroadcastTime = 0;
@@ -504,7 +744,7 @@ public class ImportService {
 
                 Matcher destMatcher = destPattern.matcher(line);
                 if (destMatcher.find()) {
-                    task.setFileName(new File(destMatcher.group(1)).getName());
+                    task.setFileName(new File(destMatcher.group(1).trim().replace("\"", "")).getName());
                 }
 
                 Matcher mergeMatcher = mergingPattern.matcher(line);
@@ -517,7 +757,9 @@ public class ImportService {
                     try {
                         float pct = Float.parseFloat(progMatcher.group(1));
                         task.setPercent((int) pct);
-                        task.setSpeed(progMatcher.group(3));
+                        if (progMatcher.group(3) != null) {
+                            task.setSpeed(progMatcher.group(3));
+                        }
                     } catch (Exception ignored) {}
                 }
 

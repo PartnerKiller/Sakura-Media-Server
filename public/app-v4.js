@@ -1753,8 +1753,9 @@ function openMedia(filePath, fileName, category) {
     if (errorBanner) errorBanner.style.display = 'none';
     player.style.display = 'block';
     
-    const relativeStreamUrl = `/api/files/stream-media/${safeBase64Encode(filePath)}?token=${state.token}`;
-    const isHlsStream = fileName.toLowerCase().endsWith('.m3u8');
+    const isDirect = file && file.isDirectUrl;
+    const relativeStreamUrl = isDirect ? file.streamUrl : `/api/files/stream-media/${safeBase64Encode(filePath)}?token=${state.token}`;
+    const isHlsStream = fileName.toLowerCase().endsWith('.m3u8') || (isDirect && (file.streamUrl.toLowerCase().includes('.m3u8') || file.streamUrl.toLowerCase().includes('.m3u')));
 
     // Destroy previous HLS.js instance if any
     if (state.hlsInstance) {
@@ -1804,6 +1805,8 @@ function openMedia(filePath, fileName, category) {
         console.warn('Failed to initialize Hls.js, falling back to direct video src:', err);
         player.src = relativeStreamUrl;
       }
+    } else if (isHlsStream && player.canPlayType('application/vnd.apple.mpegurl')) {
+      player.src = relativeStreamUrl;
     } else {
       player.src = relativeStreamUrl;
     }
@@ -1869,7 +1872,7 @@ function openMedia(filePath, fileName, category) {
     }
 
     // Configure VLC Streaming Options (UTF-8 M3U8)
-    const absoluteStreamUrl = window.location.origin + relativeStreamUrl;
+    const absoluteStreamUrl = isDirect ? file.streamUrl : (window.location.origin + relativeStreamUrl);
 
     // 1. Single-file UTF-8 M3U8 playlist file generation
     const m3uBtn = document.getElementById('btn-stream-vlc-m3u');
@@ -5509,8 +5512,32 @@ function openImportUrlModal() {
   }
 
   const urlInput = document.getElementById('import-url-input');
+  const streamBtn = document.getElementById('btn-stream-m3u8-direct');
+
+  if (streamBtn) {
+    streamBtn.style.display = 'none';
+    streamBtn.onclick = () => {
+      const url = urlInput ? urlInput.value.trim() : '';
+      const fnInput = document.getElementById('import-filename-input');
+      const fn = fnInput ? fnInput.value.trim() : '';
+      if (!url) return;
+      playDirectM3u8Stream(url, fn || 'M3U8 Live Stream');
+    };
+  }
+
   if (urlInput) {
     urlInput.value = '';
+    urlInput.oninput = () => {
+      const val = urlInput.value.trim().toLowerCase();
+      if (streamBtn) {
+        if (val.includes('.m3u8') || val.includes('.m3u') || val.includes('/hls/')) {
+          streamBtn.style.display = 'inline-flex';
+          if (window.lucide) lucide.createIcons();
+        } else {
+          streamBtn.style.display = 'none';
+        }
+      }
+    };
     setTimeout(() => urlInput.focus(), 150);
   }
 
@@ -5530,6 +5557,17 @@ function openImportUrlModal() {
   openModal('modal-import-url');
 }
 window.openImportUrlModal = openImportUrlModal;
+
+function playDirectM3u8Stream(url, title) {
+  closeImportUrlModal();
+  openMediaViewer({
+    name: title || 'M3U8 Live Stream',
+    path: url,
+    isDirectUrl: true,
+    streamUrl: url
+  }, 'video');
+}
+window.playDirectM3u8Stream = playDirectM3u8Stream;
 
 function closeImportUrlModal() {
   closeModal('modal-import-url');
@@ -5564,11 +5602,12 @@ async function handleStartImport() {
     if (window.lucide) lucide.createIcons();
   }
 
+  const isM3u8 = url.toLowerCase().includes('.m3u8') || url.toLowerCase().includes('.m3u') || url.toLowerCase().includes('/hls/');
   const progressCard = document.getElementById('import-progress-card');
   if (progressCard) {
     progressCard.style.display = 'flex';
-    document.getElementById('import-progress-status-title').innerText = 'Initiating download...';
-    document.getElementById('import-progress-filename').innerText = customFileName || 'Connecting to remote host...';
+    document.getElementById('import-progress-status-title').innerText = isM3u8 ? 'Streaming & Merging M3U8...' : 'Initiating download...';
+    document.getElementById('import-progress-filename').innerText = customFileName || (isM3u8 ? 'Downloading HLS fragments...' : 'Connecting to remote host...');
     document.getElementById('import-progress-percent').innerText = '0%';
     document.getElementById('import-progress-bar').style.width = '0%';
     document.getElementById('import-progress-bytes').innerText = '0 MB';
