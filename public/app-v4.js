@@ -1721,8 +1721,9 @@ function navigateMedia(delta) {
 }
 window.navigateMedia = navigateMedia;
 
-function openMedia(filePath, fileName, category) {
-  if (window.location.hash.substring(1) !== filePath) {
+function openMedia(filePath, fileName, category, directStreamUrl = null) {
+  const isDirect = Boolean(directStreamUrl);
+  if (!isDirect && window.location.hash.substring(1) !== filePath) {
     window.location.hash = filePath;
   }
 
@@ -1731,7 +1732,9 @@ function openMedia(filePath, fileName, category) {
   const videoExts = ['mp4', 'mkv', 'webm', 'avi', 'mov', 'flv', 'wmv', 'm4v', 'ts', '3gp', 'm3u8', 'm3u', 'ogv'];
   
   let targetList = [];
-  if (category === 'image') {
+  if (isDirect) {
+    targetList = [{ name: fileName, path: filePath, isFile: true }];
+  } else if (category === 'image') {
     targetList = (state.files || []).filter(f => f.isFile && imageExts.includes(f.name.split('.').pop().toLowerCase()));
   } else if (category === 'video') {
     targetList = (state.files || []).filter(f => f.isFile && videoExts.includes(f.name.split('.').pop().toLowerCase()));
@@ -1739,7 +1742,7 @@ function openMedia(filePath, fileName, category) {
   
   state.currentMediaList = targetList;
   state.currentMediaCategory = category;
-  state.currentMediaIndex = targetList.findIndex(f => (f.path || `${state.currentPath}/${f.name}`) === filePath || f.name === fileName);
+  state.currentMediaIndex = isDirect ? 0 : targetList.findIndex(f => (f.path || `${state.currentPath}/${f.name}`) === filePath || f.name === fileName);
   if (state.currentMediaIndex === -1 && targetList.length > 0) {
     state.currentMediaIndex = 0;
   }
@@ -1753,9 +1756,8 @@ function openMedia(filePath, fileName, category) {
     if (errorBanner) errorBanner.style.display = 'none';
     player.style.display = 'block';
     
-    const isDirect = file && file.isDirectUrl;
-    const relativeStreamUrl = isDirect ? file.streamUrl : `/api/files/stream-media/${safeBase64Encode(filePath)}?token=${state.token}`;
-    const isHlsStream = fileName.toLowerCase().endsWith('.m3u8') || (isDirect && (file.streamUrl.toLowerCase().includes('.m3u8') || file.streamUrl.toLowerCase().includes('.m3u')));
+    const relativeStreamUrl = isDirect ? directStreamUrl : `/api/files/stream-media/${safeBase64Encode(filePath)}?token=${state.token}`;
+    const isHlsStream = fileName.toLowerCase().endsWith('.m3u8') || (isDirect && (directStreamUrl.toLowerCase().includes('.m3u8') || directStreamUrl.toLowerCase().includes('.m3u') || directStreamUrl.toLowerCase().includes('/hls/')));
 
     // Destroy previous HLS.js instance if any
     if (state.hlsInstance) {
@@ -1856,23 +1858,36 @@ function openMedia(filePath, fileName, category) {
     
     const downloadBtn = document.getElementById('btn-download-video');
     if (downloadBtn) {
-      const dlUrl = `/api/files/download?path=${encodeURIComponent(filePath)}&token=${state.token}`;
-      downloadBtn.href = dlUrl;
-      downloadBtn.setAttribute('download', fileName);
-      downloadBtn.onclick = (e) => {
-        handleDownloadFile(e, filePath);
-      };
+      if (isDirect) {
+        downloadBtn.href = directStreamUrl;
+        downloadBtn.removeAttribute('download');
+        downloadBtn.target = '_blank';
+        downloadBtn.onclick = null;
+      } else {
+        const dlUrl = `/api/files/download?path=${encodeURIComponent(filePath)}&token=${state.token}`;
+        downloadBtn.href = dlUrl;
+        downloadBtn.setAttribute('download', fileName);
+        downloadBtn.removeAttribute('target');
+        downloadBtn.onclick = (e) => {
+          handleDownloadFile(e, filePath);
+        };
+      }
     }
 
     const shareVideoBtn = document.getElementById('btn-share-video-link');
     if (shareVideoBtn) {
       shareVideoBtn.onclick = (e) => {
-        handleShareFile(e, filePath);
+        if (isDirect) {
+          navigator.clipboard.writeText(directStreamUrl);
+          showToast('Stream link copied to clipboard', 'info');
+        } else {
+          handleShareFile(e, filePath);
+        }
       };
     }
 
     // Configure VLC Streaming Options (UTF-8 M3U8)
-    const absoluteStreamUrl = isDirect ? file.streamUrl : (window.location.origin + relativeStreamUrl);
+    const absoluteStreamUrl = isDirect ? directStreamUrl : (window.location.origin + relativeStreamUrl);
 
     // 1. Single-file UTF-8 M3U8 playlist file generation
     const m3uBtn = document.getElementById('btn-stream-vlc-m3u');
@@ -1887,7 +1902,7 @@ function openMedia(filePath, fileName, category) {
     // 2. Multi-file / Folder UTF-8 M3U8 playlist file generation (e.g. for anime series / movie folders)
     const folderM3uBtn = document.getElementById('btn-stream-vlc-folder-m3u');
     if (folderM3uBtn) {
-      if (targetList && targetList.length > 1) {
+      if (!isDirect && targetList && targetList.length > 1) {
         let playlistLines = ['#EXTM3U'];
         targetList.forEach(item => {
           const itemPath = item.path || (state.currentPath ? `${state.currentPath}/${item.name}` : item.name);
@@ -5560,12 +5575,7 @@ window.openImportUrlModal = openImportUrlModal;
 
 function playDirectM3u8Stream(url, title) {
   closeImportUrlModal();
-  openMediaViewer({
-    name: title || 'M3U8 Live Stream',
-    path: url,
-    isDirectUrl: true,
-    streamUrl: url
-  }, 'video');
+  openMedia(url, title || 'M3U8 Live Stream', 'video', url);
 }
 window.playDirectM3u8Stream = playDirectM3u8Stream;
 
