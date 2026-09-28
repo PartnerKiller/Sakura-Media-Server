@@ -282,15 +282,16 @@ function initApp() {
   // Restore sidebar collapsed preference on desktop
   const isSidebarCollapsed = localStorage.getItem('sakura_sidebar_collapsed') === 'true';
   const dashContainer = document.getElementById('dashboard-container');
-  if (dashContainer && isSidebarCollapsed && window.innerWidth > 768) {
-    dashContainer.classList.add('sidebar-collapsed');
+  const sidebarEl = document.getElementById('sidebar');
+  if (isSidebarCollapsed && window.innerWidth > 768) {
+    if (dashContainer) dashContainer.classList.add('sidebar-collapsed');
+    if (sidebarEl) sidebarEl.classList.add('collapsed');
     const toggleBtn = document.getElementById('btn-sidebar-toggle');
     if (toggleBtn) toggleBtn.title = 'Expand Sidebar';
   }
 
-  // Bind 3-line hamburger menu toggle buttons
+  // Bind 3-line hamburger menu toggle button
   safeAddListener('btn-sidebar-toggle', 'click', toggleSidebar);
-  safeAddListener('btn-topbar-menu', 'click', toggleSidebar);
 
   // Bind Logo Click (to return to Home Explorer)
   const sidebarBrand = document.querySelector('.sidebar-brand');
@@ -1544,8 +1545,14 @@ window.filterFiles = filterFiles;
 // MOBILE DRAWER & ACTION SHEET HANDLERS
 // ==========================================
 
+let lastSidebarToggleTime = 0;
 function toggleSidebar(e) {
+  if (e && e.preventDefault) e.preventDefault();
   if (e && e.stopPropagation) e.stopPropagation();
+  const now = Date.now();
+  if (now - lastSidebarToggleTime < 250) return;
+  lastSidebarToggleTime = now;
+
   const container = document.getElementById('dashboard-container');
   const sidebar = document.getElementById('sidebar');
   const toggleBtn = document.getElementById('btn-sidebar-toggle');
@@ -1561,6 +1568,7 @@ function toggleSidebar(e) {
   } else {
     container.classList.toggle('sidebar-collapsed');
     const isCollapsed = container.classList.contains('sidebar-collapsed');
+    sidebar.classList.toggle('collapsed', isCollapsed);
     localStorage.setItem('sakura_sidebar_collapsed', isCollapsed ? 'true' : 'false');
     if (toggleBtn) {
       toggleBtn.title = isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar';
