@@ -279,11 +279,22 @@ function initApp() {
   // Bind Logout Button
   safeAddListener('btn-logout', 'click', logout);
 
+  // Restore sidebar collapsed preference on desktop
+  const isSidebarCollapsed = localStorage.getItem('sakura_sidebar_collapsed') === 'true';
+  const dashContainer = document.getElementById('dashboard-container');
+  if (dashContainer && isSidebarCollapsed && window.innerWidth > 768) {
+    dashContainer.classList.add('sidebar-collapsed');
+  }
+
+  // Bind 3-line hamburger menu toggle buttons
+  safeAddListener('btn-sidebar-toggle', 'click', toggleSidebar);
+  safeAddListener('btn-topbar-menu', 'click', toggleSidebar);
+
   // Bind Logo Click (to return to Home Explorer)
-  const sidebarHeader = document.querySelector('.sidebar-header');
-  if (sidebarHeader) {
-    sidebarHeader.style.cursor = 'pointer';
-    sidebarHeader.addEventListener('click', () => {
+  const sidebarBrand = document.querySelector('.sidebar-brand');
+  if (sidebarBrand) {
+    sidebarBrand.style.cursor = 'pointer';
+    sidebarBrand.addEventListener('click', (e) => {
       closeAllMediaViewersSilently();
       switchPanel('explorer');
       if (state.roots.length > 0) {
@@ -751,6 +762,9 @@ function logout() {
 // PANEL NAVIGATION
 function switchPanel(panelName) {
   closeAllMediaViewersSilently();
+  if (window.innerWidth <= 768) {
+    closeMobileDrawer();
+  }
 
   // Clear any active metrics timer when switching panels
   if (state.serverMetricsTimer) {
@@ -1527,6 +1541,28 @@ window.filterFiles = filterFiles;
 // ==========================================
 // MOBILE DRAWER & ACTION SHEET HANDLERS
 // ==========================================
+
+function toggleSidebar(e) {
+  if (e && e.stopPropagation) e.stopPropagation();
+  const container = document.getElementById('dashboard-container');
+  const sidebar = document.getElementById('sidebar');
+  if (!container || !sidebar) return;
+
+  const isMobile = window.innerWidth <= 768;
+  if (isMobile) {
+    if (sidebar.classList.contains('mobile-open')) {
+      closeMobileDrawer();
+    } else {
+      openMobileDrawer();
+    }
+  } else {
+    container.classList.toggle('sidebar-collapsed');
+    const isCollapsed = container.classList.contains('sidebar-collapsed');
+    localStorage.setItem('sakura_sidebar_collapsed', isCollapsed ? 'true' : 'false');
+    if (window.lucide) lucide.createIcons();
+  }
+}
+window.toggleSidebar = toggleSidebar;
 
 function openMobileDrawer() {
   const sidebar = document.getElementById('sidebar');

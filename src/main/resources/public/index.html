@@ -64,6 +64,9 @@
     <!-- SIDEBAR -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
+        <button type="button" class="btn-hamburger" id="btn-sidebar-toggle" title="Toggle Sidebar" aria-label="Toggle menu" onclick="toggleSidebar()">
+          <i data-lucide="menu"></i>
+        </button>
         <div class="sidebar-brand">
           <img src="/favicon.jpg" class="logo" alt="Sakura Logo">
           <h2>Sakura Media</h2>
@@ -73,40 +76,40 @@
         </button>
       </div>
       <nav class="sidebar-nav">
-        <button class="nav-item active" id="nav-explorer">
+        <button class="nav-item active" id="nav-explorer" title="Explorer">
           <i data-lucide="folder-open"></i>
           <span>Explorer</span>
         </button>
-        <button class="nav-item admin-only" id="nav-users">
+        <button class="nav-item admin-only" id="nav-users" title="Users & Permissions">
           <i data-lucide="users"></i>
           <span>Users & Permissions</span>
         </button>
-        <button class="nav-item admin-only" id="nav-server">
+        <button class="nav-item admin-only" id="nav-server" title="Server Management">
           <i data-lucide="server"></i>
           <span>Server Management</span>
         </button>
-        <button class="nav-item" id="nav-recycle-bin">
+        <button class="nav-item" id="nav-recycle-bin" title="Recycle Bin">
           <i data-lucide="trash-2"></i>
           <span>Recycle Bin</span>
         </button>
-        <button class="nav-item" id="nav-shares" onclick="openManageSharesModal()">
+        <button class="nav-item" id="nav-shares" onclick="openManageSharesModal()" title="Shared Links">
           <i data-lucide="share-2"></i>
           <span>Shared Links</span>
         </button>
-        <button class="nav-item user-only" id="nav-profile">
+        <button class="nav-item user-only" id="nav-profile" title="Profile Settings">
           <i data-lucide="user"></i>
           <span>Profile Settings</span>
         </button>
       </nav>
       <div class="sidebar-footer">
-        <div class="user-profile">
+        <div class="user-profile" id="sidebar-user-profile" title="User Profile">
           <div class="avatar" id="user-avatar">S</div>
           <div class="user-details">
             <div class="user-name" id="user-display-name">Sakura</div>
             <div class="user-role" id="user-display-role">Owner</div>
           </div>
         </div>
-        <button id="btn-logout" class="btn-icon-text">
+        <button id="btn-logout" class="btn-icon-text" title="Logout">
           <i data-lucide="log-out"></i>
           <span>Logout</span>
         </button>
@@ -120,6 +123,9 @@
     <main class="main-content">
       <!-- TOP BAR -->
       <header class="topbar">
+        <button type="button" class="btn-hamburger btn-topbar-menu" id="btn-topbar-menu" title="Toggle Sidebar" aria-label="Toggle menu" onclick="toggleSidebar()">
+          <i data-lucide="menu"></i>
+        </button>
         <div class="search-bar">
           <i data-lucide="search" id="search-icon"></i>
           <input type="text" id="search-input" placeholder="Search files & folders everywhere..." autocomplete="off">
@@ -1716,6 +1722,6 @@
     </div>
   </div>
 
-  <script src="/app-v4.js?v=9.04"></script>
+  <script src="/app-v4.js?v=9.05"></script>
 </body>
 </html>
