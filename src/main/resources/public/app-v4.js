@@ -284,6 +284,8 @@ function initApp() {
   const dashContainer = document.getElementById('dashboard-container');
   if (dashContainer && isSidebarCollapsed && window.innerWidth > 768) {
     dashContainer.classList.add('sidebar-collapsed');
+    const toggleBtn = document.getElementById('btn-sidebar-toggle');
+    if (toggleBtn) toggleBtn.title = 'Expand Sidebar';
   }
 
   // Bind 3-line hamburger menu toggle buttons
@@ -1546,6 +1548,7 @@ function toggleSidebar(e) {
   if (e && e.stopPropagation) e.stopPropagation();
   const container = document.getElementById('dashboard-container');
   const sidebar = document.getElementById('sidebar');
+  const toggleBtn = document.getElementById('btn-sidebar-toggle');
   if (!container || !sidebar) return;
 
   const isMobile = window.innerWidth <= 768;
@@ -1559,6 +1562,9 @@ function toggleSidebar(e) {
     container.classList.toggle('sidebar-collapsed');
     const isCollapsed = container.classList.contains('sidebar-collapsed');
     localStorage.setItem('sakura_sidebar_collapsed', isCollapsed ? 'true' : 'false');
+    if (toggleBtn) {
+      toggleBtn.title = isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar';
+    }
     if (window.lucide) lucide.createIcons();
   }
 }
