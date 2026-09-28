@@ -2,6 +2,7 @@ package com.sakuradata.media.controller;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
+import com.auth0.jwt.interfaces.DecodedJWT;
 import com.sakuradata.media.config.JwtInterceptor;
 import com.sakuradata.media.model.User;
 import com.sakuradata.media.repository.UserRepository;
@@ -33,9 +34,9 @@ public class AuthController {
     private UserRepository userRepository;
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody Map<String, String> loginData) {
-        String username = loginData.get("username");
-        String password = loginData.get("password");
+    public ResponseEntity<?> login(@RequestBody Map<String, Object> loginData) {
+        String username = loginData.get("username") != null ? String.valueOf(loginData.get("username")).trim() : null;
+        String password = loginData.get("password") != null ? String.valueOf(loginData.get("password")) : null;
 
         if (username == null || password == null) {
             Map<String, String> err = new HashMap<>();
@@ -52,8 +53,18 @@ public class AuthController {
 
         User user = userOpt.get();
 
-        // Expire token in 24 hours
-        long expirationTime = 24 * 60 * 60 * 1000L;
+        boolean rememberMe = false;
+        if (loginData.containsKey("rememberMe")) {
+            Object rm = loginData.get("rememberMe");
+            if (rm instanceof Boolean) {
+                rememberMe = (Boolean) rm;
+            } else if (rm != null) {
+                rememberMe = Boolean.parseBoolean(rm.toString());
+            }
+        }
+
+        // Expire token in 365 days if Remember Me is checked, otherwise 24 hours
+        long expirationTime = rememberMe ? (365L * 24 * 60 * 60 * 1000L) : (24L * 60 * 60 * 1000L);
         Date expDate = new Date(System.currentTimeMillis() + expirationTime);
 
         Algorithm algorithm = Algorithm.HMAC256(JwtInterceptor.JWT_SECRET);
@@ -61,11 +72,14 @@ public class AuthController {
                 .withClaim("id", user.getId())
                 .withClaim("username", user.getUsername())
                 .withClaim("role", user.getRole())
+                .withClaim("remember", rememberMe)
                 .withExpiresAt(expDate)
                 .sign(algorithm);
 
         Map<String, Object> response = new HashMap<>();
         response.put("token", token);
+        response.put("rememberMe", rememberMe);
+        response.put("expiresAt", expDate.getTime());
 
         Map<String, Object> userInfo = new HashMap<>();
         userInfo.put("id", user.getId());
@@ -84,7 +98,38 @@ public class AuthController {
         if (user == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Unauthorized"));
         }
-        return ResponseEntity.ok(Map.of("status", "ok", "userId", user.getId()));
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("status", "ok");
+        resp.put("userId", user.getId());
+
+        DecodedJWT currentJwt = (DecodedJWT) request.getAttribute("jwt");
+        if (currentJwt != null) {
+            boolean rememberMe = false;
+            if (!currentJwt.getClaim("remember").isMissing()) {
+                rememberMe = Boolean.TRUE.equals(currentJwt.getClaim("remember").asBoolean());
+            }
+
+            Date expiresAt = currentJwt.getExpiresAt();
+            long now = System.currentTimeMillis();
+            // Renew if rememberMe is true and less than 180 days remain, or if regular session and less than 12 hours remain
+            long renewalThreshold = rememberMe ? (180L * 24 * 60 * 60 * 1000L) : (12L * 60 * 60 * 1000L);
+            if (expiresAt == null || (expiresAt.getTime() - now) < renewalThreshold) {
+                long expirationTime = rememberMe ? (365L * 24 * 60 * 60 * 1000L) : (24L * 60 * 60 * 1000L);
+                Date newExp = new Date(now + expirationTime);
+                Algorithm algorithm = Algorithm.HMAC256(JwtInterceptor.JWT_SECRET);
+                String newToken = JWT.create()
+                        .withClaim("id", user.getId())
+                        .withClaim("username", user.getUsername())
+                        .withClaim("role", user.getRole())
+                        .withClaim("remember", rememberMe)
+                        .withExpiresAt(newExp)
+                        .sign(algorithm);
+                resp.put("token", newToken);
+                resp.put("expiresAt", newExp.getTime());
+            }
+        }
+
+        return ResponseEntity.ok(resp);
     }
 
     @PutMapping("/profile")
@@ -123,14 +168,25 @@ public class AuthController {
 
         userRepository.save(user);
 
-        // Generate a new token with updated username/role
-        long expirationTime = 24 * 60 * 60 * 1000L;
+        // Check if the current token had remember=true
+        boolean rememberMe = false;
+        DecodedJWT currentJwt = (DecodedJWT) request.getAttribute("jwt");
+        if (currentJwt != null && !currentJwt.getClaim("remember").isMissing()) {
+            rememberMe = Boolean.TRUE.equals(currentJwt.getClaim("remember").asBoolean());
+        }
+        if (body.containsKey("rememberMe")) {
+            rememberMe = Boolean.parseBoolean(body.get("rememberMe"));
+        }
+
+        // Generate a new token with updated username/role and preserved expiration
+        long expirationTime = rememberMe ? (365L * 24 * 60 * 60 * 1000L) : (24L * 60 * 60 * 1000L);
         Date expDate = new Date(System.currentTimeMillis() + expirationTime);
         Algorithm algorithm = Algorithm.HMAC256(JwtInterceptor.JWT_SECRET);
         String token = JWT.create()
                 .withClaim("id", user.getId())
                 .withClaim("username", user.getUsername())
                 .withClaim("role", user.getRole())
+                .withClaim("remember", rememberMe)
                 .withExpiresAt(expDate)
                 .sign(algorithm);
 
@@ -140,6 +196,8 @@ public class AuthController {
         response.put("plainPassword", user.getPlainPassword());
         response.put("theme", user.getTheme());
         response.put("uiStyle", user.getUiStyle());
+        response.put("rememberMe", rememberMe);
+        response.put("expiresAt", expDate.getTime());
 
         return ResponseEntity.ok(response);
     }

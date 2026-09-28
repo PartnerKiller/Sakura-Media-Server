@@ -100,19 +100,20 @@ public class JwtInterceptor implements HandlerInterceptor {
 
             Optional<User> userOpt = userRepository.findById(userId);
             if (userOpt.isEmpty()) {
-                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 response.setContentType("application/json");
                 response.getWriter().write("{\"error\": \"User no longer exists\"}");
                 return false;
             }
 
-            // Set user in request context attribute and record activity
+            // Set user and jwt in request context attribute and record activity
             User currentUser = userOpt.get();
             request.setAttribute("user", currentUser);
+            request.setAttribute("jwt", jwt);
             userActivityService.recordActivity(currentUser.getId());
             return true;
         } catch (Exception e) {
-            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");
             response.getWriter().write("{\"error\": \"Invalid or expired token\"}");
             return false;

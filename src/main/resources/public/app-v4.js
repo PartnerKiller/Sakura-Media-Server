@@ -119,7 +119,7 @@ async function apiCall(endpoint, options = {}) {
     headers
   });
 
-  if ((response.status === 401 || response.status === 403) && !endpoint.startsWith('/api/auth/login')) {
+  if (response.status === 401 && !endpoint.startsWith('/api/auth/login')) {
     // Session expired or unauthorized
     logout();
     throw new Error('Unauthorized or Session expired');
@@ -244,8 +244,21 @@ function initApp() {
     }
   });
 
-  // Bind Login Form
+  // Bind Login Form & Remember Me
   safeAddListener('login-form', 'submit', handleLogin);
+  const rmCheckbox = document.getElementById('remember-me');
+  if (rmCheckbox) {
+    const savedRm = localStorage.getItem('sakura_remember_me');
+    rmCheckbox.checked = savedRm !== 'false';
+    rmCheckbox.addEventListener('change', () => {
+      localStorage.setItem('sakura_remember_me', rmCheckbox.checked ? 'true' : 'false');
+    });
+  }
+  const savedUser = localStorage.getItem('sakura_saved_username');
+  const userEl = document.getElementById('username');
+  if (userEl && savedUser && !userEl.value) {
+    userEl.value = savedUser;
+  }
   
   // Login Password Toggle
   const toggleBtn = document.getElementById('btn-toggle-login-password');
@@ -607,6 +620,18 @@ function showLogin() {
   document.getElementById('login-container').classList.add('active');
   document.getElementById('dashboard-container').classList.remove('active');
   document.getElementById('login-error').innerText = '';
+
+  const rmCheckbox = document.getElementById('remember-me');
+  if (rmCheckbox) {
+    const savedRm = localStorage.getItem('sakura_remember_me');
+    rmCheckbox.checked = savedRm !== 'false';
+  }
+
+  const savedUser = localStorage.getItem('sakura_saved_username');
+  const userEl = document.getElementById('username');
+  if (userEl && savedUser && !userEl.value) {
+    userEl.value = savedUser;
+  }
 }
 
 function showDashboard() {
@@ -654,33 +679,40 @@ async function handleLogin(e) {
       return;
     }
 
+    const rememberCheckbox = document.getElementById('remember-me');
+    const rememberMe = rememberCheckbox ? rememberCheckbox.checked : true;
+
     const res = await apiCall('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({
         username: username,
-        password: password
+        password: password,
+        rememberMe: rememberMe
       })
     });
 
     state.token = res.token;
     state.user = res.user;
     
-    const rememberMe = document.getElementById('remember-me') ? document.getElementById('remember-me').checked : true;
     if (rememberMe) {
       localStorage.setItem('token', res.token);
       localStorage.setItem('user', JSON.stringify(res.user));
+      localStorage.setItem('sakura_remember_me', 'true');
+      localStorage.setItem('sakura_saved_username', username);
       sessionStorage.removeItem('token');
       sessionStorage.removeItem('user');
     } else {
       sessionStorage.setItem('token', res.token);
       sessionStorage.setItem('user', JSON.stringify(res.user));
+      localStorage.setItem('sakura_remember_me', 'false');
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      localStorage.removeItem('sakura_saved_username');
     }
     
-    // Clear login inputs
-    if (usernameEl) usernameEl.value = '';
+    // Clear password input (keep username if rememberMe)
     if (passwordEl) passwordEl.value = '';
+    if (!rememberMe && usernameEl) usernameEl.value = '';
     
     // Reset toggle to password mode
     const pwdInput = document.getElementById('password');
@@ -5495,7 +5527,16 @@ function confirmPickerSelection() {
 // Global active presence heartbeat loop
 setInterval(() => {
   if (state.token) {
-    apiCall('/api/auth/heartbeat', { method: 'POST' }).catch(() => {});
+    apiCall('/api/auth/heartbeat', { method: 'POST' }).then(res => {
+      if (res && res.token) {
+        state.token = res.token;
+        if (localStorage.getItem('token')) {
+          localStorage.setItem('token', res.token);
+        } else if (sessionStorage.getItem('token')) {
+          sessionStorage.setItem('token', res.token);
+        }
+      }
+    }).catch(() => {});
     
     // If admin is actively on the User Management panel, refresh user statuses seamlessly
     const usersPanel = document.getElementById('panel-users');
