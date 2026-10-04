@@ -12,7 +12,7 @@
   <script src="/lucide.min.js?v=0.453"></script>
   <script src="/chart.min.js"></script>
   <script src="/hls.min.js"></script>
-  <link rel="stylesheet" href="/style.css?v=9.25">
+  <link rel="stylesheet" href="/style.css?v=9.30">
   <link rel="icon" type="image/jpeg" href="/favicon.jpg">
 </head>
 <body>
@@ -456,6 +456,7 @@
           <!-- Horizontal Sub-Tabs Bar -->
           <div class="server-tabs-bar">
             <button class="server-tab-btn active" data-tab="tab-metrics">Status & Graphs</button>
+            <button class="server-tab-btn" data-tab="tab-storage-mounts"><i data-lucide="hard-drive"></i> Disks & Storage</button>
             <button class="server-tab-btn" data-tab="tab-services">Services</button>
             <button class="server-tab-btn" data-tab="tab-audit-logs">Audit Logs</button>
             <button class="server-tab-btn" data-tab="tab-appearance">Appearance</button>
@@ -483,6 +484,106 @@
                 <div style="position: relative; height: 220px; width: 100%;">
                   <canvas id="chart-ram"></canvas>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- STORAGE & HARDWARE DISKS MANAGEMENT -->
+          <div id="tab-storage-mounts" class="server-tab-content">
+            <!-- Disks Overview Stats Bar -->
+            <div class="storage-metrics-banner" style="margin-top: 16px;">
+              <div class="metric-card">
+                <div class="metric-icon"><i data-lucide="hard-drive"></i></div>
+                <div class="metric-info">
+                  <div class="metric-label">Physical Disks</div>
+                  <div class="metric-value" id="disk-stat-total-disks">--</div>
+                </div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-icon" style="color: var(--success);"><i data-lucide="check-circle-2"></i></div>
+                <div class="metric-info">
+                  <div class="metric-label">Mounted Volumes</div>
+                  <div class="metric-value" id="disk-stat-mounted">--</div>
+                </div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-icon" style="color: var(--warning, #f59e0b);"><i data-lucide="alert-circle"></i></div>
+                <div class="metric-info">
+                  <div class="metric-label">Unmounted Volumes</div>
+                  <div class="metric-value" id="disk-stat-unmounted">--</div>
+                </div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-icon" style="color: var(--primary);"><i data-lucide="database"></i></div>
+                <div class="metric-info">
+                  <div class="metric-label">Total Hardware Capacity</div>
+                  <div class="metric-value" id="disk-stat-total-capacity">--</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Connected Hardware Disks Section -->
+            <div class="users-list-card" style="margin-top: 20px;">
+              <div class="admin-section-title-container" style="padding: 16px 24px; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <div>
+                  <h3 class="admin-section-title" style="margin: 0; display: flex; align-items: center; gap: 8px;">
+                    <i data-lucide="hard-drive" style="color: var(--primary);"></i>
+                    Connected Hardware Disks & Partitions
+                  </h3>
+                  <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.85rem;">
+                    Detect, mount unmounted partitions anywhere on the server, or allocate them to Sakura Media Server
+                  </p>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                  <button id="btn-refresh-disks" class="btn btn-secondary" onclick="loadStorageDevices()">
+                    <i data-lucide="refresh-cw"></i>
+                    <span>Rescan Disks</span>
+                  </button>
+                </div>
+              </div>
+              <div id="disks-list-container" style="padding: 20px;">
+                <div class="storage-loading">
+                  <i data-lucide="loader" class="animate-spin"></i>
+                  <span>Scanning connected disks...</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Media Server Roots Section -->
+            <div class="users-list-card" style="margin-top: 24px; margin-bottom: 32px;">
+              <div class="admin-section-title-container" style="padding: 16px 24px; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <div>
+                  <h3 class="admin-section-title" style="margin: 0; display: flex; align-items: center; gap: 8px;">
+                    <i data-lucide="folder-tree" style="color: var(--primary);"></i>
+                    Sakura Explorer Roots (Media Library Directories)
+                  </h3>
+                  <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.85rem;">
+                    Storage roots made available in the File Explorer and permissions for users
+                  </p>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                  <button id="btn-add-custom-root" class="btn btn-primary" onclick="openAddCustomRootModal()">
+                    <i data-lucide="plus"></i>
+                    <span>Add Custom Root</span>
+                  </button>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="users-table">
+                  <thead>
+                    <tr>
+                      <th>Display Name</th>
+                      <th>Server Filepath</th>
+                      <th>Storage Usage</th>
+                      <th>Permissions</th>
+                      <th>Status</th>
+                      <th style="text-align: right;">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="roots-table-body">
+                    <tr><td colspan="6" class="p-4 text-center">Loading roots...</td></tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -1719,6 +1820,107 @@
     </div>
   </div>
 
-  <script src="/app-v4.js?v=9.25"></script>
+  <!-- MOUNT STORAGE DEVICE MODAL -->
+  <div class="modal-backdrop" id="modal-mount-device" style="z-index: 1100;">
+    <div class="modal" style="max-width: 520px; width: 92%;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="hard-drive-download" style="color: var(--primary); width: 20px; height: 20px;"></i>
+          <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Mount Storage Partition</h3>
+        </div>
+        <button class="btn-close-modal" onclick="closeModal('modal-mount-device')">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <form id="form-mount-device" onsubmit="handleMountSubmit(event)">
+        <div class="modal-body" style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+          <div class="mount-device-info-box" style="padding: 12px 16px; background: rgba(255,255,255,0.04); border: 1px solid var(--border-subtle); border-radius: 10px;">
+            <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Selected Partition</div>
+            <div id="mount-modal-dev-name" style="font-size: 15px; font-weight: 600; color: var(--text-main); margin-top: 2px;">/dev/sdb1</div>
+            <div id="mount-modal-dev-meta" style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">NTFS &bull; 223.6 GB</div>
+          </div>
+
+          <input type="hidden" id="mount-input-device" name="device">
+
+          <div>
+            <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase;">Mount Destination Directory *</label>
+            <input type="text" id="mount-input-path" name="mountPath" required placeholder="/media/drive-name" style="width: 100%; padding: 10px 14px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-main); font-size: 14px; font-family: monospace;">
+            <div style="display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; align-items: center;">
+              <span style="font-size: 11px; color: var(--text-secondary);">Suggestions:</span>
+              <button type="button" class="btn btn-secondary" style="padding: 2px 8px; font-size: 11px; font-family: monospace;" onclick="setMountSuggestion('/media/ssd')">/media/ssd</button>
+              <button type="button" class="btn btn-secondary" style="padding: 2px 8px; font-size: 11px; font-family: monospace;" onclick="setMountSuggestion('/media/storage')">/media/storage</button>
+              <button type="button" class="btn btn-secondary" style="padding: 2px 8px; font-size: 11px; font-family: monospace;" onclick="setMountSuggestion('/media/hdd')">/media/hdd</button>
+              <button type="button" class="btn btn-secondary" style="padding: 2px 8px; font-size: 11px; font-family: monospace;" onclick="setMountSuggestion('/mnt/external')">/mnt/external</button>
+            </div>
+          </div>
+
+          <div style="padding: 14px; background: rgba(236,72,153,0.06); border: 1px solid rgba(236,72,153,0.2); border-radius: 10px; display: flex; flex-direction: column; gap: 10px;">
+            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none;">
+              <input type="checkbox" id="mount-input-allocate" name="allocateAsRoot" checked style="width: 17px; height: 17px; accent-color: var(--primary);">
+              <span style="font-size: 13.5px; font-weight: 500; color: var(--text-main);">Automatically add to Sakura Media Explorer</span>
+            </label>
+            <div id="mount-root-name-group">
+              <label style="display: block; font-size: 11.5px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Explorer Display Name</label>
+              <input type="text" id="mount-input-root-name" name="rootName" placeholder="e.g. SSD, External Drive" style="width: 100%; padding: 8px 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-main); font-size: 13px;">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer" style="padding: 16px 20px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 10px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-mount-device')">Cancel</button>
+          <button type="submit" id="btn-submit-mount" class="btn btn-primary" style="display: flex; align-items: center; gap: 6px;">
+            <i data-lucide="check"></i>
+            <span>Mount Drive</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ADD / EDIT CUSTOM STORAGE ROOT MODAL -->
+  <div class="modal-backdrop" id="modal-custom-root" style="z-index: 1100;">
+    <div class="modal" style="max-width: 500px; width: 92%;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="folder-plus" style="color: var(--primary); width: 20px; height: 20px;"></i>
+          <h3 id="custom-root-modal-title" style="margin: 0; font-size: 16px; font-weight: 600;">Add Media Server Root</h3>
+        </div>
+        <button class="btn-close-modal" onclick="closeModal('modal-custom-root')">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <form id="form-custom-root" onsubmit="handleCustomRootSubmit(event)">
+        <input type="hidden" id="custom-root-id" value="">
+        <div class="modal-body" style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+          <div>
+            <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase;">Display Name *</label>
+            <input type="text" id="custom-root-name" required placeholder="e.g. SSD, 4K Movies, Anime" style="width: 100%; padding: 10px 14px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-main); font-size: 14px;">
+          </div>
+          <div>
+            <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase;">Absolute Directory Path *</label>
+            <input type="text" id="custom-root-path" required placeholder="e.g. /media/ssd or /home/sakura/Videos" style="width: 100%; padding: 10px 14px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-main); font-size: 14px; font-family: monospace;">
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 4px;">
+            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none;">
+              <input type="checkbox" id="custom-root-allow-write" checked style="width: 17px; height: 17px; accent-color: var(--primary);">
+              <span style="font-size: 13.5px; color: var(--text-main);">Allow write access (upload, rename, delete)</span>
+            </label>
+            <label id="custom-root-enabled-group" style="display: none; align-items: center; gap: 10px; cursor: pointer; user-select: none;">
+              <input type="checkbox" id="custom-root-enabled" checked style="width: 17px; height: 17px; accent-color: var(--primary);">
+              <span style="font-size: 13.5px; color: var(--text-main);">Active in Explorer</span>
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer" style="padding: 16px 20px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 10px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-custom-root')">Cancel</button>
+          <button type="submit" id="btn-submit-custom-root" class="btn btn-primary" style="display: flex; align-items: center; gap: 6px;">
+            <i data-lucide="check"></i>
+            <span id="btn-custom-root-text">Save Root</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/app-v4.js?v=9.30"></script>
 </body>
 </html>

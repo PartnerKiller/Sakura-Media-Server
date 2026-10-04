@@ -3533,11 +3533,14 @@ function renderStorageAnalysis(stats) {
     `;
   };
 
-  const homeHtml = createCard(stats.home);
-  const storageHtml = createCard(stats.storage);
-  const hddHtml = createCard(stats.hdd);
-  const gdriveHtml = createCard(stats.gdrive);
-  const html = homeHtml + storageHtml + hddHtml + gdriveHtml;
+  let html = '';
+  if (stats && typeof stats === 'object') {
+    Object.values(stats).forEach(val => {
+      if (val && typeof val === 'object' && val.name && val.usePercent) {
+        html += createCard(val);
+      }
+    });
+  }
 
   containers.forEach(container => {
     container.innerHTML = html;
@@ -4018,6 +4021,9 @@ function switchSubTab(tabId) {
 function triggerSubTabLoad(tabId) {
   if (tabId === 'tab-metrics') {
     loadServerMetrics();
+  } else if (tabId === 'tab-storage-mounts') {
+    loadStorageDevices();
+    loadManagedRoots();
   } else if (tabId === 'tab-docker') {
     loadDockerContainers();
   } else if (tabId === 'tab-services') {
@@ -5820,6 +5826,519 @@ async function handleCancelActiveImport() {
   }
 }
 window.handleCancelActiveImport = handleCancelActiveImport;
+
+// =============================================================
+// STORAGE DISKS & MOUNT MANAGEMENT
+// =============================================================
+
+let cachedStorageDevices = null;
+let cachedManagedRoots = null;
+
+async function loadStorageDevices() {
+  const container = document.getElementById('disks-list-container');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="storage-loading">
+      <i data-lucide="loader" class="animate-spin"></i>
+      <span>Scanning connected hardware disks & partitions...</span>
+    </div>
+  `;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  try {
+    const data = await apiCall('/api/admin/storage/devices?_cb=' + Date.now());
+    cachedStorageDevices = data;
+
+    // Update banner metrics
+    if (data.summary) {
+      const s = data.summary;
+      const elTotal = document.getElementById('disk-stat-total-disks');
+      const elMounted = document.getElementById('disk-stat-mounted');
+      const elUnmounted = document.getElementById('disk-stat-unmounted');
+      const elCap = document.getElementById('disk-stat-total-capacity');
+
+      if (elTotal) elTotal.textContent = s.totalDisks;
+      if (elMounted) elMounted.textContent = s.mountedCount;
+      if (elUnmounted) {
+        elUnmounted.textContent = s.unmountedCount;
+        elUnmounted.style.color = s.unmountedCount > 0 ? 'var(--warning, #f59e0b)' : 'var(--text-main)';
+      }
+      if (elCap) elCap.textContent = s.formattedTotalCapacity;
+    }
+
+    renderStorageDevices(data.disks || []);
+  } catch (err) {
+    console.error('Failed to load storage devices:', err);
+    container.innerHTML = `
+      <div class="p-4 text-center text-error" style="background: rgba(239,68,68,0.08); border-radius: 8px;">
+        <i data-lucide="alert-circle" style="margin-bottom: 6px;"></i>
+        <div>Failed to scan storage devices: ${escapeHtml(err.message)}</div>
+      </div>
+    `;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+}
+
+function renderStorageDevices(disks) {
+  const container = document.getElementById('disks-list-container');
+  if (!container) return;
+
+  if (!disks || disks.length === 0) {
+    container.innerHTML = `
+      <div class="p-4 text-center text-muted">
+        <i data-lucide="hard-drive" style="width: 32px; height: 32px; margin-bottom: 8px; opacity: 0.5;"></i>
+        <div>No storage block devices detected on server.</div>
+      </div>
+    `;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    return;
+  }
+
+  let html = '<div class="disks-grid">';
+
+  disks.forEach(disk => {
+    const isSsd = !!disk.isSsd;
+    const diskTypeTag = isSsd
+      ? '<span class="badge-tag tag-ssd"><i data-lucide="zap" style="width:12px;height:12px;"></i> SSD</span>'
+      : '<span class="badge-tag tag-hdd"><i data-lucide="disc" style="width:12px;height:12px;"></i> HDD</span>';
+
+    const diskName = disk.model || disk.name;
+    const diskNode = disk.path || ('/dev/' + disk.name);
+    const diskSize = disk.formattedSize || '';
+
+    html += `
+      <div class="disk-card">
+        <div class="disk-card-header">
+          <div class="disk-title-group">
+            <div class="disk-icon-badge">
+              <i data-lucide="hard-drive"></i>
+            </div>
+            <div>
+              <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                <span class="disk-name-text">${escapeHtml(diskName)}</span>
+                <span class="disk-node-badge">${escapeHtml(diskNode)}</span>
+              </div>
+            </div>
+          </div>
+          <div class="disk-header-meta">
+            ${diskTypeTag}
+            <span class="badge-tag tag-size">${escapeHtml(diskSize)}</span>
+          </div>
+        </div>
+        <div class="disk-partitions-list">
+    `;
+
+    const partitions = disk.partitions && disk.partitions.length > 0 ? disk.partitions : [disk];
+
+    partitions.forEach(part => {
+      const partNode = part.path || ('/dev/' + part.name);
+      const partSize = part.formattedSize || '';
+      const fstype = part.fstype || '';
+      const label = part.label || '';
+      const isMounted = !!part.isMounted;
+      const mountpoint = part.mountpoint || '';
+      const isSystem = !!part.isSystem;
+      const isAllocated = !!part.isAllocated;
+      const allocatedName = part.allocatedRootName || '';
+
+      html += `
+        <div class="partition-row">
+          <div class="partition-main-info">
+            <i data-lucide="folder-git-2" style="color: var(--primary); width: 18px; height: 18px; flex-shrink: 0;"></i>
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="partition-node">${escapeHtml(partNode)}</span>
+                ${fstype ? `<span class="badge-fstype">${escapeHtml(fstype)}</span>` : ''}
+                ${label ? `<span style="font-size: 11.5px; color: var(--text-secondary);">"${escapeHtml(label)}"</span>` : ''}
+              </div>
+              <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">
+                Size: ${escapeHtml(partSize)}
+              </div>
+            </div>
+          </div>
+
+          <div class="partition-mount-details">
+      `;
+
+      if (isMounted) {
+        const percentVal = part.usePercentVal || 0;
+        const usedStr = part.formattedUsed || '0 B';
+        const totalStr = part.formattedTotal || partSize;
+        const percentStr = part.usePercent || `${percentVal}%`;
+
+        html += `
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <span class="badge-mount-status mounted">
+                <i data-lucide="check" style="width: 12px; height: 12px;"></i> Mounted at ${escapeHtml(mountpoint)}
+              </span>
+              ${isAllocated ? `<span class="badge-mount-status allocated"><i data-lucide="library" style="width: 12px; height: 12px;"></i> Media Root: ${escapeHtml(allocatedName)}</span>` : ''}
+              ${isSystem ? `<span class="badge-tag" style="background: rgba(255,255,255,0.06); font-size: 10.5px;">OS System</span>` : ''}
+            </div>
+            ${part.totalSpace ? `
+              <div class="partition-progress-bar" style="margin-top: 6px;">
+                <div class="partition-progress-fill" style="width: ${percentVal}%;"></div>
+              </div>
+              <div class="partition-usage-text">
+                <span>${usedStr} / ${totalStr} used</span>
+                <span>${percentStr}</span>
+              </div>
+            ` : ''}
+        `;
+      } else {
+        html += `
+            <div>
+              <span class="badge-mount-status unmounted">
+                <i data-lucide="circle-slash" style="width: 12px; height: 12px;"></i> Unmounted
+              </span>
+              <span style="font-size: 12px; color: var(--text-secondary); margin-left: 8px;">Ready to mount</span>
+            </div>
+        `;
+      }
+
+      html += `
+          </div>
+          <div class="partition-actions">
+      `;
+
+      if (isMounted) {
+        if (!isAllocated && !isSystem) {
+          html += `
+            <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick="openAllocateModal('${escapeHtml(mountpoint)}', '${escapeHtml(label || part.name)}')">
+              <i data-lucide="folder-plus"></i>
+              <span>Allocate as Root</span>
+            </button>
+          `;
+        }
+        if (!isSystem && mountpoint !== '/' && mountpoint !== '/boot' && mountpoint !== '/home' && mountpoint !== '/home/sakura') {
+          html += `
+            <button class="btn btn-secondary text-danger" style="padding: 6px 12px; font-size: 12px;" onclick="unmountDevice('${escapeHtml(partNode)}')">
+              <i data-lucide="eject"></i>
+              <span>Unmount</span>
+            </button>
+          `;
+        }
+      } else {
+        html += `
+          <button class="btn btn-primary" style="padding: 6px 14px; font-size: 12px;" onclick="openMountModal('${escapeHtml(partNode)}', '${escapeHtml(label || part.name)}', '${escapeHtml(fstype)}', '${escapeHtml(partSize)}')">
+            <i data-lucide="hard-drive-download"></i>
+            <span>Mount Drive</span>
+          </button>
+        `;
+      }
+
+      html += `
+          </div>
+        </div>
+      `;
+    });
+
+    html += `
+        </div>
+      </div>
+    `;
+  });
+
+  html += '</div>';
+  container.innerHTML = html;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+async function loadManagedRoots() {
+  const tbody = document.getElementById('roots-table-body');
+  if (!tbody) return;
+
+  tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center">Loading roots...</td></tr>`;
+
+  try {
+    const roots = await apiCall('/api/admin/storage/roots?_cb=' + Date.now());
+    cachedManagedRoots = roots;
+    renderManagedRoots(roots);
+  } catch (err) {
+    console.error('Failed to load managed roots:', err);
+    tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-error">Failed to load roots: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function renderManagedRoots(roots) {
+  const tbody = document.getElementById('roots-table-body');
+  if (!tbody) return;
+
+  if (!roots || roots.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-muted">No storage roots configured. Add one to make it accessible.</td></tr>`;
+    return;
+  }
+
+  let html = '';
+  roots.forEach(r => {
+    const exists = !!r.exists;
+    const enabled = !!r.enabled;
+    const allowWrite = !!r.allowWrite;
+    const percentVal = r.usePercentVal || 0;
+    const usedStr = r.formattedUsed || '0 B';
+    const totalStr = r.formattedTotal || '0 B';
+    const percentStr = r.usePercent || `${percentVal}%`;
+
+    const jsonStr = JSON.stringify(r).replace(/'/g, "&#39;");
+
+    html += `
+      <tr>
+        <td>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <i data-lucide="folder" style="color: var(--primary); width: 16px; height: 16px;"></i>
+            <span style="font-weight: 600; color: var(--text-main);">${escapeHtml(r.name)}</span>
+          </div>
+        </td>
+        <td>
+          <code style="background: rgba(255,255,255,0.06); padding: 3px 8px; border-radius: 6px; font-size: 12.5px; color: var(--text-main); font-family: monospace;">${escapeHtml(r.path)}</code>
+        </td>
+        <td style="min-width: 170px;">
+          ${exists ? `
+            <div class="partition-progress-bar" style="margin-bottom: 4px;">
+              <div class="partition-progress-fill" style="width: ${percentVal}%;"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-secondary);">
+              <span>${usedStr} / ${totalStr}</span>
+              <span>${percentStr}</span>
+            </div>
+          ` : `
+            <span style="color: var(--danger, #ef4444); font-size: 12px; display: inline-flex; align-items: center; gap: 4px;">
+              <i data-lucide="alert-triangle" style="width: 13px; height: 13px;"></i> Path not found
+            </span>
+          `}
+        </td>
+        <td>
+          ${allowWrite
+            ? '<span class="badge-tag" style="background: rgba(34,197,94,0.12); color: #4ade80; border: 1px solid rgba(34,197,94,0.25);">Read & Write</span>'
+            : '<span class="badge-tag" style="background: rgba(255,255,255,0.06); color: var(--text-secondary); border: 1px solid var(--border-subtle);">Read Only</span>'}
+        </td>
+        <td>
+          ${enabled
+            ? '<span class="badge-tag" style="background: rgba(34,197,94,0.12); color: #4ade80; border: 1px solid rgba(34,197,94,0.25);">Active</span>'
+            : '<span class="badge-tag" style="background: rgba(239,68,68,0.12); color: #ef4444; border: 1px solid rgba(239,68,68,0.25);">Disabled</span>'}
+        </td>
+        <td style="text-align: right;">
+          <div style="display: flex; align-items: center; justify-content: flex-end; gap: 6px;">
+            <button class="btn btn-secondary" style="padding: 5px 8px;" title="Edit Root" data-root='${jsonStr}' onclick="handleEditRootClick(this)">
+              <i data-lucide="edit-2" style="width: 14px; height: 14px;"></i>
+            </button>
+            <button class="btn btn-secondary text-danger" style="padding: 5px 8px;" title="Delete Root" onclick="deleteRoot(${r.id}, '${escapeHtml(r.name)}')">
+              <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  });
+
+  tbody.innerHTML = html;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function handleEditRootClick(btn) {
+  try {
+    const raw = btn.getAttribute('data-root');
+    const root = JSON.parse(raw);
+    openEditRootModal(root);
+  } catch (err) {
+    console.error('Failed to parse root data:', err);
+  }
+}
+
+// Mount Modal Actions
+function openMountModal(devicePath, defaultName, fstype, size) {
+  document.getElementById('mount-input-device').value = devicePath;
+  document.getElementById('mount-modal-dev-name').textContent = devicePath;
+  document.getElementById('mount-modal-dev-meta').textContent = `${fstype ? fstype.toUpperCase() : 'Disk'} • ${size || ''}`;
+
+  let cleanName = (defaultName || '').toLowerCase().replace(/[^a-z0-9_-]/g, '');
+  if (!cleanName || cleanName === 'unnamed') cleanName = devicePath.replace('/dev/', '');
+  document.getElementById('mount-input-path').value = '/media/' + cleanName;
+  document.getElementById('mount-input-root-name').value = defaultName || cleanName.toUpperCase();
+  document.getElementById('mount-input-allocate').checked = true;
+
+  openModal('modal-mount-device');
+}
+
+function setMountSuggestion(path) {
+  const input = document.getElementById('mount-input-path');
+  if (input) input.value = path;
+}
+
+async function handleMountSubmit(event) {
+  event.preventDefault();
+  const btn = document.getElementById('btn-submit-mount');
+  const originalHtml = btn.innerHTML;
+
+  const device = document.getElementById('mount-input-device').value.trim();
+  const mountPath = document.getElementById('mount-input-path').value.trim();
+  const allocateAsRoot = document.getElementById('mount-input-allocate').checked;
+  const rootName = document.getElementById('mount-input-root-name').value.trim();
+
+  if (!device || !mountPath) {
+    showToast('Device and mount destination path are required.', 'error');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = `<i data-lucide="loader" class="animate-spin" style="width: 14px; height: 14px;"></i> <span>Mounting...</span>`;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  try {
+    const res = await apiCall('/api/admin/storage/mount', {
+      method: 'POST',
+      body: JSON.stringify({ device, mountPath, allocateAsRoot, rootName })
+    });
+
+    closeModal('modal-mount-device');
+    showToast(res.message || `Mounted ${device} successfully!`, 'success');
+    loadStorageDevices();
+    loadManagedRoots();
+    if (typeof loadRoots === 'function') loadRoots();
+  } catch (err) {
+    console.error('Mount error:', err);
+    showToast(`Failed to mount device: ${err.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+}
+
+async function unmountDevice(target) {
+  if (!confirm(`Are you sure you want to unmount ${target}?`)) return;
+
+  try {
+    const res = await apiCall('/api/admin/storage/unmount', {
+      method: 'POST',
+      body: JSON.stringify({ target })
+    });
+    showToast(res.message || `Successfully unmounted ${target}`, 'success');
+    loadStorageDevices();
+    loadManagedRoots();
+    if (typeof loadRoots === 'function') loadRoots();
+  } catch (err) {
+    console.error('Unmount error:', err);
+    showToast(`Failed to unmount: ${err.message}`, 'error');
+  }
+}
+
+// Custom / Edit Root Modal Actions
+function openAddCustomRootModal() {
+  document.getElementById('custom-root-id').value = '';
+  document.getElementById('custom-root-name').value = '';
+  document.getElementById('custom-root-path').value = '';
+  document.getElementById('custom-root-allow-write').checked = true;
+  document.getElementById('custom-root-enabled-group').style.display = 'none';
+
+  document.getElementById('custom-root-modal-title').textContent = 'Add Media Server Root';
+  document.getElementById('btn-custom-root-text').textContent = 'Save Root';
+
+  openModal('modal-custom-root');
+}
+
+function openAllocateModal(mountPath, defaultName) {
+  openAddCustomRootModal();
+  document.getElementById('custom-root-path').value = mountPath;
+  document.getElementById('custom-root-name').value = defaultName || '';
+}
+
+function openEditRootModal(root) {
+  document.getElementById('custom-root-id').value = root.id;
+  document.getElementById('custom-root-name').value = root.name;
+  document.getElementById('custom-root-path').value = root.path;
+  document.getElementById('custom-root-allow-write').checked = root.allowWrite;
+  document.getElementById('custom-root-enabled').checked = root.enabled;
+  document.getElementById('custom-root-enabled-group').style.display = 'flex';
+
+  document.getElementById('custom-root-modal-title').textContent = 'Edit Media Server Root';
+  document.getElementById('btn-custom-root-text').textContent = 'Update Root';
+
+  openModal('modal-custom-root');
+}
+
+async function handleCustomRootSubmit(event) {
+  event.preventDefault();
+  const btn = document.getElementById('btn-submit-custom-root');
+  const originalHtml = btn.innerHTML;
+
+  const id = document.getElementById('custom-root-id').value;
+  const name = document.getElementById('custom-root-name').value.trim();
+  const path = document.getElementById('custom-root-path').value.trim();
+  const allowWrite = document.getElementById('custom-root-allow-write').checked;
+  const enabled = document.getElementById('custom-root-enabled').checked;
+
+  if (!name || !path) {
+    showToast('Name and directory path are required.', 'error');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = `<i data-lucide="loader" class="animate-spin" style="width: 14px; height: 14px;"></i> <span>Saving...</span>`;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  try {
+    if (id) {
+      await apiCall(`/api/admin/storage/roots/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ name, path, allowWrite, enabled })
+      });
+      showToast(`Updated root "${name}" successfully!`, 'success');
+    } else {
+      await apiCall('/api/admin/storage/roots', {
+        method: 'POST',
+        body: JSON.stringify({ name, path, allowWrite })
+      });
+      showToast(`Added root "${name}" successfully!`, 'success');
+    }
+
+    closeModal('modal-custom-root');
+    loadManagedRoots();
+    loadStorageDevices();
+    if (typeof loadRoots === 'function') loadRoots();
+  } catch (err) {
+    console.error('Save root error:', err);
+    showToast(`Failed to save root: ${err.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+}
+
+async function deleteRoot(id, name) {
+  if (!confirm(`Are you sure you want to remove the media root "${name}" from Sakura Media Server?\n\n(Files on disk will NOT be deleted).`)) {
+    return;
+  }
+
+  try {
+    await apiCall(`/api/admin/storage/roots/${id}`, {
+      method: 'DELETE'
+    });
+    showToast(`Media root "${name}" removed.`, 'success');
+    loadManagedRoots();
+    loadStorageDevices();
+    if (typeof loadRoots === 'function') loadRoots();
+  } catch (err) {
+    console.error('Delete root error:', err);
+    showToast(`Failed to delete root: ${err.message}`, 'error');
+  }
+}
+
+// Expose to window for inline onclick handlers
+window.loadStorageDevices = loadStorageDevices;
+window.loadManagedRoots = loadManagedRoots;
+window.openMountModal = openMountModal;
+window.setMountSuggestion = setMountSuggestion;
+window.handleMountSubmit = handleMountSubmit;
+window.unmountDevice = unmountDevice;
+window.openAddCustomRootModal = openAddCustomRootModal;
+window.openAllocateModal = openAllocateModal;
+window.openEditRootModal = openEditRootModal;
+window.handleEditRootClick = handleEditRootClick;
+window.handleCustomRootSubmit = handleCustomRootSubmit;
+window.deleteRoot = deleteRoot;
+
 
 
 

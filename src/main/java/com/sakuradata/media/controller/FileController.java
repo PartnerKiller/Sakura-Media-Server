@@ -35,6 +35,9 @@ public class FileController {
     private PermissionRepository permissionRepository;
 
     @Autowired
+    private com.sakuradata.media.repository.StorageRootRepository storageRootRepository;
+
+    @Autowired
     private com.sakuradata.media.repository.RecycleItemRepository recycleItemRepository;
 
     @Autowired
@@ -68,10 +71,22 @@ public class FileController {
     private List<Map<String, Object>> getAuthorizedRoots(User user) {
         List<Map<String, Object>> roots = new ArrayList<>();
         if ("admin".equals(user.getRole())) {
-            roots.add(Map.of("name", "Home root", "path", SAKURA_ROOT, "allowWrite", true));
-            roots.add(Map.of("name", "Storage root", "path", STORAGE_ROOT, "allowWrite", true));
-            roots.add(Map.of("name", "HDD root", "path", HDD_ROOT, "allowWrite", true));
-            roots.add(Map.of("name", "Google Drive", "path", GDRIVE_ROOT, "allowWrite", true));
+            List<com.sakuradata.media.model.StorageRoot> activeRoots = storageRootRepository.findByEnabledTrueOrderByOrderIndexAsc();
+            if (activeRoots.isEmpty()) {
+                roots.add(Map.of("name", "Home root", "path", SAKURA_ROOT, "allowWrite", true));
+                roots.add(Map.of("name", "Storage root", "path", STORAGE_ROOT, "allowWrite", true));
+                roots.add(Map.of("name", "SSD root", "path", "/media/ssd", "allowWrite", true));
+                roots.add(Map.of("name", "HDD root", "path", HDD_ROOT, "allowWrite", true));
+                roots.add(Map.of("name", "Google Drive", "path", GDRIVE_ROOT, "allowWrite", true));
+            } else {
+                for (com.sakuradata.media.model.StorageRoot r : activeRoots) {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("name", r.getName());
+                    map.put("path", r.getPath());
+                    map.put("allowWrite", r.isAllowWrite());
+                    roots.add(map);
+                }
+            }
         } else {
             List<Permission> perms = permissionRepository.findByUserId(user.getId());
             for (Permission p : perms) {
@@ -622,7 +637,7 @@ public class FileController {
         }
 
         String targetPath = resolvePath(path);
-        if (targetPath == null || targetPath.equals(SAKURA_ROOT) || targetPath.equals(STORAGE_ROOT) || targetPath.equals(HDD_ROOT) || targetPath.equals(GDRIVE_ROOT)) {
+        if (targetPath == null || isRootDirectory(targetPath)) {
             response.sendError(403, "Cannot download root directories directly");
             return;
         }
@@ -1431,14 +1446,36 @@ public class FileController {
         }
     }
 
+    private boolean isRootDirectory(String path) {
+        if (path == null) return false;
+        List<com.sakuradata.media.model.StorageRoot> activeRoots = storageRootRepository.findByEnabledTrueOrderByOrderIndexAsc();
+        for (com.sakuradata.media.model.StorageRoot r : activeRoots) {
+            if (path.equals(r.getPath())) return true;
+        }
+        return path.equals(SAKURA_ROOT) || path.equals(STORAGE_ROOT) || path.equals(HDD_ROOT) || path.equals(GDRIVE_ROOT) || path.equals("/media/ssd");
+    }
+
     private File getRecycleBinFolderForPath(String path) {
         String normalized = Paths.get(path).toAbsolutePath().normalize().toString().replace("\\", "/");
-        List<String> knownRoots = List.of("/media/storage", "/media/hdd", "/media/gdrive", "/home/sakura");
+        List<com.sakuradata.media.model.StorageRoot> activeRoots = storageRootRepository.findByEnabledTrueOrderByOrderIndexAsc();
         String matchedRoot = "/home/sakura";
-        for (String r : knownRoots) {
-            if (normalized.equals(r) || normalized.startsWith(r + "/")) {
-                matchedRoot = r;
-                break;
+        if (activeRoots != null && !activeRoots.isEmpty()) {
+            List<com.sakuradata.media.model.StorageRoot> sorted = new ArrayList<>(activeRoots);
+            sorted.sort((a, b) -> Integer.compare(b.getPath().length(), a.getPath().length()));
+            for (com.sakuradata.media.model.StorageRoot r : sorted) {
+                String rp = Paths.get(r.getPath()).toAbsolutePath().normalize().toString().replace("\\", "/");
+                if (normalized.equals(rp) || normalized.startsWith(rp + "/")) {
+                    matchedRoot = rp;
+                    break;
+                }
+            }
+        } else {
+            List<String> knownRoots = List.of("/media/storage", "/media/ssd", "/media/hdd", "/media/gdrive", "/home/sakura");
+            for (String r : knownRoots) {
+                if (normalized.equals(r) || normalized.startsWith(r + "/")) {
+                    matchedRoot = r;
+                    break;
+                }
             }
         }
         File bin = new File(matchedRoot, ".recycle-bin");

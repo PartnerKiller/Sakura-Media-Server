@@ -51,6 +51,12 @@ public class AdminController {
     @Autowired
     private com.sakuradata.media.service.UserActivityService userActivityService;
 
+    @Autowired
+    private com.sakuradata.media.service.StorageService storageService;
+
+    @Autowired
+    private StorageRootRepository storageRootRepository;
+
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     private final ExecutorService storageStatsExecutor = Executors.newFixedThreadPool(4, r -> {
         Thread t = new Thread(r, "storage-stats-worker");
@@ -351,12 +357,21 @@ public class AdminController {
         }
 
         // Guard directory path boundaries
+        List<StorageRoot> activeRoots = storageRootRepository.findByEnabledTrueOrderByOrderIndexAsc();
         for (Map<String, Object> rule : rules) {
             String path = (String) rule.get("path");
             if (path == null) continue;
             String resolved = Paths.get(path).toAbsolutePath().normalize().toString().replace("\\", "/");
-            if (!resolved.startsWith("/home/sakura") && !resolved.startsWith("/media/storage") && !resolved.startsWith("/media/hdd") && !resolved.startsWith("/media/gdrive")) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Path must be under /home/sakura, /media/storage, /media/hdd or /media/gdrive: " + path));
+            boolean validPrefix = false;
+            for (StorageRoot ar : activeRoots) {
+                String rootPath = Paths.get(ar.getPath()).toAbsolutePath().normalize().toString().replace("\\", "/");
+                if (resolved.equals(rootPath) || resolved.startsWith(rootPath + "/")) {
+                    validPrefix = true;
+                    break;
+                }
+            }
+            if (!validPrefix) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Path is not within any configured media server roots: " + path));
             }
         }
 
@@ -430,62 +445,36 @@ public class AdminController {
     }
 
     private Map<String, Object> fetchStorageStats() {
-        File homeFile = new File("/home/sakura");
-        File storageFile = new File("/media/storage");
-        File hddFile = new File("/media/hdd");
-        File gdriveFile = new File("/media/gdrive");
-
-        java.util.concurrent.Future<Map<String, Object>> homeFuture = storageStatsExecutor.submit(() -> getStatsForFile(homeFile, "local", "/home/sakura"));
-        java.util.concurrent.Future<Map<String, Object>> storageFuture = storageStatsExecutor.submit(() -> getStatsForFile(storageFile, "storage", "/media/storage"));
-        java.util.concurrent.Future<Map<String, Object>> hddFuture = storageStatsExecutor.submit(() -> getStatsForFile(hddFile, "hdd", "/media/hdd"));
-        java.util.concurrent.Future<Map<String, Object>> gdriveFuture = storageStatsExecutor.submit(() -> getStatsForFile(gdriveFile, "gdrive", "/media/gdrive"));
-
-        Map<String, Object> response = new HashMap<>();
-
-        try {
-            Map<String, Object> homeStats = homeFuture.get(3000, java.util.concurrent.TimeUnit.MILLISECONDS);
-            if (homeStats != null) {
-                homeStats.put("name", "Home (sakura)");
-                homeStats.put("path", "/home/sakura");
-                response.put("home", homeStats);
-            }
-        } catch (Exception e) {
-            homeFuture.cancel(true);
+        List<StorageRoot> activeRoots = storageRootRepository.findByEnabledTrueOrderByOrderIndexAsc();
+        if (activeRoots.isEmpty()) {
+            storageService.initDefaultRoots();
+            activeRoots = storageRootRepository.findByEnabledTrueOrderByOrderIndexAsc();
         }
 
-        try {
-            Map<String, Object> storageStats = storageFuture.get(3000, java.util.concurrent.TimeUnit.MILLISECONDS);
-            if (storageStats != null) {
-                storageStats.put("name", "Storage");
-                storageStats.put("path", "/media/storage");
-                response.put("storage", storageStats);
-            }
-        } catch (Exception e) {
-            storageFuture.cancel(true);
+        Map<StorageRoot, java.util.concurrent.Future<Map<String, Object>>> futures = new LinkedHashMap<>();
+        for (StorageRoot root : activeRoots) {
+            File f = new File(root.getPath());
+            String fsKey = root.getName().toLowerCase().replaceAll("[^a-z0-9]", "_");
+            java.util.concurrent.Future<Map<String, Object>> future = storageStatsExecutor.submit(() -> getStatsForFile(f, fsKey, root.getPath()));
+            futures.put(root, future);
         }
 
-        try {
-            Map<String, Object> hddStats = hddFuture.get(3000, java.util.concurrent.TimeUnit.MILLISECONDS);
-            if (hddStats != null) {
-                hddStats.put("name", "HDD");
-                hddStats.put("path", "/media/hdd");
-                response.put("hdd", hddStats);
+        Map<String, Object> response = new LinkedHashMap<>();
+        for (Map.Entry<StorageRoot, java.util.concurrent.Future<Map<String, Object>>> entry : futures.entrySet()) {
+            StorageRoot root = entry.getKey();
+            try {
+                long timeout = root.getPath().contains("gdrive") ? 15000 : 3000;
+                Map<String, Object> stats = entry.getValue().get(timeout, java.util.concurrent.TimeUnit.MILLISECONDS);
+                if (stats != null) {
+                    stats.put("name", root.getName());
+                    stats.put("path", root.getPath());
+                    String key = root.getName().toLowerCase().replaceAll("[^a-z0-9]", "_");
+                    response.put(key, stats);
+                }
+            } catch (Exception e) {
+                entry.getValue().cancel(true);
             }
-        } catch (Exception e) {
-            hddFuture.cancel(true);
         }
-
-        try {
-            Map<String, Object> gdriveStats = gdriveFuture.get(15000, java.util.concurrent.TimeUnit.MILLISECONDS);
-            if (gdriveStats != null) {
-                gdriveStats.put("name", "Google Drive");
-                gdriveStats.put("path", "/media/gdrive");
-                response.put("gdrive", gdriveStats);
-            }
-        } catch (Exception e) {
-            gdriveFuture.cancel(true);
-        }
-
         return response;
     }
 
@@ -1277,5 +1266,132 @@ public class AdminController {
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType("image/svg+xml"))
                 .body(svg.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    // ==========================================
+    // STORAGE & DRIVE MANAGEMENT ENDPOINTS
+    // ==========================================
+
+    @GetMapping("/admin/storage/devices")
+    public ResponseEntity<?> getStorageDevices(HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        try {
+            Map<String, Object> devices = storageService.getConnectedDevices();
+            return ResponseEntity.ok(devices);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to retrieve storage devices: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/admin/storage/mount")
+    public ResponseEntity<?> mountStorageDevice(@RequestBody Map<String, Object> payload, HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        String device = (String) payload.get("device");
+        String mountPath = (String) payload.get("mountPath");
+        boolean allocateAsRoot = Boolean.TRUE.equals(payload.get("allocateAsRoot"));
+        String rootName = (String) payload.get("rootName");
+
+        try {
+            Map<String, Object> result = storageService.mountDevice(device, mountPath, allocateAsRoot, rootName);
+            return ResponseEntity.ok(result);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Mount failed: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/admin/storage/unmount")
+    public ResponseEntity<?> unmountStorageDevice(@RequestBody Map<String, Object> payload, HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        String target = (String) payload.get("target");
+        try {
+            Map<String, Object> result = storageService.unmountDevice(target);
+            return ResponseEntity.ok(result);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Unmount failed: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/admin/storage/roots")
+    public ResponseEntity<?> getManagedRoots(HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        try {
+            List<Map<String, Object>> roots = storageService.getAllRootsWithStats();
+            return ResponseEntity.ok(roots);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to retrieve storage roots: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/admin/storage/roots")
+    public ResponseEntity<?> addStorageRoot(@RequestBody Map<String, Object> payload, HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        String name = (String) payload.get("name");
+        String path = (String) payload.get("path");
+        boolean allowWrite = !Boolean.FALSE.equals(payload.get("allowWrite"));
+
+        try {
+            StorageRoot created = storageService.addRoot(name, path, allowWrite);
+            return ResponseEntity.ok(Map.of("success", true, "root", created));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to add storage root: " + e.getMessage()));
+        }
+    }
+
+    @PutMapping("/admin/storage/roots/{id}")
+    public ResponseEntity<?> updateStorageRoot(@PathVariable Long id, @RequestBody Map<String, Object> payload, HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        String name = (String) payload.get("name");
+        String path = (String) payload.get("path");
+        boolean allowWrite = !Boolean.FALSE.equals(payload.get("allowWrite"));
+        boolean enabled = !Boolean.FALSE.equals(payload.get("enabled"));
+
+        try {
+            StorageRoot updated = storageService.updateRoot(id, name, path, allowWrite, enabled);
+            return ResponseEntity.ok(Map.of("success", true, "root", updated));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to update storage root: " + e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/admin/storage/roots/{id}")
+    public ResponseEntity<?> deleteStorageRoot(@PathVariable Long id, HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        try {
+            storageService.deleteRoot(id);
+            return ResponseEntity.ok(Map.of("success", true, "message", "Storage root removed"));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to delete storage root: " + e.getMessage()));
+        }
     }
 }
