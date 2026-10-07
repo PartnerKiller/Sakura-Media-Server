@@ -12,7 +12,7 @@
   <script src="/lucide.min.js?v=0.453"></script>
   <script src="/chart.min.js"></script>
   <script src="/hls.min.js"></script>
-  <link rel="stylesheet" href="/style.css?v=9.30">
+  <link rel="stylesheet" href="/style.css?v=9.35">
   <link rel="icon" type="image/jpeg" href="/favicon.jpg">
 </head>
 <body>
@@ -457,6 +457,7 @@
           <div class="server-tabs-bar">
             <button class="server-tab-btn active" data-tab="tab-metrics">Status & Graphs</button>
             <button class="server-tab-btn" data-tab="tab-storage-mounts"><i data-lucide="hard-drive"></i> Disks & Storage</button>
+            <button class="server-tab-btn" data-tab="tab-smb-management"><i data-lucide="share-2"></i> SMB Shares</button>
             <button class="server-tab-btn" data-tab="tab-services">Services</button>
             <button class="server-tab-btn" data-tab="tab-audit-logs">Audit Logs</button>
             <button class="server-tab-btn" data-tab="tab-appearance">Appearance</button>
@@ -588,7 +589,143 @@
             </div>
           </div>
 
-          <!-- 2. SYSTEMD SERVICES -->
+          <!-- SMB (SAMBA) NETWORK SHARES MANAGEMENT -->
+          <div id="tab-smb-management" class="server-tab-content">
+            <!-- SMB Overview Stats Banner -->
+            <div class="storage-metrics-banner" style="margin-top: 16px;">
+              <div class="metric-card">
+                <div class="metric-icon" id="smb-metric-status-icon"><i data-lucide="network"></i></div>
+                <div class="metric-info">
+                  <div class="metric-label">Samba Daemon</div>
+                  <div class="metric-value" id="smb-stat-status" style="font-size: 18px; display: flex; align-items: center; gap: 8px;">
+                    <span class="badge-status-pill smb-status-active">Running</span>
+                  </div>
+                  <div style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">
+                    <span id="smb-stat-pid">PID --</span> &bull; <span id="smb-stat-version">Samba</span>
+                  </div>
+                </div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-icon" style="color: var(--primary);"><i data-lucide="server"></i></div>
+                <div class="metric-info">
+                  <div class="metric-label">Network Location</div>
+                  <div class="metric-value" id="smb-stat-server-ip" style="font-family: monospace; font-size: 18px;">192.168.0.10</div>
+                  <div style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">
+                    \\<span id="smb-stat-hostname">sakura</span> &bull; Port 445
+                  </div>
+                </div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-icon" style="color: #38bdf8;"><i data-lucide="users"></i></div>
+                <div class="metric-info">
+                  <div class="metric-label">Connected Clients</div>
+                  <div class="metric-value" id="smb-stat-active-clients">--</div>
+                  <div style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">
+                    <span id="smb-stat-active-tcons">--</span> active share sessions
+                  </div>
+                </div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-icon" style="color: #a855f7;"><i data-lucide="folder-symlink"></i></div>
+                <div class="metric-info">
+                  <div class="metric-label">Network Shares</div>
+                  <div class="metric-value" id="smb-stat-total-shares">--</div>
+                  <div style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">
+                    <span id="smb-stat-custom-shares">--</span> custom shares configured
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Configured SMB Shares Section -->
+            <div class="users-list-card" style="margin-top: 20px;">
+              <div class="admin-section-title-container" style="padding: 16px 24px; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <div>
+                  <h3 class="admin-section-title" style="margin: 0; display: flex; align-items: center; gap: 8px;">
+                    <i data-lucide="share-2" style="color: var(--primary);"></i>
+                    Configured Samba Network Shares
+                  </h3>
+                  <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.85rem;">
+                    Shares published across the local network (LAN) for Windows, Mac, Linux, and Smart TV media clients
+                  </p>
+                </div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                  <button id="btn-add-smb-share" class="btn btn-primary" onclick="openNewSmbShareModal()">
+                    <i data-lucide="plus"></i>
+                    <span>New SMB Share</span>
+                  </button>
+                  <button id="btn-manage-smb-users" class="btn btn-secondary" onclick="openSmbUsersModal()">
+                    <i data-lucide="user-check"></i>
+                    <span>SMB Users</span>
+                  </button>
+                  <button id="btn-reload-smb" class="btn btn-secondary" onclick="reloadSmbConfig()" title="Reload smb.conf dynamically without kicking users">
+                    <i data-lucide="rotate-cw"></i>
+                    <span>Reload</span>
+                  </button>
+                  <button id="btn-restart-smb" class="btn btn-secondary" onclick="restartSmbService()" title="Restart Samba smbd service">
+                    <i data-lucide="refresh-cw"></i>
+                    <span>Restart Daemon</span>
+                  </button>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="users-table">
+                  <thead>
+                    <tr>
+                      <th>Share Name</th>
+                      <th>Network UNC Path</th>
+                      <th>Local Directory</th>
+                      <th>Access</th>
+                      <th>Security & Users</th>
+                      <th>Active Clients</th>
+                      <th style="text-align: right;">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="smb-shares-table-body">
+                    <tr><td colspan="7" class="p-4 text-center">Loading Samba shares...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Real-time Connected Clients & Sessions Section -->
+            <div class="users-list-card" style="margin-top: 24px; margin-bottom: 32px;">
+              <div class="admin-section-title-container" style="padding: 16px 24px; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <div>
+                  <h3 class="admin-section-title" style="margin: 0; display: flex; align-items: center; gap: 8px;">
+                    <i data-lucide="activity" style="color: #38bdf8;"></i>
+                    Active SMB Client Sessions (smbstatus)
+                  </h3>
+                  <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.85rem;">
+                    Devices and network users currently connected to this server via SMB
+                  </p>
+                </div>
+                <div>
+                  <button class="btn btn-secondary" onclick="loadSmbSessions()">
+                    <i data-lucide="refresh-cw"></i>
+                    <span>Refresh Sessions</span>
+                  </button>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="users-table">
+                  <thead>
+                    <tr>
+                      <th>Client Machine / IP</th>
+                      <th>User</th>
+                      <th>Shares Accessed</th>
+                      <th>Protocol Dialect</th>
+                      <th>Session Security</th>
+                      <th>Session ID</th>
+                    </tr>
+                  </thead>
+                  <tbody id="smb-sessions-table-body">
+                    <tr><td colspan="6" class="p-4 text-center">No active client sessions.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
           <div id="tab-services" class="server-tab-content">
             <div class="users-list-card" style="margin-top: 16px;">
               <div class="admin-section-title-container" style="padding: 16px 24px; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center;">
@@ -1921,6 +2058,141 @@
     </div>
   </div>
 
-  <script src="/app-v4.js?v=9.30"></script>
+  <!-- CREATE / EDIT SMB NETWORK SHARE MODAL -->
+  <div class="modal-backdrop" id="modal-smb-share" style="z-index: 1100;">
+    <div class="modal" style="max-width: 540px; width: 92%;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="share-2" style="color: var(--primary); width: 20px; height: 20px;"></i>
+          <h3 id="smb-modal-title" style="margin: 0; font-size: 16px; font-weight: 600;">Create SMB Network Share</h3>
+        </div>
+        <button class="btn-close-modal" onclick="closeModal('modal-smb-share')">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <form id="form-smb-share" onsubmit="handleSmbShareSubmit(event)">
+        <input type="hidden" id="smb-share-is-new" value="true">
+        <input type="hidden" id="smb-share-orig-name" value="">
+        <div class="modal-body" style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+          <div>
+            <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase;">Share Name (Network Identifier) *</label>
+            <input type="text" id="smb-share-name" required placeholder="e.g. Movies, Backups, Storage" style="width: 100%; padding: 10px 14px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-main); font-size: 14px;">
+            <div id="smb-share-unc-preview" style="margin-top: 6px; font-size: 11.5px; font-family: monospace; color: var(--text-secondary);">
+              Windows Path: \\192.168.0.10\<span id="smb-unc-preview-name">...</span>
+            </div>
+          </div>
+
+          <div>
+            <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase;">Server Directory Path *</label>
+            <input type="text" id="smb-share-path" required placeholder="e.g. /media/storage or /home/sakura/Downloads" style="width: 100%; padding: 10px 14px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-main); font-size: 14px; font-family: monospace;">
+            <div id="smb-path-suggestions" style="display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; align-items: center;">
+              <span style="font-size: 11px; color: var(--text-secondary);">Quick pick:</span>
+              <button type="button" class="btn btn-secondary" style="padding: 2px 8px; font-size: 11px; font-family: monospace;" onclick="setSmbPathSuggestion('/media/storage', 'Storage')">/media/storage</button>
+              <button type="button" class="btn btn-secondary" style="padding: 2px 8px; font-size: 11px; font-family: monospace;" onclick="setSmbPathSuggestion('/media/ssd', 'SSD')">/media/ssd</button>
+              <button type="button" class="btn btn-secondary" style="padding: 2px 8px; font-size: 11px; font-family: monospace;" onclick="setSmbPathSuggestion('/home/sakura', 'Home')">/home/sakura</button>
+            </div>
+          </div>
+
+          <div>
+            <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase;">Comment / Description</label>
+            <input type="text" id="smb-share-comment" placeholder="Optional description for network clients" style="width: 100%; padding: 9px 13px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-main); font-size: 13.5px;">
+          </div>
+
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px;">
+            <div style="font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Permissions & Network Access</div>
+
+            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none;">
+              <input type="checkbox" id="smb-share-writable" checked style="width: 17px; height: 17px; accent-color: var(--primary);">
+              <div>
+                <div style="font-size: 13.5px; font-weight: 500; color: var(--text-main);">Allow Read & Write access</div>
+                <div style="font-size: 11.5px; color: var(--text-secondary);">If unchecked, clients can only read/download files (read-only mode).</div>
+              </div>
+            </label>
+
+            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none;">
+              <input type="checkbox" id="smb-share-browseable" checked style="width: 17px; height: 17px; accent-color: var(--primary);">
+              <div>
+                <div style="font-size: 13.5px; font-weight: 500; color: var(--text-main);">Visible in Network Explorer (Browseable)</div>
+                <div style="font-size: 11.5px; color: var(--text-secondary);">Shows up automatically in Windows "Network" or Finder without typing manual path.</div>
+              </div>
+            </label>
+
+            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none;">
+              <input type="checkbox" id="smb-share-guest-ok" style="width: 17px; height: 17px; accent-color: var(--primary);">
+              <div>
+                <div style="font-size: 13.5px; font-weight: 500; color: var(--text-main);">Allow Guest Access (Public / No password)</div>
+                <div style="font-size: 11.5px; color: var(--text-secondary);">Anyone on your local Wi-Fi or LAN can access this share without entering credentials.</div>
+              </div>
+            </label>
+          </div>
+
+          <div>
+            <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase;">Allowed Users (Optional)</label>
+            <input type="text" id="smb-share-valid-users" placeholder="e.g. sakura (leave blank to allow all authenticated accounts)" style="width: 100%; padding: 9px 13px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-main); font-size: 13px; font-family: monospace;">
+          </div>
+        </div>
+        <div class="modal-footer" style="padding: 16px 20px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 10px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-smb-share')">Cancel</button>
+          <button type="submit" id="btn-submit-smb-share" class="btn btn-primary" style="display: flex; align-items: center; gap: 6px;">
+            <i data-lucide="check"></i>
+            <span id="btn-smb-share-text">Save Share</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MANAGE SAMBA USERS MODAL -->
+  <div class="modal-backdrop" id="modal-smb-users" style="z-index: 1100;">
+    <div class="modal" style="max-width: 580px; width: 92%;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="user-check" style="color: var(--primary); width: 20px; height: 20px;"></i>
+          <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Samba Network Users & Passwords</h3>
+        </div>
+        <button class="btn-close-modal" onclick="closeModal('modal-smb-users')">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body" style="padding: 20px; display: flex; flex-direction: column; gap: 20px;">
+        <div>
+          <div style="font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 8px;">Active Samba Accounts</div>
+          <div id="smb-users-list" style="display: flex; flex-direction: column; gap: 8px;">
+            <div class="storage-loading"><i data-lucide="loader" class="animate-spin"></i><span>Loading Samba users...</span></div>
+          </div>
+        </div>
+
+        <div style="border-top: 1px solid var(--border-subtle); padding-top: 16px;">
+          <div style="font-size: 13px; font-weight: 600; color: var(--text-main); margin-bottom: 4px;">Set or Update SMB User Password</div>
+          <p class="text-muted" style="margin: 0 0 12px 0; font-size: 12px;">This sets the authentication password used by Windows, Mac, or Smart TV to connect to password-protected shares.</p>
+          <form id="form-smb-password" onsubmit="handleSmbPasswordSubmit(event)" style="display: flex; flex-direction: column; gap: 12px;">
+            <div>
+              <label style="display: block; font-size: 11.5px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Username</label>
+              <input type="text" id="smb-input-username" value="sakura" required style="width: 100%; padding: 8px 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-main); font-size: 13px;">
+            </div>
+            <div>
+              <label style="display: block; font-size: 11.5px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">New SMB Password</label>
+              <input type="password" id="smb-input-password" required placeholder="Enter password" style="width: 100%; padding: 8px 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-main); font-size: 13px;">
+            </div>
+            <div>
+              <label style="display: block; font-size: 11.5px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Confirm Password</label>
+              <input type="password" id="smb-input-confirm" required placeholder="Confirm password" style="width: 100%; padding: 8px 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-main); font-size: 13px;">
+            </div>
+            <div style="display: flex; justify-content: flex-end; margin-top: 4px;">
+              <button type="submit" id="btn-submit-smb-pass" class="btn btn-primary" style="display: flex; align-items: center; gap: 6px;">
+                <i data-lucide="key"></i>
+                <span>Set SMB Password</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+      <div class="modal-footer" style="padding: 14px 20px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-smb-users')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app-v4.js?v=9.35"></script>
 </body>
 </html>

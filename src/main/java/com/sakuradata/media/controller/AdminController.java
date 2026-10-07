@@ -55,6 +55,9 @@ public class AdminController {
     private com.sakuradata.media.service.StorageService storageService;
 
     @Autowired
+    private com.sakuradata.media.service.SmbService smbService;
+
+    @Autowired
     private StorageRootRepository storageRootRepository;
 
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
@@ -1392,6 +1395,166 @@ public class AdminController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Failed to delete storage root: " + e.getMessage()));
+        }
+    }
+
+    // ==========================================
+    // SAMBA (SMB) NETWORK SHARES MANAGEMENT
+    // ==========================================
+
+    @GetMapping("/admin/smb/status")
+    public ResponseEntity<?> getSmbStatus(HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        try {
+            Map<String, Object> overview = smbService.getSmbOverview();
+            return ResponseEntity.ok(overview);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to retrieve SMB status: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/admin/smb/shares")
+    public ResponseEntity<?> getSmbShares(HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        try {
+            List<Map<String, Object>> shares = smbService.getAllShares();
+            return ResponseEntity.ok(shares);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to retrieve SMB shares: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/admin/smb/shares")
+    public ResponseEntity<?> createSmbShare(@RequestBody Map<String, Object> payload, HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        try {
+            Map<String, Object> result = smbService.saveShare(payload, true);
+            return ResponseEntity.ok(result);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to create SMB share: " + e.getMessage()));
+        }
+    }
+
+    @PutMapping("/admin/smb/shares/{shareName}")
+    public ResponseEntity<?> updateSmbShare(@PathVariable String shareName, @RequestBody Map<String, Object> payload, HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        try {
+            Map<String, Object> mutablePayload = new HashMap<>(payload);
+            mutablePayload.put("originalName", shareName);
+            Map<String, Object> result = smbService.saveShare(mutablePayload, false);
+            return ResponseEntity.ok(result);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to update SMB share: " + e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/admin/smb/shares/{shareName}")
+    public ResponseEntity<?> deleteSmbShare(@PathVariable String shareName, HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        try {
+            Map<String, Object> result = smbService.deleteShare(shareName);
+            return ResponseEntity.ok(result);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to delete SMB share: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/admin/smb/sessions")
+    public ResponseEntity<?> getSmbSessions(HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        try {
+            List<Map<String, Object>> sessions = smbService.getActiveSessions();
+            return ResponseEntity.ok(sessions);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to retrieve active SMB sessions: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/admin/smb/users")
+    public ResponseEntity<?> getSmbUsers(HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        try {
+            List<Map<String, Object>> users = smbService.getSambaUsers();
+            return ResponseEntity.ok(users);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to retrieve Samba users: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/admin/smb/users/password")
+    public ResponseEntity<?> setSmbUserPassword(@RequestBody Map<String, Object> payload, HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        String username = (String) payload.get("username");
+        String password = (String) payload.get("password");
+        try {
+            Map<String, Object> result = smbService.setSambaUserPassword(username, password);
+            return ResponseEntity.ok(result);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to set Samba password: " + e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/admin/smb/users/{username}")
+    public ResponseEntity<?> deleteSmbUser(@PathVariable String username, HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        try {
+            Map<String, Object> result = smbService.deleteSambaUser(username);
+            return ResponseEntity.ok(result);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to remove Samba user: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/admin/smb/service/{action}")
+    public ResponseEntity<?> controlSmbService(@PathVariable String action, HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        try {
+            Map<String, Object> result = smbService.controlService(action);
+            return ResponseEntity.ok(result);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to execute service action: " + e.getMessage()));
         }
     }
 }

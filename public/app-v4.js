@@ -4024,6 +4024,8 @@ function triggerSubTabLoad(tabId) {
   } else if (tabId === 'tab-storage-mounts') {
     loadStorageDevices();
     loadManagedRoots();
+  } else if (tabId === 'tab-smb-management') {
+    loadSmbManagement();
   } else if (tabId === 'tab-docker') {
     loadDockerContainers();
   } else if (tabId === 'tab-services') {
@@ -6338,6 +6340,554 @@ window.openEditRootModal = openEditRootModal;
 window.handleEditRootClick = handleEditRootClick;
 window.handleCustomRootSubmit = handleCustomRootSubmit;
 window.deleteRoot = deleteRoot;
+
+// =============================================================
+// SAMBA (SMB) NETWORK SHARES MANAGEMENT
+// =============================================================
+
+let cachedSmbOverview = null;
+let cachedSmbShares = [];
+
+async function loadSmbManagement() {
+  await Promise.all([
+    loadSmbStatus(),
+    loadSmbShares(),
+    loadSmbSessions()
+  ]);
+}
+
+async function loadSmbStatus() {
+  try {
+    const data = await apiCall('/api/admin/smb/status?_cb=' + Date.now());
+    cachedSmbOverview = data;
+
+    const elStatus = document.getElementById('smb-stat-status');
+    const elIcon = document.getElementById('smb-metric-status-icon');
+    const elPid = document.getElementById('smb-stat-pid');
+    const elVer = document.getElementById('smb-stat-version');
+    const elIp = document.getElementById('smb-stat-server-ip');
+    const elHost = document.getElementById('smb-stat-hostname');
+    const elClients = document.getElementById('smb-stat-active-clients');
+    const elTcons = document.getElementById('smb-stat-active-tcons');
+    const elTotalShares = document.getElementById('smb-stat-total-shares');
+    const elCustomShares = document.getElementById('smb-stat-custom-shares');
+
+    if (elStatus) {
+      if (data.running) {
+        elStatus.innerHTML = `<span class="badge-status-pill smb-status-active"><i data-lucide="check" style="width:12px;height:12px;"></i> Running</span>`;
+        if (elIcon) elIcon.style.color = 'var(--success, #22c55e)';
+      } else {
+        elStatus.innerHTML = `<span class="badge-status-pill smb-status-inactive"><i data-lucide="x" style="width:12px;height:12px;"></i> Stopped</span>`;
+        if (elIcon) elIcon.style.color = 'var(--danger, #ef4444)';
+      }
+    }
+
+    if (elPid) elPid.textContent = data.mainPid ? `PID ${data.mainPid}` : 'Inactive';
+    if (elVer) elVer.textContent = data.version || 'Samba';
+    if (elIp) elIp.textContent = data.serverIp || '192.168.0.10';
+    if (elHost) elHost.textContent = data.hostname || 'sakura';
+    if (elClients) elClients.textContent = data.activeClientsCount || 0;
+    if (elTcons) elTcons.textContent = data.activeTconsCount || 0;
+    if (elTotalShares) elTotalShares.textContent = data.totalShares || 0;
+    if (elCustomShares) elCustomShares.textContent = data.customSharesCount || 0;
+
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  } catch (err) {
+    console.error('Failed to load SMB status:', err);
+  }
+}
+
+async function loadSmbShares() {
+  const tbody = document.getElementById('smb-shares-table-body');
+  if (!tbody) return;
+
+  tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center">Loading Samba shares...</td></tr>`;
+
+  try {
+    const shares = await apiCall('/api/admin/smb/shares?_cb=' + Date.now());
+    cachedSmbShares = shares;
+    renderSmbShares(shares);
+  } catch (err) {
+    console.error('Failed to load SMB shares:', err);
+    tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-error">Failed to load SMB shares: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function renderSmbShares(shares) {
+  const tbody = document.getElementById('smb-shares-table-body');
+  if (!tbody) return;
+
+  if (!shares || shares.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-muted">No SMB shares configured yet. Click "+ New SMB Share" to share a directory.</td></tr>`;
+    return;
+  }
+
+  let html = '';
+  shares.forEach(s => {
+    const isSystem = !!s.isSystem;
+    const readOnly = !!s.readOnly;
+    const guestOk = !!s.guestOk;
+    const browseable = !!s.browseable;
+    const activeClientsCount = s.activeClientsCount || 0;
+    const pathExists = !!s.pathExists;
+
+    const winUnc = s.uncWindowsIp || `\\\\192.168.0.10\\${s.name}`;
+    const macUnc = s.uncMacLinuxIp || `smb://192.168.0.10/${s.name}`;
+
+    const jsonStr = JSON.stringify(s).replace(/'/g, "&#39;");
+
+    html += `
+      <tr>
+        <td>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <i data-lucide="${isSystem ? 'printer' : 'folder-symlink'}" style="color: var(--primary); width: 16px; height: 16px; flex-shrink: 0;"></i>
+            <div>
+              <span style="font-weight: 600; color: var(--text-main); font-size: 14px;">${escapeHtml(s.name)}</span>
+              ${s.comment ? `<div style="font-size: 11.5px; color: var(--text-secondary);">${escapeHtml(s.comment)}</div>` : ''}
+            </div>
+          </div>
+        </td>
+        <td>
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <code class="unc-code-badge" title="${escapeHtml(winUnc)}">${escapeHtml(winUnc)}</code>
+              <button type="button" class="btn-unc-copy" title="Copy Windows UNC path" onclick="copyUncText('${escapeHtml(winUnc)}', this)">
+                <i data-lucide="copy" style="width: 13px; height: 13px;"></i>
+              </button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="font-size: 11px; color: var(--text-secondary); font-family: monospace;">${escapeHtml(macUnc)}</span>
+              <button type="button" class="btn-unc-copy" title="Copy Mac/Linux URL" onclick="copyUncText('${escapeHtml(macUnc)}', this)">
+                <i data-lucide="copy" style="width: 11px; height: 11px;"></i>
+              </button>
+            </div>
+          </div>
+        </td>
+        <td>
+          <div>
+            <code style="background: rgba(255,255,255,0.06); padding: 3px 8px; border-radius: 6px; font-size: 12px; color: var(--text-main); font-family: monospace;">${escapeHtml(s.path || '(system)')}</code>
+            ${s.path && !pathExists ? `
+              <div style="color: var(--danger, #ef4444); font-size: 11px; margin-top: 3px; display: flex; align-items: center; gap: 4px;">
+                <i data-lucide="alert-triangle" style="width: 12px; height: 12px;"></i> Path not found
+              </div>
+            ` : ''}
+          </div>
+        </td>
+        <td>
+          ${readOnly
+            ? '<span class="badge-tag" style="background: rgba(255,255,255,0.06); color: var(--text-secondary); border: 1px solid var(--border-subtle);"><i data-lucide="eye" style="width:11px;height:11px;"></i> Read-Only</span>'
+            : '<span class="badge-tag" style="background: rgba(34,197,94,0.12); color: #4ade80; border: 1px solid rgba(34,197,94,0.25);"><i data-lucide="edit-3" style="width:11px;height:11px;"></i> Read & Write</span>'}
+        </td>
+        <td>
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              ${guestOk
+                ? '<span class="badge-tag tag-guest"><i data-lucide="unlock" style="width:11px;height:11px;"></i> Guest OK (Public)</span>'
+                : '<span class="badge-tag tag-auth"><i data-lucide="lock" style="width:11px;height:11px;"></i> Password Required</span>'}
+              ${browseable
+                ? '<span class="badge-tag" style="background: rgba(255,255,255,0.05); color: var(--text-secondary); font-size: 10.5px;">Visible</span>'
+                : '<span class="badge-tag" style="background: rgba(239,68,68,0.1); color: #f87171; font-size: 10.5px;">Hidden</span>'}
+            </div>
+            ${s.validUsers ? `<div style="font-size: 11px; color: var(--text-secondary); font-family: monospace;">Users: ${escapeHtml(s.validUsers)}</div>` : ''}
+          </div>
+        </td>
+        <td>
+          ${activeClientsCount > 0
+            ? `<span class="badge-tag tag-clients" title="Connected: ${escapeHtml((s.activeClients || []).join(', '))}"><i data-lucide="user-check" style="width:11px;height:11px;"></i> ${activeClientsCount} active</span>`
+            : '<span style="font-size: 12px; color: var(--text-secondary);">Idle</span>'}
+        </td>
+        <td style="text-align: right;">
+          <div style="display: flex; align-items: center; justify-content: flex-end; gap: 6px;">
+            ${isSystem ? `
+              <span class="badge-tag" style="font-size: 10.5px; opacity: 0.6;">System</span>
+            ` : `
+              <button class="btn btn-secondary" style="padding: 5px 8px;" title="Edit Share" data-share='${jsonStr}' onclick="handleEditSmbShareClick(this)">
+                <i data-lucide="edit-2" style="width: 14px; height: 14px;"></i>
+              </button>
+              <button class="btn btn-secondary text-danger" style="padding: 5px 8px;" title="Delete Share" onclick="deleteSmbShare('${escapeHtml(s.name)}')">
+                <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+              </button>
+            `}
+          </div>
+        </td>
+      </tr>
+    `;
+  });
+
+  tbody.innerHTML = html;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+async function loadSmbSessions() {
+  const tbody = document.getElementById('smb-sessions-table-body');
+  if (!tbody) return;
+
+  try {
+    const sessions = await apiCall('/api/admin/smb/sessions?_cb=' + Date.now());
+    if (!sessions || sessions.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-muted">No active client sessions connected.</td></tr>`;
+      return;
+    }
+
+    let html = '';
+    sessions.forEach(sess => {
+      const sharesList = sess.shares && sess.shares.length > 0
+        ? sess.shares.map(sh => `<span class="badge-tag tag-auth" style="font-size: 11px;">${escapeHtml(sh)}</span>`).join(' ')
+        : '<span style="color: var(--text-secondary); font-size: 12px;">None</span>';
+
+      html += `
+        <tr>
+          <td>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <i data-lucide="monitor" style="color: #38bdf8; width: 16px; height: 16px;"></i>
+              <span style="font-family: monospace; font-weight: 600; color: var(--text-main); font-size: 13.5px;">${escapeHtml(sess.remoteMachine || sess.remoteAddress || 'Unknown')}</span>
+            </div>
+          </td>
+          <td>
+            <span style="font-weight: 500; color: var(--text-main);">${escapeHtml(sess.username || 'guest')}</span>
+          </td>
+          <td>
+            <div style="display: flex; gap: 4px; flex-wrap: wrap;">${sharesList}</div>
+          </td>
+          <td>
+            <span class="badge-tag tag-size" style="font-family: monospace;">${escapeHtml(sess.protocol || 'SMB3')}</span>
+          </td>
+          <td>
+            <span style="font-size: 11.5px; color: var(--text-secondary);">${escapeHtml(sess.signing || 'Standard')}</span>
+          </td>
+          <td>
+            <span style="font-family: monospace; font-size: 11px; color: var(--text-secondary);">${escapeHtml(sess.sessionId || '-')}</span>
+          </td>
+        </tr>
+      `;
+    });
+
+    tbody.innerHTML = html;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  } catch (err) {
+    console.error('Failed to load SMB sessions:', err);
+    tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-error">Failed to load active sessions: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+// Modal Form Operations
+function openNewSmbShareModal() {
+  document.getElementById('smb-share-is-new').value = 'true';
+  document.getElementById('smb-share-orig-name').value = '';
+  document.getElementById('smb-modal-title').textContent = 'Create SMB Network Share';
+  document.getElementById('btn-smb-share-text').textContent = 'Save Share';
+
+  document.getElementById('smb-share-name').value = '';
+  document.getElementById('smb-share-path').value = '';
+  document.getElementById('smb-share-comment').value = '';
+  document.getElementById('smb-share-writable').checked = true;
+  document.getElementById('smb-share-browseable').checked = true;
+  document.getElementById('smb-share-guest-ok').checked = false;
+  document.getElementById('smb-share-valid-users').value = 'sakura';
+  document.getElementById('smb-unc-preview-name').textContent = '...';
+
+  // Listen for name typing to update UNC preview
+  const nameInput = document.getElementById('smb-share-name');
+  nameInput.oninput = () => {
+    document.getElementById('smb-unc-preview-name').textContent = nameInput.value.trim() || '...';
+  };
+
+  openModal('modal-smb-share');
+}
+
+function openEditSmbShareModal(share) {
+  document.getElementById('smb-share-is-new').value = 'false';
+  document.getElementById('smb-share-orig-name').value = share.name;
+  document.getElementById('smb-modal-title').textContent = `Edit SMB Share: ${share.name}`;
+  document.getElementById('btn-smb-share-text').textContent = 'Update Share';
+
+  document.getElementById('smb-share-name').value = share.name;
+  document.getElementById('smb-share-path').value = share.path || '';
+  document.getElementById('smb-share-comment').value = share.comment || '';
+  document.getElementById('smb-share-writable').checked = !share.readOnly;
+  document.getElementById('smb-share-browseable').checked = share.browseable;
+  document.getElementById('smb-share-guest-ok').checked = share.guestOk;
+  document.getElementById('smb-share-valid-users').value = share.validUsers || '';
+  document.getElementById('smb-unc-preview-name').textContent = share.name;
+
+  const nameInput = document.getElementById('smb-share-name');
+  nameInput.oninput = () => {
+    document.getElementById('smb-unc-preview-name').textContent = nameInput.value.trim() || '...';
+  };
+
+  openModal('modal-smb-share');
+}
+
+function handleEditSmbShareClick(btn) {
+  try {
+    const raw = btn.getAttribute('data-share');
+    const share = JSON.parse(raw);
+    openEditSmbShareModal(share);
+  } catch (err) {
+    console.error('Failed to parse share data:', err);
+  }
+}
+
+function setSmbPathSuggestion(path, defaultName) {
+  document.getElementById('smb-share-path').value = path;
+  const nameInput = document.getElementById('smb-share-name');
+  if (!nameInput.value.trim() && defaultName) {
+    nameInput.value = defaultName;
+    document.getElementById('smb-unc-preview-name').textContent = defaultName;
+  }
+}
+
+async function handleSmbShareSubmit(event) {
+  event.preventDefault();
+  const btn = document.getElementById('btn-submit-smb-share');
+  const origHtml = btn.innerHTML;
+
+  const isNew = document.getElementById('smb-share-is-new').value === 'true';
+  const origName = document.getElementById('smb-share-orig-name').value;
+  const name = document.getElementById('smb-share-name').value.trim();
+  const path = document.getElementById('smb-share-path').value.trim();
+  const comment = document.getElementById('smb-share-comment').value.trim();
+  const readOnly = !document.getElementById('smb-share-writable').checked;
+  const browseable = document.getElementById('smb-share-browseable').checked;
+  const guestOk = document.getElementById('smb-share-guest-ok').checked;
+  const validUsers = document.getElementById('smb-share-valid-users').value.trim();
+
+  if (!name || !path) {
+    showToast('Share name and directory path are required.', 'error');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = `<i data-lucide="loader" class="animate-spin" style="width:14px;height:14px;"></i> <span>Saving...</span>`;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  try {
+    const payload = {
+      name,
+      path,
+      comment,
+      readOnly,
+      browseable,
+      guestOk,
+      validUsers,
+      createDirectory: true
+    };
+
+    if (isNew) {
+      await apiCall('/api/admin/smb/shares', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      showToast(`Share [${name}] created and activated on network!`, 'success');
+    } else {
+      await apiCall(`/api/admin/smb/shares/${encodeURIComponent(origName)}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      });
+      showToast(`Share [${name}] updated successfully!`, 'success');
+    }
+
+    closeModal('modal-smb-share');
+    loadSmbManagement();
+  } catch (err) {
+    console.error('Save SMB share error:', err);
+    showToast(`Failed to save SMB share: ${err.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = origHtml;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+}
+
+async function deleteSmbShare(name) {
+  if (!confirm(`Are you sure you want to remove the SMB network share "${name}"?\n\n(Files on disk will NOT be deleted).`)) {
+    return;
+  }
+
+  try {
+    await apiCall(`/api/admin/smb/shares/${encodeURIComponent(name)}`, {
+      method: 'DELETE'
+    });
+    showToast(`Share [${name}] removed.`, 'success');
+    loadSmbManagement();
+  } catch (err) {
+    console.error('Delete SMB share error:', err);
+    showToast(`Failed to delete share: ${err.message}`, 'error');
+  }
+}
+
+// User Management Modal
+async function openSmbUsersModal() {
+  openModal('modal-smb-users');
+  await loadSmbUsers();
+}
+
+async function loadSmbUsers() {
+  const container = document.getElementById('smb-users-list');
+  if (!container) return;
+
+  try {
+    const users = await apiCall('/api/admin/smb/users?_cb=' + Date.now());
+    if (!users || users.length === 0) {
+      container.innerHTML = `<div class="p-3 text-center text-muted">No Samba user accounts found.</div>`;
+      return;
+    }
+
+    let html = '';
+    users.forEach(u => {
+      html += `
+        <div class="smb-user-card">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(236,72,153,0.12); color: var(--primary); display: flex; align-items: center; justify-content: center;">
+              <i data-lucide="user" style="width: 16px; height: 16px;"></i>
+            </div>
+            <div>
+              <div style="font-weight: 600; color: var(--text-main); font-size: 13.5px;">${escapeHtml(u.username)}</div>
+              ${u.passwordLastSet ? `<div style="font-size: 11px; color: var(--text-secondary);">Last updated: ${escapeHtml(u.passwordLastSet)}</div>` : ''}
+            </div>
+          </div>
+          <div>
+            <button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px;" onclick="prefillSmbUserPassword('${escapeHtml(u.username)}')">
+              <i data-lucide="key" style="width: 12px; height: 12px;"></i>
+              <span>Change Password</span>
+            </button>
+          </div>
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  } catch (err) {
+    console.error('Failed to load Samba users:', err);
+    container.innerHTML = `<div class="p-3 text-center text-error">Failed to load users: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function prefillSmbUserPassword(username) {
+  const input = document.getElementById('smb-input-username');
+  if (input) input.value = username;
+  const passInput = document.getElementById('smb-input-password');
+  if (passInput) passInput.focus();
+}
+
+async function handleSmbPasswordSubmit(event) {
+  event.preventDefault();
+  const btn = document.getElementById('btn-submit-smb-pass');
+  const origHtml = btn.innerHTML;
+
+  const username = document.getElementById('smb-input-username').value.trim();
+  const password = document.getElementById('smb-input-password').value;
+  const confirm = document.getElementById('smb-input-confirm').value;
+
+  if (!username) {
+    showToast('Username is required.', 'error');
+    return;
+  }
+  if (!password) {
+    showToast('Password cannot be empty.', 'error');
+    return;
+  }
+  if (password !== confirm) {
+    showToast('Passwords do not match.', 'error');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = `<i data-lucide="loader" class="animate-spin" style="width:14px;height:14px;"></i> <span>Updating...</span>`;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  try {
+    await apiCall('/api/admin/smb/users/password', {
+      method: 'POST',
+      body: JSON.stringify({ username, password })
+    });
+    showToast(`Password updated for Samba user "${username}"!`, 'success');
+    document.getElementById('smb-input-password').value = '';
+    document.getElementById('smb-input-confirm').value = '';
+    loadSmbUsers();
+  } catch (err) {
+    console.error('SMB password error:', err);
+    showToast(`Failed to update password: ${err.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = origHtml;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+}
+
+// Service Controls
+async function restartSmbService() {
+  if (!confirm('Restart Samba (smbd) daemon now? Client connections will briefly re-authenticate.')) return;
+  try {
+    const res = await apiCall('/api/admin/smb/service/restart', { method: 'POST' });
+    showToast(res.message || 'Samba restarted successfully!', 'success');
+    loadSmbManagement();
+  } catch (err) {
+    console.error('Restart SMB error:', err);
+    showToast(`Failed to restart Samba: ${err.message}`, 'error');
+  }
+}
+
+async function reloadSmbConfig() {
+  try {
+    const res = await apiCall('/api/admin/smb/service/reload', { method: 'POST' });
+    showToast(res.message || 'Samba reloaded configuration without dropping users.', 'success');
+    loadSmbManagement();
+  } catch (err) {
+    console.error('Reload SMB error:', err);
+    showToast(`Failed to reload Samba: ${err.message}`, 'error');
+  }
+}
+
+function copyUncText(text, btn) {
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(() => {
+    showToast(`Copied to clipboard: ${text}`, 'success');
+    if (btn) {
+      const orig = btn.innerHTML;
+      btn.innerHTML = `<i data-lucide="check" style="width: 13px; height: 13px; color: #4ade80;"></i>`;
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+      setTimeout(() => {
+        btn.innerHTML = orig;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+      }, 1500);
+    }
+  }).catch(err => {
+    showToast('Failed to copy text', 'error');
+  });
+}
+
+// Quick share helper from Disks & Storage tab
+function openNewSmbShareModalWithPath(path, name) {
+  switchSubTab('tab-smb-management');
+  openNewSmbShareModal();
+  if (path) document.getElementById('smb-share-path').value = path;
+  if (name) {
+    document.getElementById('smb-share-name').value = name;
+    document.getElementById('smb-unc-preview-name').textContent = name;
+  }
+}
+
+// Export to window for inline onclick handlers
+window.loadSmbManagement = loadSmbManagement;
+window.loadSmbStatus = loadSmbStatus;
+window.loadSmbShares = loadSmbShares;
+window.loadSmbSessions = loadSmbSessions;
+window.openNewSmbShareModal = openNewSmbShareModal;
+window.openEditSmbShareModal = openEditSmbShareModal;
+window.handleEditSmbShareClick = handleEditSmbShareClick;
+window.setSmbPathSuggestion = setSmbPathSuggestion;
+window.handleSmbShareSubmit = handleSmbShareSubmit;
+window.deleteSmbShare = deleteSmbShare;
+window.openSmbUsersModal = openSmbUsersModal;
+window.prefillSmbUserPassword = prefillSmbUserPassword;
+window.handleSmbPasswordSubmit = handleSmbPasswordSubmit;
+window.restartSmbService = restartSmbService;
+window.reloadSmbConfig = reloadSmbConfig;
+window.copyUncText = copyUncText;
+window.openNewSmbShareModalWithPath = openNewSmbShareModalWithPath;
+
 
 
 
