@@ -58,6 +58,9 @@ public class AdminController {
     private com.sakuradata.media.service.SmbService smbService;
 
     @Autowired
+    private com.sakuradata.media.service.CloudStorageService cloudStorageService;
+
+    @Autowired
     private StorageRootRepository storageRootRepository;
 
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
@@ -1555,6 +1558,130 @@ public class AdminController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Failed to execute service action: " + e.getMessage()));
+        }
+    }
+
+    // ==========================================
+    // CLOUD STORAGE & GOOGLE DRIVE ENDPOINTS
+    // ==========================================
+
+    @GetMapping("/admin/cloud/drives")
+    public ResponseEntity<?> getCloudDrives(HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        try {
+            List<Map<String, Object>> drives = cloudStorageService.getCloudDrives();
+            return ResponseEntity.ok(drives);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to load cloud drives: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/admin/cloud/google/session")
+    public ResponseEntity<?> startGoogleLoginSession(@RequestBody(required = false) Map<String, Object> payload, HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        String clientId = payload != null && payload.containsKey("clientId") ? (String) payload.get("clientId") : null;
+        String clientSecret = payload != null && payload.containsKey("clientSecret") ? (String) payload.get("clientSecret") : null;
+        try {
+            Map<String, Object> session = cloudStorageService.startGoogleLogin(clientId, clientSecret);
+            return ResponseEntity.ok(session);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to start Google login session: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/admin/cloud/google/session/{sessionId}/status")
+    public ResponseEntity<?> checkGoogleSessionStatus(@PathVariable String sessionId, HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        try {
+            Map<String, Object> status = cloudStorageService.checkLoginSession(sessionId);
+            return ResponseEntity.ok(status);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to check session: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/admin/cloud/google/session/{sessionId}/complete")
+    public ResponseEntity<?> completeGoogleLoginSession(@PathVariable String sessionId, @RequestBody Map<String, Object> payload, HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        String callbackUrlOrCode = payload.get("callbackUrlOrCode") != null ? (String) payload.get("callbackUrlOrCode") : null;
+        String remoteName = payload.get("remoteName") != null ? (String) payload.get("remoteName") : "gdrive";
+        String mountPath = payload.get("mountPath") != null ? (String) payload.get("mountPath") : "/media/" + remoteName;
+        boolean allocateAsRoot = Boolean.TRUE.equals(payload.get("allocateAsRoot"));
+        String rootName = payload.get("rootName") != null ? (String) payload.get("rootName") : null;
+
+        try {
+            Map<String, Object> result = cloudStorageService.completeGoogleLogin(sessionId, callbackUrlOrCode, remoteName, mountPath, allocateAsRoot, rootName);
+            return ResponseEntity.ok(result);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to complete Google Drive attachment: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/admin/cloud/google/attach-token")
+    public ResponseEntity<?> attachDriveWithToken(@RequestBody Map<String, Object> payload, HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        String remoteName = payload.get("remoteName") != null ? (String) payload.get("remoteName") : "gdrive";
+        String tokenJson = payload.get("token") != null ? (String) payload.get("token") : null;
+        String mountPath = payload.get("mountPath") != null ? (String) payload.get("mountPath") : "/media/" + remoteName;
+        boolean allocateAsRoot = Boolean.TRUE.equals(payload.get("allocateAsRoot"));
+        String rootName = payload.get("rootName") != null ? (String) payload.get("rootName") : null;
+
+        try {
+            Map<String, Object> result = cloudStorageService.attachDriveWithToken(remoteName, tokenJson, mountPath, allocateAsRoot, rootName);
+            return ResponseEntity.ok(result);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to attach drive: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/admin/cloud/drives/{remoteName}/control/{action}")
+    public ResponseEntity<?> controlCloudDrive(@PathVariable String remoteName, @PathVariable String action, HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        try {
+            Map<String, Object> result = cloudStorageService.controlDrive(remoteName, action);
+            return ResponseEntity.ok(result);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to " + action + " drive: " + e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/admin/cloud/drives/{remoteName}")
+    public ResponseEntity<?> detachCloudDrive(@PathVariable String remoteName, HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        try {
+            Map<String, Object> result = cloudStorageService.detachDrive(remoteName);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to detach drive: " + e.getMessage()));
         }
     }
 }

@@ -536,7 +536,11 @@
                   </p>
                 </div>
                 <div style="display: flex; gap: 8px;">
-                  <button id="btn-refresh-disks" class="btn btn-secondary" onclick="loadStorageDevices()">
+                  <button class="btn btn-primary" onclick="openAttachGoogleDriveModal()">
+                    <i data-lucide="cloud"></i>
+                    <span>Attach Google Drive</span>
+                  </button>
+                  <button id="btn-refresh-disks" class="btn btn-secondary" onclick="loadStorageDevices(); loadCloudDrives();">
                     <i data-lucide="refresh-cw"></i>
                     <span>Rescan Disks</span>
                   </button>
@@ -546,6 +550,37 @@
                 <div class="storage-loading">
                   <i data-lucide="loader" class="animate-spin"></i>
                   <span>Scanning connected disks...</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Attached Google Drives & Cloud Mounts Section -->
+            <div class="users-list-card" style="margin-top: 24px;">
+              <div class="admin-section-title-container" style="padding: 16px 24px; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <div>
+                  <h3 class="admin-section-title" style="margin: 0; display: flex; align-items: center; gap: 8px;">
+                    <i data-lucide="cloud" style="color: #4285f4;"></i>
+                    Attached Google Drives & Cloud Mounts
+                  </h3>
+                  <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.85rem;">
+                    Google Drive accounts mounted to the server via Google Login, streaming directly to Sakura Media Server
+                  </p>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                  <button class="btn btn-secondary" onclick="loadCloudDrives()">
+                    <i data-lucide="refresh-cw"></i>
+                    <span>Refresh</span>
+                  </button>
+                  <button class="btn btn-primary" onclick="openAttachGoogleDriveModal()">
+                    <i data-lucide="plus"></i>
+                    <span>Attach Google Drive</span>
+                  </button>
+                </div>
+              </div>
+              <div id="cloud-drives-list-container" style="padding: 20px;">
+                <div class="storage-loading">
+                  <i data-lucide="loader" class="animate-spin"></i>
+                  <span>Loading cloud storage drives...</span>
                 </div>
               </div>
             </div>
@@ -2193,6 +2228,134 @@
     </div>
   </div>
 
-  <script src="/app-v4.js?v=9.35"></script>
+  <!-- ATTACH GOOGLE DRIVE MODAL -->
+  <div class="modal-backdrop" id="modal-attach-gdrive" style="z-index: 1100;">
+    <div class="modal" style="max-width: 580px; width: 92%;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <svg style="width: 22px; height: 22px;" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+            <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+            <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44c-.8 1.4-1.2 2.95-1.2 4.5h27.5z" fill="#00ac47"/>
+            <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/>
+            <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+            <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
+            <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
+          </svg>
+          <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Attach Google Drive</h3>
+        </div>
+        <button class="btn-close-modal" onclick="closeModal('modal-attach-gdrive')">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <!-- Tab selection: 1-Click Login vs Manual Token -->
+      <div style="display: flex; border-bottom: 1px solid var(--border-subtle); background: rgba(0,0,0,0.15);">
+        <button type="button" id="tab-btn-gdrive-oauth" class="gdrive-tab-btn active" onclick="switchGdriveModalTab('oauth')">
+          <i data-lucide="log-in" style="width: 14px; height: 14px;"></i>
+          <span>Google Login (OAuth)</span>
+        </button>
+        <button type="button" id="tab-btn-gdrive-manual" class="gdrive-tab-btn" onclick="switchGdriveModalTab('manual')">
+          <i data-lucide="key" style="width: 14px; height: 14px;"></i>
+          <span>Paste Token / Manual</span>
+        </button>
+      </div>
+
+      <div class="modal-body" style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+        <!-- Drive Name & Mount Path Configuration -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div>
+            <label style="display: block; font-size: 11.5px; font-weight: 600; color: var(--text-secondary); margin-bottom: 5px; text-transform: uppercase;">Remote Identifier *</label>
+            <input type="text" id="gdrive-input-remote-name" value="gdrive" required placeholder="e.g. gdrive or gdrive2" style="width: 100%; padding: 9px 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-main); font-size: 13px; font-family: monospace;">
+          </div>
+          <div>
+            <label style="display: block; font-size: 11.5px; font-weight: 600; color: var(--text-secondary); margin-bottom: 5px; text-transform: uppercase;">Mount Destination *</label>
+            <input type="text" id="gdrive-input-mount-path" value="/media/gdrive" required placeholder="e.g. /media/gdrive" style="width: 100%; padding: 9px 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-main); font-size: 13px; font-family: monospace;">
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: -6px;">
+          <span style="font-size: 11px; color: var(--text-secondary);">Suggested paths:</span>
+          <button type="button" class="btn btn-secondary" style="padding: 2px 8px; font-size: 11px; font-family: monospace;" onclick="setGdrivePathSuggestion('gdrive', '/media/gdrive')">/media/gdrive</button>
+          <button type="button" class="btn btn-secondary" style="padding: 2px 8px; font-size: 11px; font-family: monospace;" onclick="setGdrivePathSuggestion('gdrive2', '/media/gdrive2')">/media/gdrive2</button>
+          <button type="button" class="btn btn-secondary" style="padding: 2px 8px; font-size: 11px; font-family: monospace;" onclick="setGdrivePathSuggestion('gdrive-media', '/media/gdrive-media')">/media/gdrive-media</button>
+        </div>
+
+        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; background: rgba(255,255,255,0.02); padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border-subtle);">
+          <input type="checkbox" id="gdrive-allocate-root" checked style="width: 16px; height: 16px; accent-color: var(--primary);">
+          <div>
+            <div style="font-size: 13px; font-weight: 500; color: var(--text-main);">Allocate as Media Explorer Root</div>
+            <div style="font-size: 11.5px; color: var(--text-secondary);">Automatically adds this Google Drive to your media server library roots for streaming & browsing.</div>
+          </div>
+        </label>
+
+        <!-- TAB 1: GOOGLE LOGIN (OAUTH) -->
+        <div id="gdrive-tab-oauth-content" style="display: flex; flex-direction: column; gap: 14px;">
+          <!-- Step 1: Launch Login -->
+          <div id="gdrive-oauth-step-1" style="background: rgba(66, 133, 244, 0.06); border: 1px solid rgba(66, 133, 244, 0.2); border-radius: 10px; padding: 16px; text-align: center;">
+            <div style="font-size: 13.5px; font-weight: 500; color: var(--text-main); margin-bottom: 6px;">Sign in with your Google Account</div>
+            <p class="text-muted" style="margin: 0 0 14px 0; font-size: 12px;">Click below to open the official Google authentication window and allow Drive access.</p>
+            <button type="button" id="btn-start-google-login" class="btn" style="background: #ffffff; color: #1f1f1f; font-weight: 600; padding: 10px 20px; font-size: 14px; display: inline-flex; align-items: center; gap: 10px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.15); box-shadow: 0 2px 4px rgba(0,0,0,0.15); cursor: pointer;" onclick="handleStartGoogleLogin()">
+              <svg style="width: 18px; height: 18px;" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+              </svg>
+              <span>Sign in with Google</span>
+            </button>
+          </div>
+
+          <!-- Step 2: Waiting & Finish -->
+          <div id="gdrive-oauth-step-2" style="display: none; background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 16px; flex-direction: column; gap: 12px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <i data-lucide="loader" class="animate-spin" style="color: var(--primary); width: 16px; height: 16px;"></i>
+                <span style="font-size: 13.5px; font-weight: 600; color: var(--text-main);">Waiting for Google Sign-In...</span>
+              </div>
+              <button type="button" class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="reopenGoogleAuthUrl()">
+                <i data-lucide="external-link" style="width: 12px; height: 12px;"></i> Re-open Login
+              </button>
+            </div>
+
+            <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5; background: rgba(0,0,0,0.2); padding: 10px 12px; border-radius: 6px;">
+              <strong>Almost done:</strong> Log in and click <strong>Allow</strong> in the Google tab. When finished, Google redirects to a URL starting with <code style="color: var(--primary);">http://127.0.0.1:53682/?state=...&code=...</code>. Copy that link from your address bar and paste it below:
+            </div>
+
+            <div>
+              <label style="display: block; font-size: 11.5px; font-weight: 600; color: var(--text-secondary); margin-bottom: 5px; text-transform: uppercase;">Paste Redirect URL or Code</label>
+              <input type="text" id="gdrive-input-callback-url" placeholder="http://127.0.0.1:53682/?state=...&code=4/0Ab..." style="width: 100%; padding: 9px 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-main); font-size: 12.5px; font-family: monospace;">
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; margin-top: 4px;">
+              <button type="button" id="btn-finish-gdrive-login" class="btn btn-primary" onclick="handleCompleteGoogleLogin()" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px;">
+                <i data-lucide="cloud-lightning"></i>
+                <span>Complete & Attach Drive</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: MANUAL TOKEN -->
+        <div id="gdrive-tab-manual-content" style="display: none; flex-direction: column; gap: 14px;">
+          <div>
+            <label style="display: block; font-size: 11.5px; font-weight: 600; color: var(--text-secondary); margin-bottom: 5px; text-transform: uppercase;">Rclone Token JSON *</label>
+            <textarea id="gdrive-input-token-json" rows="5" placeholder='{"access_token":"ya29...","token_type":"Bearer","refresh_token":"1//...","expiry":"..."}' style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-main); font-size: 12px; font-family: monospace; resize: vertical;"></textarea>
+          </div>
+          <div style="display: flex; justify-content: flex-end;">
+            <button type="button" class="btn btn-primary" onclick="handleAttachDriveWithToken()" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px;">
+              <i data-lucide="check"></i>
+              <span>Attach with Token</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="padding: 14px 20px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-attach-gdrive')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app-v4.js?v=9.36"></script>
 </body>
 </html>

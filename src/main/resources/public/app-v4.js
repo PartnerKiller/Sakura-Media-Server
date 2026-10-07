@@ -4024,6 +4024,7 @@ function triggerSubTabLoad(tabId) {
   } else if (tabId === 'tab-storage-mounts') {
     loadStorageDevices();
     loadManagedRoots();
+    loadCloudDrives();
   } else if (tabId === 'tab-smb-management') {
     loadSmbManagement();
   } else if (tabId === 'tab-docker') {
@@ -6916,6 +6917,405 @@ window.restartSmbService = restartSmbService;
 window.reloadSmbConfig = reloadSmbConfig;
 window.copyUncText = copyUncText;
 window.openNewSmbShareModalWithPath = openNewSmbShareModalWithPath;
+
+// =============================================================
+// GOOGLE DRIVE & CLOUD STORAGE MANAGEMENT
+// =============================================================
+
+let currentGoogleSession = null;
+let googleSessionPollInterval = null;
+
+async function loadCloudDrives() {
+  const container = document.getElementById('cloud-drives-list-container');
+  if (!container) return;
+
+  try {
+    const drives = await apiCall('/api/admin/cloud/drives?_cb=' + Date.now());
+    renderCloudDrives(drives || []);
+  } catch (err) {
+    console.error('Failed to load cloud drives:', err);
+    container.innerHTML = `
+      <div class="p-3 text-center text-error" style="background: rgba(239,68,68,0.08); border-radius: 8px;">
+        <i data-lucide="alert-circle" style="margin-bottom: 4px;"></i>
+        <div>Failed to load cloud drives: ${escapeHtml(err.message)}</div>
+      </div>
+    `;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+}
+
+function renderCloudDrives(drives) {
+  const container = document.getElementById('cloud-drives-list-container');
+  if (!container) return;
+
+  if (!drives || drives.length === 0) {
+    container.innerHTML = `
+      <div style="padding: 24px; text-align: center; color: var(--text-secondary);">
+        <i data-lucide="cloud-off" style="width: 32px; height: 32px; margin-bottom: 8px; opacity: 0.5;"></i>
+        <div style="font-size: 14px; font-weight: 500;">No cloud drives currently configured.</div>
+        <div style="font-size: 12px; margin-top: 4px;">Click <strong>Attach Google Drive</strong> to mount your Google Drive directly to the server.</div>
+      </div>
+    `;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    return;
+  }
+
+  let html = '<div class="cloud-drives-grid">';
+
+  drives.forEach(drive => {
+    const remote = drive.remoteName;
+    const mountPath = drive.mountPath || ('/media/' + remote);
+    const isMounted = !!drive.isMounted;
+    const isRunning = !!drive.serviceRunning;
+    const isAllocated = !!drive.isAllocatedRoot;
+    const allocatedName = drive.allocatedRootName || '';
+    const pid = drive.mainPid ? `PID: ${drive.mainPid}` : '';
+
+    const totalStr = drive.formattedTotal || 'Unknown';
+    const usedStr = drive.formattedUsed || '0 B';
+    const percentVal = drive.usePercentVal || 0;
+    const percentStr = drive.usePercent || `${percentVal}%`;
+
+    html += `
+      <div class="cloud-drive-card">
+        <div class="cloud-drive-header">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div class="cloud-drive-icon-badge">
+              <svg style="width: 22px; height: 22px;" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+                <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+                <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44c-.8 1.4-1.2 2.95-1.2 4.5h27.5z" fill="#00ac47"/>
+                <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/>
+                <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+                <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
+                <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
+              </svg>
+            </div>
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 15px; font-weight: 600; color: var(--text-main); font-family: monospace;">${escapeHtml(remote)}:</span>
+                <span class="badge-tag tag-cloud"><i data-lucide="cloud" style="width:11px;height:11px;"></i> Google Drive</span>
+              </div>
+              <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px; font-family: monospace;">
+                ${escapeHtml(mountPath)}
+              </div>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+            <span class="badge-mount-status ${isMounted ? 'mounted' : 'unmounted'}">
+              <i data-lucide="${isMounted ? 'check' : 'circle-slash'}" style="width: 12px; height: 12px;"></i>
+              ${isMounted ? 'Mounted' : 'Unmounted'}
+            </span>
+            ${pid ? `<span style="font-size: 11px; color: var(--text-secondary);">${escapeHtml(pid)}</span>` : ''}
+          </div>
+        </div>
+
+        <!-- Storage Bar (if mounted) -->
+        ${isMounted ? `
+          <div>
+            <div class="partition-progress-bar">
+              <div class="partition-progress-fill" style="width: ${percentVal}%; background: #4285f4;"></div>
+            </div>
+            <div class="partition-usage-text" style="margin-top: 4px;">
+              <span>${escapeHtml(usedStr)} / ${escapeHtml(totalStr)} used</span>
+              <span>${escapeHtml(percentStr)}</span>
+            </div>
+          </div>
+        ` : `
+          <div style="padding: 8px 12px; background: rgba(245, 158, 11, 0.08); border-radius: 6px; font-size: 12px; color: #fbbf24;">
+            Drive is currently unmounted. Click "Mount" below to start the background service.
+          </div>
+        `}
+
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; border-top: 1px solid var(--border-subtle); padding-top: 12px; margin-top: auto;">
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            ${isMounted ? `
+              <button class="btn btn-secondary text-danger" style="padding: 4px 10px; font-size: 11.5px;" onclick="controlCloudDrive('${escapeHtml(remote)}', 'unmount')">
+                <i data-lucide="power"></i>
+                <span>Unmount</span>
+              </button>
+              <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 11.5px;" onclick="controlCloudDrive('${escapeHtml(remote)}', 'restart')">
+                <i data-lucide="refresh-cw"></i>
+                <span>Restart</span>
+              </button>
+            ` : `
+              <button class="btn btn-primary" style="padding: 4px 12px; font-size: 11.5px;" onclick="controlCloudDrive('${escapeHtml(remote)}', 'mount')">
+                <i data-lucide="play"></i>
+                <span>Mount</span>
+              </button>
+            `}
+
+            ${isMounted && !isAllocated ? `
+              <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 11.5px;" onclick="openAllocateModal('${escapeHtml(mountPath)}', '${escapeHtml(remote)}')">
+                <i data-lucide="folder-plus"></i>
+                <span>Allocate Root</span>
+              </button>
+            ` : ''}
+
+            ${isMounted ? `
+              <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 11.5px;" onclick="openNewSmbShareModalWithPath('${escapeHtml(mountPath)}', '${escapeHtml(remote)}')">
+                <i data-lucide="share-2"></i>
+                <span>Share SMB</span>
+              </button>
+            ` : ''}
+          </div>
+
+          <button class="btn btn-secondary text-danger" style="padding: 4px 8px; font-size: 11.5px;" title="Detach Google Drive" onclick="detachCloudDrive('${escapeHtml(remote)}')">
+            <i data-lucide="trash-2"></i>
+          </button>
+        </div>
+      </div>
+    `;
+  });
+
+  html += '</div>';
+  container.innerHTML = html;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function openAttachGoogleDriveModal() {
+  currentGoogleSession = null;
+  if (googleSessionPollInterval) {
+    clearInterval(googleSessionPollInterval);
+    googleSessionPollInterval = null;
+  }
+
+  // Generate suggested remote name (check existing)
+  const defaultRemote = 'gdrive2';
+  document.getElementById('gdrive-input-remote-name').value = defaultRemote;
+  document.getElementById('gdrive-input-mount-path').value = '/media/' + defaultRemote;
+  document.getElementById('gdrive-input-callback-url').value = '';
+  document.getElementById('gdrive-input-token-json').value = '';
+  document.getElementById('gdrive-allocate-root').checked = true;
+
+  // Reset steps
+  document.getElementById('gdrive-oauth-step-1').style.display = 'block';
+  document.getElementById('gdrive-oauth-step-2').style.display = 'none';
+
+  switchGdriveModalTab('oauth');
+  openModal('modal-attach-gdrive');
+}
+
+function switchGdriveModalTab(tab) {
+  const btnOAuth = document.getElementById('tab-btn-gdrive-oauth');
+  const btnManual = document.getElementById('tab-btn-gdrive-manual');
+  const contentOAuth = document.getElementById('gdrive-tab-oauth-content');
+  const contentManual = document.getElementById('gdrive-tab-manual-content');
+
+  if (tab === 'oauth') {
+    btnOAuth.classList.add('active');
+    btnManual.classList.remove('active');
+    contentOAuth.style.display = 'flex';
+    contentManual.style.display = 'none';
+  } else {
+    btnManual.classList.add('active');
+    btnOAuth.classList.remove('active');
+    contentManual.style.display = 'flex';
+    contentOAuth.style.display = 'none';
+  }
+}
+
+function setGdrivePathSuggestion(name, path) {
+  document.getElementById('gdrive-input-remote-name').value = name;
+  document.getElementById('gdrive-input-mount-path').value = path;
+}
+
+async function handleStartGoogleLogin() {
+  const btn = document.getElementById('btn-start-google-login');
+  const origHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = `<i data-lucide="loader" class="animate-spin" style="width: 18px; height: 18px;"></i> <span>Contacting Google...</span>`;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  try {
+    const session = await apiCall('/api/admin/cloud/google/session', {
+      method: 'POST',
+      body: JSON.stringify({})
+    });
+
+    currentGoogleSession = session;
+
+    // Open Google Login in popup / new tab
+    if (session.googleAuthUrl) {
+      window.open(session.googleAuthUrl, '_blank');
+    }
+
+    // Switch to step 2 in modal
+    document.getElementById('gdrive-oauth-step-1').style.display = 'none';
+    document.getElementById('gdrive-oauth-step-2').style.display = 'flex';
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+
+    // Start background polling to see if rclone captures the code automatically
+    if (googleSessionPollInterval) clearInterval(googleSessionPollInterval);
+    googleSessionPollInterval = setInterval(async () => {
+      if (!currentGoogleSession || !currentGoogleSession.sessionId) return;
+      try {
+        const check = await apiCall(`/api/admin/cloud/google/session/${currentGoogleSession.sessionId}/status`);
+        if (check && (check.completed || check.hasToken)) {
+          clearInterval(googleSessionPollInterval);
+          googleSessionPollInterval = null;
+          showToast('Google Authorization detected!', 'success');
+          // Auto complete
+          handleCompleteGoogleLogin();
+        }
+      } catch (ignored) {}
+    }, 2500);
+
+  } catch (err) {
+    showToast(`Failed to initialize Google login: ${err.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = origHtml;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+}
+
+function reopenGoogleAuthUrl() {
+  if (currentGoogleSession && currentGoogleSession.googleAuthUrl) {
+    window.open(currentGoogleSession.googleAuthUrl, '_blank');
+  } else {
+    showToast('Session expired. Please restart Google Login.', 'warning');
+    document.getElementById('gdrive-oauth-step-1').style.display = 'block';
+    document.getElementById('gdrive-oauth-step-2').style.display = 'none';
+  }
+}
+
+async function handleCompleteGoogleLogin() {
+  if (!currentGoogleSession || !currentGoogleSession.sessionId) {
+    showToast('No active Google OAuth session. Please click "Sign in with Google" first.', 'error');
+    return;
+  }
+
+  const callbackUrl = document.getElementById('gdrive-input-callback-url').value.trim();
+  const remoteName = document.getElementById('gdrive-input-remote-name').value.trim();
+  const mountPath = document.getElementById('gdrive-input-mount-path').value.trim();
+  const allocateAsRoot = document.getElementById('gdrive-allocate-root').checked;
+
+  if (!remoteName) {
+    showToast('Please specify a remote identifier (e.g. gdrive)', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('btn-finish-gdrive-login');
+  const origHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = `<i data-lucide="loader" class="animate-spin" style="width: 16px; height: 16px;"></i> <span>Mounting Drive...</span>`;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  try {
+    const result = await apiCall(`/api/admin/cloud/google/session/${currentGoogleSession.sessionId}/complete`, {
+      method: 'POST',
+      body: JSON.stringify({
+        callbackUrlOrCode: callbackUrl,
+        remoteName: remoteName,
+        mountPath: mountPath,
+        allocateAsRoot: allocateAsRoot,
+        rootName: `Google Drive (${remoteName})`
+      })
+    });
+
+    if (googleSessionPollInterval) {
+      clearInterval(googleSessionPollInterval);
+      googleSessionPollInterval = null;
+    }
+
+    closeModal('modal-attach-gdrive');
+    showToast(result.message || 'Google Drive attached successfully!', 'success');
+
+    // Refresh all views
+    loadCloudDrives();
+    loadStorageDevices();
+    loadManagedRoots();
+  } catch (err) {
+    showToast(`Failed to attach Google Drive: ${err.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = origHtml;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+}
+
+async function handleAttachDriveWithToken() {
+  const remoteName = document.getElementById('gdrive-input-remote-name').value.trim();
+  const mountPath = document.getElementById('gdrive-input-mount-path').value.trim();
+  const tokenJson = document.getElementById('gdrive-input-token-json').value.trim();
+  const allocateAsRoot = document.getElementById('gdrive-allocate-root').checked;
+
+  if (!remoteName) {
+    showToast('Please enter a remote identifier', 'error');
+    return;
+  }
+  if (!tokenJson) {
+    showToast('Please paste the rclone token JSON', 'error');
+    return;
+  }
+
+  try {
+    const result = await apiCall('/api/admin/cloud/google/attach-token', {
+      method: 'POST',
+      body: JSON.stringify({
+        remoteName: remoteName,
+        mountPath: mountPath,
+        token: tokenJson,
+        allocateAsRoot: allocateAsRoot,
+        rootName: `Google Drive (${remoteName})`
+      })
+    });
+
+    closeModal('modal-attach-gdrive');
+    showToast(result.message || 'Google Drive mounted successfully!', 'success');
+    loadCloudDrives();
+    loadStorageDevices();
+    loadManagedRoots();
+  } catch (err) {
+    showToast(`Failed to attach drive: ${err.message}`, 'error');
+  }
+}
+
+async function controlCloudDrive(remoteName, action) {
+  try {
+    showToast(`Executing ${action} for ${remoteName}...`, 'info');
+    await apiCall(`/api/admin/cloud/drives/${encodeURIComponent(remoteName)}/control/${action}`, {
+      method: 'POST'
+    });
+    showToast(`Drive [${remoteName}] ${action} completed.`, 'success');
+    loadCloudDrives();
+  } catch (err) {
+    showToast(`Failed to ${action} drive: ${err.message}`, 'error');
+  }
+}
+
+async function detachCloudDrive(remoteName) {
+  if (!confirm(`Are you sure you want to detach Google Drive [${remoteName}] from the server? This will stop the mount service.`)) {
+    return;
+  }
+
+  try {
+    showToast(`Detaching Google Drive [${remoteName}]...`, 'info');
+    const res = await apiCall(`/api/admin/cloud/drives/${encodeURIComponent(remoteName)}`, {
+      method: 'DELETE'
+    });
+    showToast(res.message || 'Drive detached.', 'success');
+    loadCloudDrives();
+    loadStorageDevices();
+    loadManagedRoots();
+  } catch (err) {
+    showToast(`Failed to detach drive: ${err.message}`, 'error');
+  }
+}
+
+// Window exports for HTML onclick handlers
+window.loadCloudDrives = loadCloudDrives;
+window.renderCloudDrives = renderCloudDrives;
+window.openAttachGoogleDriveModal = openAttachGoogleDriveModal;
+window.switchGdriveModalTab = switchGdriveModalTab;
+window.setGdrivePathSuggestion = setGdrivePathSuggestion;
+window.handleStartGoogleLogin = handleStartGoogleLogin;
+window.reopenGoogleAuthUrl = reopenGoogleAuthUrl;
+window.handleCompleteGoogleLogin = handleCompleteGoogleLogin;
+window.handleAttachDriveWithToken = handleAttachDriveWithToken;
+window.controlCloudDrive = controlCloudDrive;
+window.detachCloudDrive = detachCloudDrive;
+
 
 
 
