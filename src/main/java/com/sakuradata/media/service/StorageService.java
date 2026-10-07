@@ -73,7 +73,7 @@ public class StorageService {
         }
 
         try {
-            String[] cmd = new String[]{"lsblk", "-J", "-b", "-o", "NAME,KNAME,PATH,SIZE,TYPE,FSTYPE,LABEL,UUID,MOUNTPOINT,MODEL,SERIAL,ROTA"};
+            String[] cmd = new String[]{"lsblk", "-J", "-b", "-o", "NAME,KNAME,PATH,SIZE,TYPE,FSTYPE,LABEL,UUID,MOUNTPOINT,MODEL,SERIAL,ROTA,PARTTYPENAME"};
             Process process = Runtime.getRuntime().exec(cmd);
             String output;
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
@@ -88,8 +88,8 @@ public class StorageService {
                 if (blockDevices != null && blockDevices.isArray()) {
                     for (JsonNode devNode : blockDevices) {
                         String type = getNodeString(devNode, "type");
-                        if ("loop".equalsIgnoreCase(type)) {
-                            continue; // skip loopback squashfs/snap devices
+                        if ("loop".equalsIgnoreCase(type) || "rom".equalsIgnoreCase(type)) {
+                            continue; // skip loopback squashfs/snap devices and optical roms
                         }
 
                         Map<String, Object> diskData = parseDeviceNode(devNode, rootPathMap);
@@ -105,9 +105,11 @@ public class StorageService {
                                 else unmountedCount++;
                             }
                         } else {
-                            boolean isMounted = Boolean.TRUE.equals(diskData.get("isMounted"));
-                            if (isMounted) mountedCount++;
-                            else unmountedCount++;
+                            if (isUsableDisk(diskData)) {
+                                boolean isMounted = Boolean.TRUE.equals(diskData.get("isMounted"));
+                                if (isMounted) mountedCount++;
+                                else unmountedCount++;
+                            }
                         }
 
                         disks.add(diskData);
@@ -148,6 +150,7 @@ public class StorageService {
         String uuid = getNodeString(devNode, "uuid");
         String model = getNodeString(devNode, "model");
         String serial = getNodeString(devNode, "serial");
+        String parttypename = getNodeString(devNode, "parttypename");
         boolean isSsd = devNode.has("rota") && !devNode.get("rota").isNull() && !devNode.get("rota").asBoolean(true);
 
         String mountpoint = getMountpoint(devNode);
@@ -162,6 +165,7 @@ public class StorageService {
         dev.put("uuid", uuid);
         dev.put("model", model != null ? model.trim() : (label != null ? label : name));
         dev.put("serial", serial);
+        dev.put("parttypename", parttypename);
         dev.put("isSsd", isSsd);
         dev.put("mountpoint", mountpoint);
         dev.put("isMounted", mountpoint != null && !mountpoint.trim().isEmpty());
@@ -175,12 +179,68 @@ public class StorageService {
         if (children != null && children.isArray()) {
             for (JsonNode childNode : children) {
                 Map<String, Object> part = parseDeviceNode(childNode, rootPathMap);
-                partitions.add(part);
+                if (isUsablePartition(part)) {
+                    partitions.add(part);
+                }
             }
         }
         dev.put("partitions", partitions);
 
         return dev;
+    }
+
+    /**
+     * Checks if a partition is usable as server media/file storage.
+     * Filters out non-storage, tiny metadata, and system reserved partitions
+     * (e.g. 1MB BIOS boot, 127MB Microsoft MSR, LDM metadata, swap).
+     */
+    private boolean isUsablePartition(Map<String, Object> part) {
+        if (part == null) return false;
+
+        boolean isMounted = Boolean.TRUE.equals(part.get("isMounted"));
+        if (isMounted) {
+            return true; // Keep all actively mounted partitions visible
+        }
+
+        // Exclude system reserved and metadata partition types
+        String partTypeName = (String) part.get("parttypename");
+        if (partTypeName != null) {
+            String lowerType = partTypeName.toLowerCase();
+            if (lowerType.contains("bios boot") ||
+                lowerType.contains("reserved") ||
+                lowerType.contains("metadata") ||
+                lowerType.contains("efi") ||
+                lowerType.contains("apple_") ||
+                lowerType.contains("solaris")) {
+                return false;
+            }
+        }
+
+        // Exclude swap and squashfs
+        String fstype = (String) part.get("fstype");
+        if (fstype != null) {
+            String lowerFs = fstype.toLowerCase();
+            if ("swap".equals(lowerFs) || "squashfs".equals(lowerFs)) {
+                return false;
+            }
+        }
+
+        // Exclude unmounted partitions smaller than 1 GB (1,073,741,824 bytes)
+        // Storage drives/partitions for media server are always >= 1 GB
+        long sizeBytes = (long) part.getOrDefault("sizeBytes", 0L);
+        if (sizeBytes < 1024L * 1024L * 1024L) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private boolean isUsableDisk(Map<String, Object> disk) {
+        if (disk == null) return false;
+        boolean isMounted = Boolean.TRUE.equals(disk.get("isMounted"));
+        if (isMounted) return true;
+        long sizeBytes = (long) disk.getOrDefault("sizeBytes", 0L);
+        return sizeBytes >= 1024L * 1024L * 1024L;
     }
 
     private String getMountpoint(JsonNode node) {

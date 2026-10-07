@@ -5931,109 +5931,138 @@ function renderStorageDevices(disks) {
         <div class="disk-partitions-list">
     `;
 
-    const partitions = disk.partitions && disk.partitions.length > 0 ? disk.partitions : [disk];
-
-    partitions.forEach(part => {
-      const partNode = part.path || ('/dev/' + part.name);
-      const partSize = part.formattedSize || '';
-      const fstype = part.fstype || '';
-      const label = part.label || '';
-      const isMounted = !!part.isMounted;
-      const mountpoint = part.mountpoint || '';
-      const isSystem = !!part.isSystem;
-      const isAllocated = !!part.isAllocated;
-      const allocatedName = part.allocatedRootName || '';
-
-      html += `
-        <div class="partition-row">
-          <div class="partition-main-info">
-            <i data-lucide="folder-git-2" style="color: var(--primary); width: 18px; height: 18px; flex-shrink: 0;"></i>
-            <div>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span class="partition-node">${escapeHtml(partNode)}</span>
-                ${fstype ? `<span class="badge-fstype">${escapeHtml(fstype)}</span>` : ''}
-                ${label ? `<span style="font-size: 11.5px; color: var(--text-secondary);">"${escapeHtml(label)}"</span>` : ''}
-              </div>
-              <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">
-                Size: ${escapeHtml(partSize)}
-              </div>
-            </div>
-          </div>
-
-          <div class="partition-mount-details">
-      `;
-
-      if (isMounted) {
-        const percentVal = part.usePercentVal || 0;
-        const usedStr = part.formattedUsed || '0 B';
-        const totalStr = part.formattedTotal || partSize;
-        const percentStr = part.usePercent || `${percentVal}%`;
-
-        html += `
-            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-              <span class="badge-mount-status mounted">
-                <i data-lucide="check" style="width: 12px; height: 12px;"></i> Mounted at ${escapeHtml(mountpoint)}
-              </span>
-              ${isAllocated ? `<span class="badge-mount-status allocated"><i data-lucide="library" style="width: 12px; height: 12px;"></i> Media Root: ${escapeHtml(allocatedName)}</span>` : ''}
-              ${isSystem ? `<span class="badge-tag" style="background: rgba(255,255,255,0.06); font-size: 10.5px;">OS System</span>` : ''}
-            </div>
-            ${part.totalSpace ? `
-              <div class="partition-progress-bar" style="margin-top: 6px;">
-                <div class="partition-progress-fill" style="width: ${percentVal}%;"></div>
-              </div>
-              <div class="partition-usage-text">
-                <span>${usedStr} / ${totalStr} used</span>
-                <span>${percentStr}</span>
-              </div>
-            ` : ''}
-        `;
-      } else {
-        html += `
-            <div>
-              <span class="badge-mount-status unmounted">
-                <i data-lucide="circle-slash" style="width: 12px; height: 12px;"></i> Unmounted
-              </span>
-              <span style="font-size: 12px; color: var(--text-secondary); margin-left: 8px;">Ready to mount</span>
-            </div>
-        `;
-      }
-
-      html += `
-          </div>
-          <div class="partition-actions">
-      `;
-
-      if (isMounted) {
-        if (!isAllocated && !isSystem) {
-          html += `
-            <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick="openAllocateModal('${escapeHtml(mountpoint)}', '${escapeHtml(label || part.name)}')">
-              <i data-lucide="folder-plus"></i>
-              <span>Allocate as Root</span>
-            </button>
-          `;
+    const isUsableStorageItem = (item) => {
+      if (!item) return false;
+      if (item.isMounted) return true;
+      if (item.parttypename) {
+        const t = item.parttypename.toLowerCase();
+        if (t.includes('bios boot') || t.includes('reserved') || t.includes('metadata') || t.includes('efi') || t.includes('apple_')) {
+          return false;
         }
-        if (!isSystem && mountpoint !== '/' && mountpoint !== '/boot' && mountpoint !== '/home' && mountpoint !== '/home/sakura') {
-          html += `
-            <button class="btn btn-secondary text-danger" style="padding: 6px 12px; font-size: 12px;" onclick="unmountDevice('${escapeHtml(partNode)}')">
-              <i data-lucide="eject"></i>
-              <span>Unmount</span>
-            </button>
-          `;
-        }
-      } else {
-        html += `
-          <button class="btn btn-primary" style="padding: 6px 14px; font-size: 12px;" onclick="openMountModal('${escapeHtml(partNode)}', '${escapeHtml(label || part.name)}', '${escapeHtml(fstype)}', '${escapeHtml(partSize)}')">
-            <i data-lucide="hard-drive-download"></i>
-            <span>Mount Drive</span>
-          </button>
-        `;
       }
+      if (item.fstype && (item.fstype.toLowerCase() === 'swap' || item.fstype.toLowerCase() === 'squashfs')) {
+        return false;
+      }
+      const size = item.sizeBytes || 0;
+      if (size < 1024 * 1024 * 1024) { // < 1 GB
+        return false;
+      }
+      return true;
+    };
 
+    const partitions = (disk.partitions && disk.partitions.length > 0)
+      ? disk.partitions.filter(isUsableStorageItem)
+      : (isUsableStorageItem(disk) ? [disk] : []);
+
+    if (partitions.length === 0) {
       html += `
-          </div>
+        <div style="padding: 14px 18px; font-size: 12.5px; color: var(--text-secondary); font-style: italic;">
+          All partitions on this drive are system-reserved or smaller than 1 GB.
         </div>
       `;
-    });
+    } else {
+      partitions.forEach(part => {
+        const partNode = part.path || ('/dev/' + part.name);
+        const partSize = part.formattedSize || '';
+        const fstype = part.fstype || '';
+        const label = part.label || '';
+        const isMounted = !!part.isMounted;
+        const mountpoint = part.mountpoint || '';
+        const isSystem = !!part.isSystem;
+        const isAllocated = !!part.isAllocated;
+        const allocatedName = part.allocatedRootName || '';
+
+        html += `
+          <div class="partition-row">
+            <div class="partition-main-info">
+              <i data-lucide="folder-git-2" style="color: var(--primary); width: 18px; height: 18px; flex-shrink: 0;"></i>
+              <div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span class="partition-node">${escapeHtml(partNode)}</span>
+                  ${fstype ? `<span class="badge-fstype">${escapeHtml(fstype)}</span>` : ''}
+                  ${label ? `<span style="font-size: 11.5px; color: var(--text-secondary);">"${escapeHtml(label)}"</span>` : ''}
+                </div>
+                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">
+                  Size: ${escapeHtml(partSize)}
+                </div>
+              </div>
+            </div>
+
+            <div class="partition-mount-details">
+        `;
+
+        if (isMounted) {
+          const percentVal = part.usePercentVal || 0;
+          const usedStr = part.formattedUsed || '0 B';
+          const totalStr = part.formattedTotal || partSize;
+          const percentStr = part.usePercent || `${percentVal}%`;
+
+          html += `
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <span class="badge-mount-status mounted">
+                  <i data-lucide="check" style="width: 12px; height: 12px;"></i> Mounted at ${escapeHtml(mountpoint)}
+                </span>
+                ${isAllocated ? `<span class="badge-mount-status allocated"><i data-lucide="library" style="width: 12px; height: 12px;"></i> Media Root: ${escapeHtml(allocatedName)}</span>` : ''}
+                ${isSystem ? `<span class="badge-tag" style="background: rgba(255,255,255,0.06); font-size: 10.5px;">OS System</span>` : ''}
+              </div>
+              ${part.totalSpace ? `
+                <div class="partition-progress-bar" style="margin-top: 6px;">
+                  <div class="partition-progress-fill" style="width: ${percentVal}%;"></div>
+                </div>
+                <div class="partition-usage-text">
+                  <span>${usedStr} / ${totalStr} used</span>
+                  <span>${percentStr}</span>
+                </div>
+              ` : ''}
+          `;
+        } else {
+          html += `
+              <div>
+                <span class="badge-mount-status unmounted">
+                  <i data-lucide="circle-slash" style="width: 12px; height: 12px;"></i> Unmounted
+                </span>
+                <span style="font-size: 12px; color: var(--text-secondary); margin-left: 8px;">Ready to mount</span>
+              </div>
+          `;
+        }
+
+        html += `
+            </div>
+            <div class="partition-actions">
+        `;
+
+        if (isMounted) {
+          if (!isAllocated && !isSystem) {
+            html += `
+              <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick="openAllocateModal('${escapeHtml(mountpoint)}', '${escapeHtml(label || part.name)}')">
+                <i data-lucide="folder-plus"></i>
+                <span>Allocate as Root</span>
+              </button>
+            `;
+          }
+          if (!isSystem && mountpoint !== '/' && mountpoint !== '/boot' && mountpoint !== '/home' && mountpoint !== '/home/sakura') {
+            html += `
+              <button class="btn btn-secondary text-danger" style="padding: 6px 12px; font-size: 12px;" onclick="unmountDevice('${escapeHtml(partNode)}')">
+                <i data-lucide="eject"></i>
+                <span>Unmount</span>
+              </button>
+            `;
+          }
+        } else {
+          html += `
+            <button class="btn btn-primary" style="padding: 6px 14px; font-size: 12px;" onclick="openMountModal('${escapeHtml(partNode)}', '${escapeHtml(label || part.name)}', '${escapeHtml(fstype)}', '${escapeHtml(partSize)}')">
+              <i data-lucide="hard-drive-download"></i>
+              <span>Mount Drive</span>
+            </button>
+          `;
+        }
+
+        html += `
+            </div>
+          </div>
+        `;
+      });
+    }
 
     html += `
         </div>
