@@ -1330,6 +1330,23 @@ public class AdminController {
         }
     }
 
+    @PostMapping("/admin/storage/eject")
+    public ResponseEntity<?> ejectStorageDevice(@RequestBody Map<String, Object> payload, HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        String target = (String) payload.get("target");
+        try {
+            Map<String, Object> result = storageService.ejectDevice(target);
+            return ResponseEntity.ok(result);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Eject failed: " + e.getMessage()));
+        }
+    }
+
     @GetMapping("/admin/storage/roots")
     public ResponseEntity<?> getManagedRoots(HttpServletRequest request) {
         if (!isAdmin(request)) {

@@ -186,6 +186,29 @@ public class StorageService {
         }
         dev.put("partitions", partitions);
 
+        boolean isSystemDisk = Boolean.TRUE.equals(dev.get("isSystem"));
+        boolean anyPartitionMounted = Boolean.TRUE.equals(dev.get("isMounted"));
+        boolean anyPartitionUnmounted = false;
+        if (!partitions.isEmpty()) {
+            for (Map<String, Object> part : partitions) {
+                if (Boolean.TRUE.equals(part.get("isSystem"))) {
+                    isSystemDisk = true;
+                }
+                if (Boolean.TRUE.equals(part.get("isMounted"))) {
+                    anyPartitionMounted = true;
+                } else {
+                    anyPartitionUnmounted = true;
+                }
+            }
+        } else {
+            if (!Boolean.TRUE.equals(dev.get("isMounted"))) {
+                anyPartitionUnmounted = true;
+            }
+        }
+        dev.put("isSystemDisk", isSystemDisk);
+        dev.put("hasMountedPartitions", anyPartitionMounted);
+        dev.put("hasUnmountedPartitions", anyPartitionUnmounted);
+
         return dev;
     }
 
@@ -259,7 +282,9 @@ public class StorageService {
 
     private void enrichMountInfo(Map<String, Object> data, String mountpoint, Map<String, StorageRoot> rootPathMap) {
         String normalized = normalizePath(mountpoint);
-        boolean isSystem = "/".equals(normalized) || "/boot".equals(normalized) || normalized.startsWith("/boot/");
+        boolean isSystem = "/".equals(normalized) || "/boot".equals(normalized) || normalized.startsWith("/boot/")
+                || "/home".equals(normalized) || "/home/sakura".equals(normalized)
+                || SYSTEM_PATHS.contains(normalized);
         data.put("isSystem", isSystem);
 
         StorageRoot matchedRoot = rootPathMap.get(normalized);
@@ -320,7 +345,10 @@ public class StorageService {
         device = device.trim();
 
         if (mountPath == null || mountPath.trim().isEmpty()) {
-            throw new IllegalArgumentException("Mount destination path is required");
+            String label = getDeviceLabel(device);
+            String clean = (label != null && !label.trim().isEmpty()) ? label.trim().toLowerCase().replaceAll("[^a-z0-9_-]", "") : "";
+            if (clean.isEmpty()) clean = Paths.get(device).getFileName().toString();
+            mountPath = "/media/" + clean;
         }
         mountPath = normalizePath(mountPath.trim());
 
@@ -336,6 +364,8 @@ public class StorageService {
         if (!targetDir.exists()) {
             // create directory via sudo
             executeCommand(new String[]{"sudo", "mkdir", "-p", mountPath});
+            executeCommand(new String[]{"sudo", "chown", "1000:1000", mountPath});
+            executeCommand(new String[]{"sudo", "chmod", "775", mountPath});
         }
 
         // Try mounting
@@ -393,7 +423,30 @@ public class StorageService {
             throw new IllegalArgumentException("Cannot unmount protected system path: " + target);
         }
 
+        // If target is a whole disk, unmount all its mounted partitions
+        if (target.startsWith("/dev/") && isWholeDisk(target)) {
+            Map<String, String> partitionMounts = getPartitionMounts(target);
+            for (Map.Entry<String, String> entry : partitionMounts.entrySet()) {
+                String mp = entry.getValue();
+                if (mp != null && !mp.isEmpty()) {
+                    String normMp = normalizePath(mp);
+                    if (SYSTEM_PATHS.contains(normMp) || "/home".equals(normMp) || "/home/sakura".equals(normMp)) {
+                        throw new IllegalArgumentException("Cannot unmount system partition: " + mp);
+                    }
+                    Map<String, Object> uRes = executeCommand(new String[]{"sudo", "umount", mp});
+                    if ((int) uRes.get("exitCode") != 0) {
+                        executeCommand(new String[]{"sudo", "umount", "-l", mp});
+                    }
+                }
+            }
+            return Map.of("success", true, "message", "Successfully unmounted all partitions on " + target);
+        }
+
         Map<String, Object> res = executeCommand(new String[]{"sudo", "umount", target});
+        if ((int) res.get("exitCode") != 0) {
+            // Lazy unmount fallback
+            res = executeCommand(new String[]{"sudo", "umount", "-l", target});
+        }
         if ((int) res.get("exitCode") != 0) {
             String err = (String) res.get("stderr");
             throw new Exception("Failed to unmount " + target + ": " + (err != null ? err : "exit code " + res.get("exitCode")));
@@ -402,9 +455,71 @@ public class StorageService {
         return Map.of("success", true, "message", "Successfully unmounted " + target);
     }
 
+    public Map<String, Object> ejectDevice(String target) throws Exception {
+        if (target == null || target.trim().isEmpty()) {
+            throw new IllegalArgumentException("Device or mountpoint is required for eject");
+        }
+        target = target.trim();
+        String normalizedTarget = normalizePath(target);
+
+        if (SYSTEM_PATHS.contains(normalizedTarget) || "/home".equals(normalizedTarget) || "/home/sakura".equals(normalizedTarget)) {
+            throw new IllegalArgumentException("Cannot eject system disk: " + target);
+        }
+
+        String parentDisk = resolveParentDisk(target);
+        if (parentDisk == null || !parentDisk.startsWith("/dev/")) {
+            throw new IllegalArgumentException("Could not identify block device for " + target);
+        }
+
+        // Safety check: ensure none of the partitions on parentDisk are system partitions
+        Map<String, String> partitionMounts = getPartitionMounts(parentDisk);
+        for (String mp : partitionMounts.values()) {
+            if (mp != null && !mp.isEmpty()) {
+                String normMp = normalizePath(mp);
+                if (SYSTEM_PATHS.contains(normMp) || "/home".equals(normMp) || "/home/sakura".equals(normMp)) {
+                    throw new IllegalArgumentException("Cannot eject disk containing system partition mounted at " + mp);
+                }
+            }
+        }
+
+        // Unmount all mounted partitions on parentDisk
+        for (Map.Entry<String, String> entry : partitionMounts.entrySet()) {
+            String mp = entry.getValue();
+            String dev = entry.getKey();
+            if (mp != null && !mp.isEmpty()) {
+                Map<String, Object> uRes = executeCommand(new String[]{"sudo", "umount", mp});
+                if ((int) uRes.get("exitCode") != 0) {
+                    executeCommand(new String[]{"sudo", "umount", "-l", mp});
+                }
+            } else if (dev != null && !dev.equals(parentDisk)) {
+                executeCommand(new String[]{"sudo", "umount", dev});
+            }
+        }
+
+        // Sync filesystem buffers
+        executeCommand(new String[]{"sync"});
+
+        // Safely power off drive via udisksctl
+        Map<String, Object> pwrRes = executeCommand(new String[]{"udisksctl", "power-off", "-b", parentDisk, "--no-user-interaction"});
+        if ((int) pwrRes.get("exitCode") == 0) {
+            return Map.of("success", true, "message", "Drive " + parentDisk + " safely ejected and powered off.");
+        }
+
+        // Fallback: sudo eject
+        Map<String, Object> ejectRes = executeCommand(new String[]{"sudo", "eject", parentDisk});
+        if ((int) ejectRes.get("exitCode") == 0) {
+            return Map.of("success", true, "message", "Drive " + parentDisk + " safely ejected.");
+        }
+
+        String errMsg = (String) pwrRes.get("stderr");
+        if (errMsg == null || errMsg.isEmpty()) errMsg = (String) ejectRes.get("stderr");
+        throw new Exception("Eject failed for " + parentDisk + ": " + (errMsg != null ? errMsg : "Unknown error"));
+    }
+
     public List<Map<String, Object>> getAllRootsWithStats() {
         List<StorageRoot> roots = storageRootRepository.findAllByOrderByOrderIndexAsc();
         List<Map<String, Object>> list = new ArrayList<>();
+        Map<String, String> activeMounts = getActiveMountpoints();
 
         for (StorageRoot root : roots) {
             Map<String, Object> item = new LinkedHashMap<>();
@@ -415,6 +530,19 @@ public class StorageService {
             item.put("enabled", root.isEnabled());
             item.put("orderIndex", root.getOrderIndex());
             item.put("deviceNode", root.getDeviceNode());
+
+            String normPath = normalizePath(root.getPath());
+            String sourceDevice = activeMounts.get(normPath);
+            boolean isMounted = sourceDevice != null;
+            boolean isSystem = SYSTEM_PATHS.contains(normPath) || "/home".equals(normPath) || "/home/sakura".equals(normPath);
+            if (!isSystem && sourceDevice != null) {
+                if (sourceDevice.equals("/dev/sda2") || (sourceDevice.startsWith("/dev/sda") && !sourceDevice.contains("sdb"))) {
+                    isSystem = true;
+                }
+            }
+            item.put("isSystem", isSystem);
+            item.put("isMounted", isMounted);
+            item.put("sourceDevice", sourceDevice != null ? sourceDevice : root.getDeviceNode());
 
             File f = new File(root.getPath());
             boolean exists = f.exists() && f.isDirectory();
@@ -549,6 +677,117 @@ public class StorageService {
                 process.destroy();
             }
         }
+    }
+
+    private String getDeviceLabel(String device) {
+        try {
+            Process p = Runtime.getRuntime().exec(new String[]{"lsblk", "-no", "LABEL", device});
+            try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+                String line = r.readLine();
+                if (line != null && !line.trim().isEmpty()) {
+                    return line.trim();
+                }
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    private boolean isWholeDisk(String dev) {
+        try {
+            Process p = Runtime.getRuntime().exec(new String[]{"lsblk", "-no", "TYPE", dev});
+            try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+                String line = r.readLine();
+                if (line != null && "disk".equalsIgnoreCase(line.trim())) {
+                    return true;
+                }
+            }
+        } catch (Exception ignored) {}
+        return false;
+    }
+
+    private Map<String, String> getPartitionMounts(String disk) {
+        Map<String, String> mounts = new LinkedHashMap<>();
+        try {
+            Process p = Runtime.getRuntime().exec(new String[]{"lsblk", "-rno", "PATH,MOUNTPOINT", disk});
+            try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+                String line;
+                while ((line = r.readLine()) != null) {
+                    line = line.trim();
+                    if (line.isEmpty()) continue;
+                    String[] parts = line.split("\\s+", 2);
+                    String path = parts[0];
+                    String mp = parts.length > 1 ? parts[1].trim() : "";
+                    if (!mp.isEmpty()) {
+                        mounts.put(path, mp);
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return mounts;
+    }
+
+    private String resolveParentDisk(String target) {
+        if (target == null) return null;
+        target = target.trim();
+
+        // If it's a mountpoint, find the underlying block device
+        if (target.startsWith("/") && !target.startsWith("/dev/")) {
+            try {
+                Process p = Runtime.getRuntime().exec(new String[]{"findmnt", "-no", "SOURCE", target});
+                try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+                    String line = r.readLine();
+                    if (line != null && !line.trim().isEmpty()) {
+                        target = line.trim();
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+
+        // Clean up any square bracket suffixes e.g. /dev/sda2[/home/sakura/media-server]
+        if (target.contains("[")) {
+            target = target.substring(0, target.indexOf('[')).trim();
+        }
+
+        if (!target.startsWith("/dev/") && !target.contains("/")) {
+            target = "/dev/" + target;
+        }
+
+        if (!target.startsWith("/dev/")) {
+            return null;
+        }
+
+        // If it's a partition (e.g. /dev/sdb1), get parent disk via lsblk -no PKNAME
+        try {
+            Process p = Runtime.getRuntime().exec(new String[]{"lsblk", "-no", "PKNAME", target});
+            try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+                String line = r.readLine();
+                if (line != null && !line.trim().isEmpty()) {
+                    String pk = line.trim();
+                    return pk.startsWith("/dev/") ? pk : "/dev/" + pk;
+                }
+            }
+        } catch (Exception ignored) {}
+
+        return target;
+    }
+
+    private Map<String, String> getActiveMountpoints() {
+        Map<String, String> map = new HashMap<>();
+        try {
+            Process p = Runtime.getRuntime().exec(new String[]{"findmnt", "-lno", "TARGET,SOURCE"});
+            try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+                String line;
+                while ((line = r.readLine()) != null) {
+                    line = line.trim();
+                    if (line.isEmpty()) continue;
+                    String[] parts = line.split("\\s+", 2);
+                    if (parts.length >= 2) {
+                        map.put(normalizePath(parts[0].trim()), parts[1].trim());
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return map;
     }
 
     private String normalizePath(String path) {

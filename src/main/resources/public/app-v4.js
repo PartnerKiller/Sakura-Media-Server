@@ -6065,9 +6065,25 @@ function renderStorageDevices(disks) {
               </div>
             </div>
           </div>
-          <div class="disk-header-meta">
+          <div class="disk-header-meta" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
             ${diskTypeTag}
             <span class="badge-tag tag-size">${escapeHtml(diskSize)}</span>
+            ${disk.isSystemDisk ? `
+              <span class="badge-tag" style="background: rgba(255,255,255,0.06); color: var(--text-secondary); font-size: 11px;">OS System Disk</span>
+            ` : `
+              <div style="display: flex; align-items: center; gap: 6px; margin-left: 4px;">
+                ${disk.hasMountedPartitions ? `
+                  <button class="btn btn-secondary text-warning" style="padding: 4px 9px; font-size: 11.5px;" title="Unmount all partitions on this drive" onclick="unmountDisk('${escapeHtml(diskNode)}', '${escapeHtml(diskName)}')">
+                    <i data-lucide="circle-slash" style="width: 12px; height: 12px;"></i>
+                    <span>Unmount All</span>
+                  </button>
+                ` : ''}
+                <button class="btn btn-secondary text-danger" style="padding: 4px 9px; font-size: 11.5px;" title="Safely unmount all partitions and power off drive" onclick="ejectDevice('${escapeHtml(diskNode)}', '${escapeHtml(diskName)}')">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none; flex-shrink:0;"><path d="m5 15 7-9 7 9Z"/><path d="M5 19h14"/></svg>
+                  <span>Eject Drive</span>
+                </button>
+              </div>
+            `}
           </div>
         </div>
         <div class="disk-partitions-list">
@@ -6170,13 +6186,13 @@ function renderStorageDevices(disks) {
 
         html += `
             </div>
-            <div class="partition-actions">
+            <div class="partition-actions" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
         `;
 
         if (isMounted) {
           if (!isAllocated && !isSystem) {
             html += `
-              <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick="openAllocateModal('${escapeHtml(mountpoint)}', '${escapeHtml(label || part.name)}')">
+              <button class="btn btn-secondary" style="padding: 6px 11px; font-size: 12px;" onclick="openAllocateModal('${escapeHtml(mountpoint)}', '${escapeHtml(label || part.name)}')">
                 <i data-lucide="folder-plus"></i>
                 <span>Allocate as Root</span>
               </button>
@@ -6184,19 +6200,35 @@ function renderStorageDevices(disks) {
           }
           if (!isSystem && mountpoint !== '/' && mountpoint !== '/boot' && mountpoint !== '/home' && mountpoint !== '/home/sakura') {
             html += `
-              <button class="btn btn-secondary text-danger" style="padding: 6px 12px; font-size: 12px;" onclick="unmountDevice('${escapeHtml(partNode)}')">
-                <i data-lucide="eject"></i>
+              <button class="btn btn-secondary text-warning" style="padding: 6px 11px; font-size: 12px;" title="Unmount this partition" onclick="unmountDevice('${escapeHtml(partNode)}')">
+                <i data-lucide="circle-slash" style="width: 13px; height: 13px;"></i>
                 <span>Unmount</span>
               </button>
             `;
+            if (!disk.isSystemDisk) {
+              html += `
+                <button class="btn btn-secondary text-danger" style="padding: 6px 11px; font-size: 12px;" title="Safely unmount and eject drive" onclick="ejectDevice('${escapeHtml(partNode)}', '${escapeHtml(label || part.name)}')">
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none; flex-shrink:0;"><path d="m5 15 7-9 7 9Z"/><path d="M5 19h14"/></svg>
+                  <span>Eject</span>
+                </button>
+              `;
+            }
           }
         } else {
           html += `
-            <button class="btn btn-primary" style="padding: 6px 14px; font-size: 12px;" onclick="openMountModal('${escapeHtml(partNode)}', '${escapeHtml(label || part.name)}', '${escapeHtml(fstype)}', '${escapeHtml(partSize)}')">
-              <i data-lucide="hard-drive-download"></i>
-              <span>Mount Drive</span>
+            <button class="btn btn-primary" style="padding: 6px 13px; font-size: 12px;" onclick="openMountModal('${escapeHtml(partNode)}', '${escapeHtml(label || part.name)}', '${escapeHtml(fstype)}', '${escapeHtml(partSize)}')">
+              <i data-lucide="hard-drive-download" style="width: 13px; height: 13px;"></i>
+              <span>Mount</span>
             </button>
           `;
+          if (!disk.isSystemDisk) {
+            html += `
+              <button class="btn btn-secondary text-danger" style="padding: 6px 11px; font-size: 12px;" title="Safely eject drive" onclick="ejectDevice('${escapeHtml(partNode)}', '${escapeHtml(label || part.name)}')">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none; flex-shrink:0;"><path d="m5 15 7-9 7 9Z"/><path d="M5 19h14"/></svg>
+                <span>Eject</span>
+              </button>
+            `;
+          }
         }
 
         html += `
@@ -6263,7 +6295,10 @@ function renderManagedRoots(roots) {
           </div>
         </td>
         <td>
-          <code style="background: rgba(255,255,255,0.06); padding: 3px 8px; border-radius: 6px; font-size: 12.5px; color: var(--text-main); font-family: monospace;">${escapeHtml(r.path)}</code>
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <code style="background: rgba(255,255,255,0.06); padding: 3px 8px; border-radius: 6px; font-size: 12.5px; color: var(--text-main); font-family: monospace;">${escapeHtml(r.path)}</code>
+            ${r.sourceDevice ? `<span style="font-size: 11px; color: var(--text-secondary); font-family: monospace;">Device: ${escapeHtml(r.sourceDevice)}</span>` : ''}
+          </div>
         </td>
         <td style="min-width: 170px;">
           ${exists ? `
@@ -6275,8 +6310,9 @@ function renderManagedRoots(roots) {
               <span>${percentStr}</span>
             </div>
           ` : `
-            <span style="color: var(--danger, #ef4444); font-size: 12px; display: inline-flex; align-items: center; gap: 4px;">
-              <i data-lucide="alert-triangle" style="width: 13px; height: 13px;"></i> Path not found
+            <span style="color: ${!r.isMounted && !r.isSystem ? '#fbbf24' : 'var(--danger, #ef4444)'}; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;">
+              <i data-lucide="${!r.isMounted && !r.isSystem ? 'circle-slash' : 'alert-triangle'}" style="width: 13px; height: 13px;"></i>
+              ${!r.isMounted && !r.isSystem ? 'Unmounted' : 'Path not found'}
             </span>
           `}
         </td>
@@ -6292,6 +6328,22 @@ function renderManagedRoots(roots) {
         </td>
         <td style="text-align: right;">
           <div style="display: flex; align-items: center; justify-content: flex-end; gap: 6px;">
+            ${!r.isSystem ? `
+              ${r.isMounted ? `
+                <button class="btn btn-secondary text-warning" style="padding: 5px 8px;" title="Unmount Storage Root" onclick="unmountDevice('${escapeHtml(r.path)}')">
+                  <i data-lucide="circle-slash" style="width: 14px; height: 14px;"></i>
+                </button>
+                <button class="btn btn-secondary text-danger" style="padding: 5px 8px;" title="Safely Eject Drive" onclick="ejectDevice('${escapeHtml(r.sourceDevice || r.path)}', '${escapeHtml(r.name)}')">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;"><path d="m5 15 7-9 7 9Z"/><path d="M5 19h14"/></svg>
+                </button>
+              ` : `
+                <button class="btn btn-primary" style="padding: 5px 8px;" title="Mount Storage Device" onclick="quickMountOrOpenModal('${escapeHtml(r.deviceNode || '')}', '${escapeHtml(r.path)}', '${escapeHtml(r.name)}')">
+                  <i data-lucide="hard-drive-download" style="width: 14px; height: 14px;"></i>
+                </button>
+              `}
+            ` : `
+              <span style="font-size: 11px; color: var(--text-secondary); margin-right: 4px;" title="Protected System Path">System</span>
+            `}
             <button class="btn btn-secondary" style="padding: 5px 8px;" title="Edit Root" data-root='${jsonStr}' onclick="handleEditRootClick(this)">
               <i data-lucide="edit-2" style="width: 14px; height: 14px;"></i>
             </button>
@@ -6393,6 +6445,79 @@ async function unmountDevice(target) {
   } catch (err) {
     console.error('Unmount error:', err);
     showToast(`Failed to unmount: ${err.message}`, 'error');
+  }
+}
+
+async function unmountDisk(diskNode, diskName) {
+  const displayLabel = diskName ? `${diskName} (${diskNode})` : diskNode;
+  if (!confirm(`Are you sure you want to unmount all partitions on ${displayLabel}?`)) return;
+
+  try {
+    showToast(`Unmounting partitions on ${diskNode}...`, 'info');
+    const res = await apiCall('/api/admin/storage/unmount', {
+      method: 'POST',
+      body: JSON.stringify({ target: diskNode })
+    });
+    showToast(res.message || `Successfully unmounted ${diskNode}`, 'success');
+    loadStorageDevices();
+    loadManagedRoots();
+    if (typeof loadRoots === 'function') loadRoots();
+  } catch (err) {
+    console.error('Unmount error:', err);
+    showToast(`Failed to unmount: ${err.message}`, 'error');
+  }
+}
+
+async function ejectDevice(target, name) {
+  const displayLabel = name ? `${name} (${target})` : target;
+  if (!confirm(`Are you sure you want to safely eject ${displayLabel}?\n\nThis will cleanly unmount all its partitions, flush file buffers to disk, and power off the hardware drive so it can be safely removed.`)) return;
+
+  try {
+    showToast(`Safely ejecting ${displayLabel}...`, 'info');
+    const res = await apiCall('/api/admin/storage/eject', {
+      method: 'POST',
+      body: JSON.stringify({ target })
+    });
+    showToast(res.message || `Successfully ejected ${target}`, 'success');
+    loadStorageDevices();
+    loadManagedRoots();
+    if (typeof loadRoots === 'function') loadRoots();
+  } catch (err) {
+    console.error('Eject error:', err);
+    showToast(`Failed to eject: ${err.message}`, 'error');
+  }
+}
+
+function quickMountOrOpenModal(devicePath, mountPath, rootName) {
+  if (devicePath && devicePath.startsWith('/dev/')) {
+    openMountModal(devicePath, rootName);
+    if (mountPath) {
+      const p = document.getElementById('mount-input-path');
+      if (p) p.value = mountPath;
+    }
+  } else {
+    // If no specific deviceNode recorded in root, find first unmounted partition from cached devices
+    if (cachedStorageDevices && cachedStorageDevices.disks) {
+      for (const d of cachedStorageDevices.disks) {
+        if (d.partitions && d.partitions.length > 0) {
+          const unmountedPart = d.partitions.find(p => !p.isMounted && !p.isSystem);
+          if (unmountedPart) {
+            const dev = unmountedPart.path || ('/dev/' + unmountedPart.name);
+            openMountModal(dev, rootName || unmountedPart.label || unmountedPart.name, unmountedPart.fstype, unmountedPart.formattedSize);
+            if (mountPath) {
+              const p = document.getElementById('mount-input-path');
+              if (p) p.value = mountPath;
+            }
+            return;
+          }
+        }
+      }
+    }
+    openMountModal('', rootName);
+    if (mountPath) {
+      const p = document.getElementById('mount-input-path');
+      if (p) p.value = mountPath;
+    }
   }
 }
 
@@ -6505,6 +6630,9 @@ window.openMountModal = openMountModal;
 window.setMountSuggestion = setMountSuggestion;
 window.handleMountSubmit = handleMountSubmit;
 window.unmountDevice = unmountDevice;
+window.unmountDisk = unmountDisk;
+window.ejectDevice = ejectDevice;
+window.quickMountOrOpenModal = quickMountOrOpenModal;
 window.openAddCustomRootModal = openAddCustomRootModal;
 window.openAllocateModal = openAllocateModal;
 window.openEditRootModal = openEditRootModal;

@@ -45,9 +45,12 @@ Designed to easily stream media files, mount local disks and Google Drive cloud 
 ### 💽 Hardware Disks & Storage Management
 - **Connected Storage Scanner**: Real-time hardware disk and partition scanner powered by native `lsblk` telemetry.
 - **Smart Partition Filtering**: Automatically filters out unusable system-reserved metadata partitions (e.g., 1 MB BIOS boot, 127 MB MSR, LDM metadata, swap) so only genuine storage devices are presented.
-- **1-Click Mount & Unmount**: Mount any connected hard drive, SSD, or USB device to any destination path directly from the UI without manual CLI commands.
-- **Auto Root Allocation**: Checkbox option to instantly allocate newly mounted drives as active Media Library roots.
-- **Storage Roots Table**: View all active storage roots, disk usage progress bars, permission badges, and enable/disable toggles.
+- **Convenient Mount, Unmount & Eject Options**:
+  - **Mount**: 1-click default mount (`/media/<name>`) or custom destination path modal with auto-allocation as Media Library root.
+  - **Unmount**: Cleanly unmount partitions or entire physical disks (`sudo umount` with automatic lazy unmount `-l` fallback if busy).
+  - **Safely Eject Drive**: Safely unmounts all partitions across the physical drive, flushes write buffers to disk (`sync`), and powers off/detaches the hardware drive (`udisksctl power-off -b /dev/sdX` and `sudo eject`) for safe physical disconnection with zero data loss.
+  - **OS System Protection**: Built-in safeguards strictly protect the host operating system drive, root partition (`/`), `/boot`, and `/home` from unmount or eject operations.
+- **Media Library Roots Table**: View active storage roots, live mount status (`Mounted` / `Unmounted`), underlying device nodes (`Device: /dev/sdb1`), disk usage progress bars, permission badges, inline mount/unmount/eject actions, and enable/disable toggles.
 
 ### 🛡️ User & Security Management
 - **Token-Based Sessions**: Robust JWT-based authentication system with environment-driven secret key support.

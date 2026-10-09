@@ -128,6 +128,22 @@ button, .btn {
   border-color: rgba(255, 255, 255, 0.15);
   transform: translateY(-1px);
 }
+.btn-secondary.text-danger {
+  color: #ef4444;
+}
+.btn-secondary.text-danger:hover {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #f87171;
+}
+.btn-secondary.text-warning {
+  color: #f59e0b;
+}
+.btn-secondary.text-warning:hover {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #fbbf24;
+}
 
 .btn-icon-text {
   background: transparent;
