@@ -1012,6 +1012,111 @@ public class FileController {
         }
     }
 
+    public static class OperationCancelledException extends IOException {
+        public OperationCancelledException(String message) {
+            super(message);
+        }
+    }
+
+    public static class FileCancelledException extends IOException {
+        public FileCancelledException(String message) {
+            super(message);
+        }
+    }
+
+    public static class TaskCancellationState {
+        private final String taskId;
+        private volatile boolean cancelAll = false;
+        private volatile boolean cancelCurrent = false;
+        private volatile String currentFileName = null;
+        private volatile Path currentTargetPath = null;
+
+        public TaskCancellationState(String taskId) {
+            this.taskId = taskId;
+        }
+
+        public String getTaskId() {
+            return taskId;
+        }
+
+        public boolean isCancelAll() {
+            return cancelAll;
+        }
+
+        public void setCancelAll(boolean cancelAll) {
+            this.cancelAll = cancelAll;
+        }
+
+        public boolean isCancelCurrent() {
+            return cancelCurrent;
+        }
+
+        public void setCancelCurrent(boolean cancelCurrent) {
+            this.cancelCurrent = cancelCurrent;
+        }
+
+        public void resetCancelCurrent() {
+            this.cancelCurrent = false;
+        }
+
+        public String getCurrentFileName() {
+            return currentFileName;
+        }
+
+        public void setCurrentFileName(String currentFileName) {
+            this.currentFileName = currentFileName;
+        }
+
+        public Path getCurrentTargetPath() {
+            return currentTargetPath;
+        }
+
+        public void setCurrentTargetPath(Path currentTargetPath) {
+            this.currentTargetPath = currentTargetPath;
+        }
+    }
+
+    private static final java.util.concurrent.ConcurrentHashMap<String, TaskCancellationState> activeFileTasks = new java.util.concurrent.ConcurrentHashMap<>();
+
+    @RequestMapping(value = {"/op-cancel-all/{taskId}", "/cancel-all/{taskId}"}, method = {RequestMethod.POST, RequestMethod.GET})
+    public ResponseEntity<?> cancelAllFileOp(@PathVariable String taskId) {
+        TaskCancellationState state = activeFileTasks.get(taskId);
+        if (state != null) {
+            state.setCancelAll(true);
+            Path target = state.getCurrentTargetPath();
+            if (target != null) {
+                try {
+                    Files.deleteIfExists(target);
+                } catch (Exception ignored) {}
+            }
+            SseController.broadcast("file-op-progress", Map.of(
+                "taskId", taskId,
+                "action", "cancelled",
+                "currentFile", "Cancelled by user",
+                "completed", true,
+                "cancelled", true
+            ));
+            return ResponseEntity.ok(Map.of("success", true, "message", "Operation cancelled"));
+        }
+        return ResponseEntity.ok(Map.of("success", true, "message", "Task not found or already completed"));
+    }
+
+    @RequestMapping(value = {"/op-cancel-current/{taskId}", "/cancel-current/{taskId}"}, method = {RequestMethod.POST, RequestMethod.GET})
+    public ResponseEntity<?> cancelCurrentFileOp(@PathVariable String taskId) {
+        TaskCancellationState state = activeFileTasks.get(taskId);
+        if (state != null) {
+            state.setCancelCurrent(true);
+            Path target = state.getCurrentTargetPath();
+            if (target != null) {
+                try {
+                    Files.deleteIfExists(target);
+                } catch (Exception ignored) {}
+            }
+            return ResponseEntity.ok(Map.of("success", true, "message", "Current file cancelled / skipped"));
+        }
+        return ResponseEntity.ok(Map.of("success", true, "message", "Task not found or already completed"));
+    }
+
     @PostMapping("/copy")
     public ResponseEntity<?> copyFiles(HttpServletRequest request, @RequestBody Map<String, Object> body) {
         User user = (User) request.getAttribute("user");
@@ -1074,41 +1179,72 @@ public class FileController {
             return ResponseEntity.badRequest().body(Map.of("success", false, "errors", errors.isEmpty() ? List.of("No valid source files found") : errors, "copiedCount", 0));
         }
 
-        long totalBytes = calculateTotalBytes(validSourceFiles);
-        int totalFiles = countTotalFiles(validSourceFiles);
-        ProgressTracker tracker = new ProgressTracker(taskId, "copy", totalBytes, totalFiles);
-        tracker.broadcastProgress("Starting copy...", false);
-
-        int copiedCount = 0;
-
-        for (File srcFile : validSourceFiles) {
-            String resolvedSrc = srcFile.getAbsolutePath().replace("\\", "/");
-
-            // Prevent circular copy
-            if (srcFile.isDirectory() && isSubPath(resolvedSrc, targetDirStr)) {
-                errors.add("Cannot copy a directory into itself or its subdirectories: " + srcFile.getName());
-                continue;
-            }
-
-            Path destPath = targetDir.toPath().resolve(srcFile.getName());
-            try {
-                copyRecursively(srcFile.toPath(), destPath, overwrite, tracker);
-                copiedCount++;
-            } catch (Exception e) {
-                errors.add("Failed to copy " + srcFile.getName() + ": " + e.getMessage());
-            }
+        if (taskId == null || taskId.trim().isEmpty()) {
+            taskId = "task_" + UUID.randomUUID().toString();
         }
 
-        tracker.broadcastProgress("Completed", true);
-        SseController.broadcast("fs-change", Map.of("userId", user.getId(), "parentPath", targetDirStr));
+        TaskCancellationState taskState = new TaskCancellationState(taskId);
+        activeFileTasks.put(taskId, taskState);
 
-        Map<String, Object> resp = new HashMap<>();
-        resp.put("success", errors.isEmpty());
-        resp.put("copiedCount", copiedCount);
-        if (!errors.isEmpty()) {
-            resp.put("errors", errors);
+        try {
+            long totalBytes = calculateTotalBytes(validSourceFiles);
+            int totalFiles = countTotalFiles(validSourceFiles);
+            ProgressTracker tracker = new ProgressTracker(taskId, "copy", totalBytes, totalFiles);
+            tracker.broadcastProgress("Starting copy...", false);
+
+            int copiedCount = 0;
+
+            for (File srcFile : validSourceFiles) {
+                if (taskState.isCancelAll()) {
+                    break;
+                }
+
+                String resolvedSrc = srcFile.getAbsolutePath().replace("\\", "/");
+
+                // Prevent circular copy
+                if (srcFile.isDirectory() && isSubPath(resolvedSrc, targetDirStr)) {
+                    errors.add("Cannot copy a directory into itself or its subdirectories: " + srcFile.getName());
+                    continue;
+                }
+
+                Path destPath = targetDir.toPath().resolve(srcFile.getName());
+                try {
+                    copyRecursively(srcFile.toPath(), destPath, overwrite, tracker, taskState);
+                    copiedCount++;
+                } catch (FileCancelledException e) {
+                    errors.add("Skipped " + srcFile.getName() + " (cancelled by user)");
+                } catch (OperationCancelledException e) {
+                    errors.add("Operation cancelled by user");
+                    break;
+                } catch (Exception e) {
+                    errors.add("Failed to copy " + srcFile.getName() + ": " + e.getMessage());
+                }
+            }
+
+            if (taskState.isCancelAll()) {
+                tracker.broadcastCancelled();
+                SseController.broadcast("fs-change", Map.of("userId", user.getId(), "parentPath", targetDirStr));
+                Map<String, Object> resp = new HashMap<>();
+                resp.put("success", false);
+                resp.put("cancelled", true);
+                resp.put("copiedCount", copiedCount);
+                resp.put("errors", errors);
+                return ResponseEntity.ok(resp);
+            }
+
+            tracker.broadcastProgress("Completed", true);
+            SseController.broadcast("fs-change", Map.of("userId", user.getId(), "parentPath", targetDirStr));
+
+            Map<String, Object> resp = new HashMap<>();
+            resp.put("success", errors.isEmpty());
+            resp.put("copiedCount", copiedCount);
+            if (!errors.isEmpty()) {
+                resp.put("errors", errors);
+            }
+            return ResponseEntity.ok(resp);
+        } finally {
+            activeFileTasks.remove(taskId);
         }
-        return ResponseEntity.ok(resp);
     }
 
     @PostMapping("/move")
@@ -1173,49 +1309,80 @@ public class FileController {
             return ResponseEntity.badRequest().body(Map.of("success", false, "errors", errors.isEmpty() ? List.of("No valid source files found") : errors, "movedCount", 0));
         }
 
-        long totalBytes = calculateTotalBytes(validSourceFiles);
-        int totalFiles = countTotalFiles(validSourceFiles);
-        ProgressTracker tracker = new ProgressTracker(taskId, "move", totalBytes, totalFiles);
-        tracker.broadcastProgress("Starting move...", false);
-
-        int movedCount = 0;
-        Set<String> affectedParents = new HashSet<>();
-        affectedParents.add(targetDirStr);
-
-        for (File srcFile : validSourceFiles) {
-            String resolvedSrc = srcFile.getAbsolutePath().replace("\\", "/");
-
-            // Prevent circular move
-            if (srcFile.isDirectory() && isSubPath(resolvedSrc, targetDirStr)) {
-                errors.add("Cannot move a directory into itself or its subdirectories: " + srcFile.getName());
-                continue;
-            }
-
-            if (srcFile.getParentFile() != null) {
-                affectedParents.add(srcFile.getParentFile().getAbsolutePath().replace("\\", "/"));
-            }
-
-            Path destPath = targetDir.toPath().resolve(srcFile.getName());
-            try {
-                moveRecursively(srcFile.toPath(), destPath, overwrite, tracker);
-                movedCount++;
-            } catch (Exception e) {
-                errors.add("Failed to move " + srcFile.getName() + ": " + e.getMessage());
-            }
+        if (taskId == null || taskId.trim().isEmpty()) {
+            taskId = "task_" + UUID.randomUUID().toString();
         }
 
-        tracker.broadcastProgress("Completed", true);
-        for (String p : affectedParents) {
-            SseController.broadcast("fs-change", Map.of("userId", user.getId(), "parentPath", p));
-        }
+        TaskCancellationState taskState = new TaskCancellationState(taskId);
+        activeFileTasks.put(taskId, taskState);
 
-        Map<String, Object> resp = new HashMap<>();
-        resp.put("success", errors.isEmpty());
-        resp.put("movedCount", movedCount);
-        if (!errors.isEmpty()) {
-            resp.put("errors", errors);
+        try {
+            long totalBytes = calculateTotalBytes(validSourceFiles);
+            int totalFiles = countTotalFiles(validSourceFiles);
+            ProgressTracker tracker = new ProgressTracker(taskId, "move", totalBytes, totalFiles);
+            tracker.broadcastProgress("Starting move...", false);
+
+            int movedCount = 0;
+            Set<String> affectedParents = new HashSet<>();
+            affectedParents.add(targetDirStr);
+
+            for (File srcFile : validSourceFiles) {
+                if (taskState.isCancelAll()) {
+                    break;
+                }
+
+                String resolvedSrc = srcFile.getAbsolutePath().replace("\\", "/");
+
+                // Prevent circular move
+                if (srcFile.isDirectory() && isSubPath(resolvedSrc, targetDirStr)) {
+                    errors.add("Cannot move a directory into itself or its subdirectories: " + srcFile.getName());
+                    continue;
+                }
+
+                if (srcFile.getParentFile() != null) {
+                    affectedParents.add(srcFile.getParentFile().getAbsolutePath().replace("\\", "/"));
+                }
+
+                Path destPath = targetDir.toPath().resolve(srcFile.getName());
+                try {
+                    moveRecursively(srcFile.toPath(), destPath, overwrite, tracker, taskState);
+                    movedCount++;
+                } catch (FileCancelledException e) {
+                    errors.add("Skipped " + srcFile.getName() + " (cancelled by user)");
+                } catch (OperationCancelledException e) {
+                    errors.add("Operation cancelled by user");
+                    break;
+                } catch (Exception e) {
+                    errors.add("Failed to move " + srcFile.getName() + ": " + e.getMessage());
+                }
+            }
+
+            for (String p : affectedParents) {
+                SseController.broadcast("fs-change", Map.of("userId", user.getId(), "parentPath", p));
+            }
+
+            if (taskState.isCancelAll()) {
+                tracker.broadcastCancelled();
+                Map<String, Object> resp = new HashMap<>();
+                resp.put("success", false);
+                resp.put("cancelled", true);
+                resp.put("movedCount", movedCount);
+                resp.put("errors", errors);
+                return ResponseEntity.ok(resp);
+            }
+
+            tracker.broadcastProgress("Completed", true);
+
+            Map<String, Object> resp = new HashMap<>();
+            resp.put("success", errors.isEmpty());
+            resp.put("movedCount", movedCount);
+            if (!errors.isEmpty()) {
+                resp.put("errors", errors);
+            }
+            return ResponseEntity.ok(resp);
+        } finally {
+            activeFileTasks.remove(taskId);
         }
-        return ResponseEntity.ok(resp);
     }
 
     @PostMapping("/batch-delete")
@@ -1406,42 +1573,118 @@ public class FileController {
     }
 
     private void copyRecursively(Path source, Path target, boolean overwrite) throws IOException {
-        copyRecursively(source, target, overwrite, null);
+        copyRecursively(source, target, overwrite, null, null);
     }
 
     private void copyRecursively(Path source, Path target, boolean overwrite, ProgressTracker tracker) throws IOException {
+        copyRecursively(source, target, overwrite, tracker, null);
+    }
+
+    private void copyRecursively(Path source, Path target, boolean overwrite, ProgressTracker tracker, TaskCancellationState taskState) throws IOException {
+        if (taskState != null && taskState.isCancelAll()) {
+            throw new OperationCancelledException("Operation cancelled");
+        }
+
         if (Files.isDirectory(source)) {
             if (!Files.exists(target)) {
                 Files.createDirectories(target);
             }
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(source)) {
                 for (Path entry : stream) {
+                    if (taskState != null && taskState.isCancelAll()) {
+                        throw new OperationCancelledException("Operation cancelled");
+                    }
                     Path destEntry = target.resolve(entry.getFileName());
-                    copyRecursively(entry, destEntry, overwrite, tracker);
+                    try {
+                        copyRecursively(entry, destEntry, overwrite, tracker, taskState);
+                    } catch (FileCancelledException fce) {
+                        if (tracker != null) {
+                            tracker.fileSkipped(entry.getFileName().toString());
+                        }
+                    }
                 }
             }
         } else {
+            if (taskState != null && taskState.isCancelCurrent()) {
+                taskState.resetCancelCurrent();
+                if (tracker != null) {
+                    tracker.fileSkipped(source.getFileName().toString());
+                }
+                throw new FileCancelledException("File cancelled by user: " + source.getFileName());
+            }
+
             Path finalTarget = target;
             if (!overwrite && Files.exists(finalTarget)) {
                 finalTarget = getUniqueDestinationPath(finalTarget);
             }
+
+            if (taskState != null) {
+                taskState.setCurrentFileName(source.getFileName().toString());
+                taskState.setCurrentTargetPath(finalTarget);
+            }
+
+            boolean completed = false;
             try (InputStream in = Files.newInputStream(source);
                  OutputStream out = Files.newOutputStream(finalTarget)) {
-                copyStreamWithProgress(in, out, source.getFileName().toString(), tracker);
+                copyStreamWithProgress(in, out, source.getFileName().toString(), tracker, taskState);
+                completed = true;
+            } catch (FileCancelledException e) {
+                try { Files.deleteIfExists(finalTarget); } catch (Exception ignored) {}
+                if (taskState != null) {
+                    taskState.resetCancelCurrent();
+                    taskState.setCurrentTargetPath(null);
+                }
+                if (tracker != null) {
+                    tracker.fileSkipped(source.getFileName().toString());
+                }
+                throw e;
+            } catch (OperationCancelledException e) {
+                try { Files.deleteIfExists(finalTarget); } catch (Exception ignored) {}
+                if (taskState != null) {
+                    taskState.setCurrentTargetPath(null);
+                }
+                throw e;
+            } catch (Throwable t) {
+                if (!completed) {
+                    try { Files.deleteIfExists(finalTarget); } catch (Exception ignored) {}
+                }
+                if (t instanceof IOException) throw (IOException) t;
+                throw new IOException(t);
+            } finally {
+                if (taskState != null) {
+                    taskState.setCurrentTargetPath(null);
+                }
             }
+
             if (tracker != null) {
                 tracker.fileCompleted(source.getFileName().toString());
             }
         }
     }
 
-    private void copyStreamWithProgress(InputStream in, OutputStream out, String filename, ProgressTracker tracker) throws IOException {
+    private void copyStreamWithProgress(InputStream in, OutputStream out, String filename, ProgressTracker tracker, TaskCancellationState taskState) throws IOException {
         byte[] buffer = new byte[1024 * 1024]; // 1MB buffer for fast I/O
         int bytesRead;
         while ((bytesRead = in.read(buffer)) != -1) {
+            if (taskState != null) {
+                if (taskState.isCancelAll()) {
+                    throw new OperationCancelledException("Operation cancelled by user");
+                }
+                if (taskState.isCancelCurrent()) {
+                    throw new FileCancelledException("File cancelled by user: " + filename);
+                }
+            }
             out.write(buffer, 0, bytesRead);
             if (tracker != null) {
                 tracker.addBytes(bytesRead, filename);
+            }
+        }
+        if (taskState != null) {
+            if (taskState.isCancelAll()) {
+                throw new OperationCancelledException("Operation cancelled by user");
+            }
+            if (taskState.isCancelCurrent()) {
+                throw new FileCancelledException("File cancelled by user: " + filename);
             }
         }
     }
@@ -1486,11 +1729,19 @@ public class FileController {
     }
 
     private void moveRecursively(Path source, Path target, boolean overwrite) throws IOException {
-        moveRecursively(source, target, overwrite, null);
+        moveRecursively(source, target, overwrite, null, null);
     }
 
     private void moveRecursively(Path source, Path target, boolean overwrite, ProgressTracker tracker) throws IOException {
+        moveRecursively(source, target, overwrite, tracker, null);
+    }
+
+    private void moveRecursively(Path source, Path target, boolean overwrite, ProgressTracker tracker, TaskCancellationState taskState) throws IOException {
         if (source.equals(target)) return;
+
+        if (taskState != null && taskState.isCancelAll()) {
+            throw new OperationCancelledException("Operation cancelled");
+        }
 
         Path finalTarget = target;
         if (!overwrite && Files.exists(finalTarget)) {
@@ -1509,7 +1760,7 @@ public class FileController {
             // Cross-filesystem fallback
         }
 
-        copyRecursively(source, finalTarget, overwrite, tracker);
+        copyRecursively(source, finalTarget, overwrite, tracker, taskState);
         deleteRecursively(source);
     }
 
@@ -1636,36 +1887,51 @@ public class FileController {
             long now = System.currentTimeMillis();
             if (now - lastBroadcastTime > 150) { // Broadcast max ~6 times per second
                 lastBroadcastTime = now;
-                broadcastProgress(currentFile, false);
+                broadcastProgress(currentFile, false, false);
             }
         }
 
         synchronized void fileCompleted(String currentFile) {
             this.copiedFiles++;
-            broadcastProgress(currentFile, false);
+            broadcastProgress(currentFile, false, false);
+        }
+
+        synchronized void fileSkipped(String currentFile) {
+            this.copiedFiles++;
+            broadcastProgress(currentFile + " (Skipped)", false, false);
+        }
+
+        void broadcastCancelled() {
+            broadcastProgress("Cancelled by user", true, true);
         }
 
         void broadcastProgress(String currentFile, boolean completed) {
+            broadcastProgress(currentFile, completed, false);
+        }
+
+        void broadcastProgress(String currentFile, boolean completed, boolean cancelled) {
             try {
                 int percent = (int) Math.min(100, (copiedBytes * 100) / totalBytes);
-                if (completed) percent = 100;
+                if (completed && !cancelled) percent = 100;
                 
                 long elapsedSec = (System.currentTimeMillis() - startTime) / 1000;
                 double speedMbps = elapsedSec > 0 ? (copiedBytes / (1024.0 * 1024.0)) / elapsedSec : 0;
                 String speedStr = speedMbps > 0 ? String.format(Locale.US, "%.1f MB/s", speedMbps) : "";
 
-                SseController.broadcast("file-op-progress", Map.of(
-                    "taskId", taskId != null ? taskId : "",
-                    "action", action,
-                    "currentFile", currentFile != null ? currentFile : "",
-                    "copiedBytes", copiedBytes,
-                    "totalBytes", totalBytes,
-                    "copiedFiles", copiedFiles,
-                    "totalFiles", totalFiles,
-                    "percent", percent,
-                    "speed", speedStr,
-                    "completed", completed
-                ));
+                Map<String, Object> payload = new HashMap<>();
+                payload.put("taskId", taskId != null ? taskId : "");
+                payload.put("action", action);
+                payload.put("currentFile", currentFile != null ? currentFile : "");
+                payload.put("copiedBytes", copiedBytes);
+                payload.put("totalBytes", totalBytes);
+                payload.put("copiedFiles", copiedFiles);
+                payload.put("totalFiles", totalFiles);
+                payload.put("percent", percent);
+                payload.put("speed", speedStr);
+                payload.put("completed", completed);
+                payload.put("cancelled", cancelled);
+
+                SseController.broadcast("file-op-progress", payload);
             } catch (Throwable ignored) {}
         }
     }

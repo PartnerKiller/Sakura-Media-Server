@@ -2813,6 +2813,7 @@ async function handlePasteClipboard() {
   }
 
   showToast(`${action === 'move' ? 'Moving' : 'Copying'} ${paths.length} item(s)...`, 'info');
+  state.activeFileOpTaskId = taskId;
   updateFileOpProgressUI({
     taskId: taskId,
     action: action,
@@ -2837,19 +2838,36 @@ async function handlePasteClipboard() {
       })
     });
 
-    if (res.success) {
+    if (res && res.cancelled) {
+      updateFileOpProgressUI({
+        taskId: taskId,
+        action: action,
+        currentFile: 'Cancelled by user',
+        percent: 100,
+        completed: true,
+        cancelled: true
+      });
+      showToast(`${action === 'move' ? 'Move' : 'Copy'} operation cancelled.`, 'info');
+      state.clipboard = { action: null, paths: [] };
+      updatePasteButton();
+      browsePath(state.currentPath);
+    } else if (res && res.success) {
       showToast(`Successfully ${action === 'move' ? 'moved' : 'copied'} items!`, 'success');
       state.clipboard = { action: null, paths: [] };
       updatePasteButton();
       browsePath(state.currentPath);
     } else {
-      showToast(`Operation completed with errors: ${(res.errors || []).join('; ')}`, 'error');
+      showToast(`Operation completed with errors: ${((res && res.errors) || []).join('; ')}`, 'error');
       state.clipboard = { action: null, paths: [] };
       updatePasteButton();
       browsePath(state.currentPath);
     }
   } catch (err) {
     showToast(`Failed to paste items: ${err.message}`, 'error');
+  } finally {
+    if (state.activeFileOpTaskId === taskId) {
+      state.activeFileOpTaskId = null;
+    }
   }
 }
 window.handlePasteClipboard = handlePasteClipboard;
@@ -3039,6 +3057,7 @@ async function confirmCopyMove() {
   const destination = state.copyMoveTarget;
   const endpoint = action === 'move' ? '/api/files/move' : '/api/files/copy';
   const taskId = 'task_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+  state.activeFileOpTaskId = taskId;
 
   const confirmBtn = document.getElementById('btn-confirm-copy-move');
   const cancelBtn = document.getElementById('btn-cancel-copy-move');
@@ -3046,7 +3065,17 @@ async function confirmCopyMove() {
     confirmBtn.disabled = true;
     confirmBtn.innerHTML = '<i data-lucide="loader" class="animate-spin" style="width: 14px; height: 14px;"></i> <span>Processing...</span>';
   }
-  if (cancelBtn) cancelBtn.disabled = true;
+  if (cancelBtn) {
+    cancelBtn.disabled = false;
+    cancelBtn.onclick = (e) => {
+      e.preventDefault();
+      if (state.activeFileOpTaskId) {
+        cancelAllFileOp();
+      } else {
+        closeCopyMoveModal();
+      }
+    };
+  }
 
   // Show progress immediately in modal
   updateFileOpProgressUI({
@@ -3073,6 +3102,25 @@ async function confirmCopyMove() {
       })
     });
 
+    if (res && res.cancelled) {
+      updateFileOpProgressUI({
+        taskId: taskId,
+        action: action,
+        currentFile: 'Cancelled by user',
+        percent: 100,
+        completed: true,
+        cancelled: true
+      });
+      setTimeout(() => {
+        closeCopyMoveModal();
+        showToast(`${action === 'move' ? 'Move' : 'Copy'} operation cancelled.`, 'info');
+        state.selectedPaths.clear();
+        updateBatchActionBar();
+        browsePath(state.currentPath);
+      }, 500);
+      return;
+    }
+
     // Mark 100% complete
     updateFileOpProgressUI({
       taskId: taskId,
@@ -3084,13 +3132,13 @@ async function confirmCopyMove() {
 
     setTimeout(() => {
       closeCopyMoveModal();
-      if (res.success) {
+      if (res && res.success) {
         showToast(`Successfully ${action === 'move' ? 'moved' : 'copied'} items!`, 'success');
         state.selectedPaths.clear();
         updateBatchActionBar();
         browsePath(state.currentPath);
       } else {
-        showToast(`Completed with errors: ${(res.errors || []).join('; ')}`, 'error');
+        showToast(`Completed with errors: ${((res && res.errors) || []).join('; ')}`, 'error');
         state.selectedPaths.clear();
         updateBatchActionBar();
         browsePath(state.currentPath);
@@ -3099,23 +3147,99 @@ async function confirmCopyMove() {
   } catch (err) {
     showToast(`Failed: ${err.message}`, 'error');
   } finally {
+    if (state.activeFileOpTaskId === taskId) {
+      state.activeFileOpTaskId = null;
+    }
     if (confirmBtn) {
       confirmBtn.disabled = false;
       confirmBtn.innerHTML = `<i data-lucide="check"></i> <span>${action === 'move' ? 'Move Here' : 'Copy Here'}</span>`;
       if (typeof lucide !== 'undefined') lucide.createIcons();
     }
-    if (cancelBtn) cancelBtn.disabled = false;
+    if (cancelBtn) {
+      cancelBtn.disabled = false;
+      cancelBtn.onclick = null;
+    }
   }
 }
 
+async function cancelAllFileOp(event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  const taskId = state.activeFileOpTaskId;
+  if (!taskId) {
+    const expProg = document.getElementById('file-op-progress-container');
+    if (expProg) expProg.style.display = 'none';
+    const modalProg = document.getElementById('copy-move-progress-container');
+    if (modalProg) modalProg.style.display = 'none';
+    return;
+  }
+
+  try {
+    showToast('Cancelling operation...', 'info');
+    const btns = document.querySelectorAll('.btn-file-op-cancel-all, .btn-file-op-skip');
+    btns.forEach(b => b.disabled = true);
+
+    const res = await apiCall(`/api/files/op-cancel-all/${taskId}`, { method: 'POST' });
+    if (res && res.success) {
+      showToast('Operation cancelled', 'info');
+    }
+  } catch (err) {
+    console.error('Failed to cancel file operation:', err);
+    showToast('Failed to cancel: ' + err.message, 'error');
+  }
+}
+window.cancelAllFileOp = cancelAllFileOp;
+
+async function cancelCurrentFileOp(event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  const taskId = state.activeFileOpTaskId;
+  if (!taskId) return;
+
+  try {
+    showToast('Cancelling current file...', 'info');
+    const skipBtns = document.querySelectorAll('.btn-file-op-skip');
+    skipBtns.forEach(b => b.disabled = true);
+
+    const res = await apiCall(`/api/files/op-cancel-current/${taskId}`, { method: 'POST' });
+    if (res && res.success) {
+      showToast('Current file cancelled / skipped', 'info');
+    }
+    setTimeout(() => {
+      skipBtns.forEach(b => b.disabled = false);
+    }, 1200);
+  } catch (err) {
+    console.error('Failed to cancel current file:', err);
+    showToast('Failed to skip file: ' + err.message, 'error');
+  }
+}
+window.cancelCurrentFileOp = cancelCurrentFileOp;
+
 function updateFileOpProgressUI(data) {
+  if (data.taskId) {
+    state.activeFileOpTaskId = data.taskId;
+  }
+  const isCancelled = Boolean(data.cancelled);
+  const isCompleted = Boolean(data.completed);
   const percent = Math.min(100, Math.max(0, data.percent || 0));
   const actionLabel = data.action === 'move' ? 'Moving' : 'Copying';
-  const fileName = data.currentFile || 'Processing...';
-  const speed = data.speed || '';
+  let titleText = isCancelled ? `${actionLabel} cancelled` : `${actionLabel} files...`;
+  if (isCompleted && !isCancelled) titleText = `${actionLabel} complete!`;
+  const fileName = data.currentFile || (isCancelled ? 'Cancelled by user' : 'Processing...');
+  const speed = isCancelled ? '' : (data.speed || '');
   const copiedBytes = formatBytes(data.copiedBytes || 0);
   const totalBytes = formatBytes(data.totalBytes || 0);
   const filesStr = `${data.copiedFiles || 0} / ${data.totalFiles || 1} files`;
+
+  // Enable/disable buttons depending on completion
+  const actionBtns = document.querySelectorAll('.btn-file-op-action');
+  actionBtns.forEach(b => {
+    b.disabled = isCompleted || isCancelled;
+  });
 
   // Update in-modal progress card
   const modalProg = document.getElementById('copy-move-progress-container');
@@ -3129,11 +3253,15 @@ function updateFileOpProgressUI(data) {
     const filesEl = document.getElementById('copy-move-progress-files');
     const bytesEl = document.getElementById('copy-move-progress-bytes');
 
-    if (titleEl) titleEl.innerText = `${actionLabel} files...`;
+    if (titleEl) titleEl.innerText = titleText;
     if (fileEl) fileEl.innerText = fileName;
-    if (pctEl) pctEl.innerText = `${percent}%`;
+    if (pctEl) pctEl.innerText = isCancelled ? 'Cancelled' : `${percent}%`;
     if (speedEl) speedEl.innerText = speed;
-    if (fillEl) fillEl.style.width = `${percent}%`;
+    if (fillEl) {
+      fillEl.style.width = isCancelled ? '100%' : `${percent}%`;
+      if (isCancelled) fillEl.style.backgroundColor = '#ef4444';
+      else fillEl.style.backgroundColor = '';
+    }
     if (filesEl) filesEl.innerText = filesStr;
     if (bytesEl) bytesEl.innerText = `${copiedBytes} / ${totalBytes}`;
   }
@@ -3150,19 +3278,32 @@ function updateFileOpProgressUI(data) {
     const filesEl = document.getElementById('file-op-progress-files');
     const bytesEl = document.getElementById('file-op-progress-bytes');
 
-    if (titleEl) titleEl.innerText = `${actionLabel} files...`;
+    if (titleEl) titleEl.innerText = titleText;
     if (fileEl) fileEl.innerText = fileName;
-    if (pctEl) pctEl.innerText = `${percent}%`;
+    if (pctEl) pctEl.innerText = isCancelled ? 'Cancelled' : `${percent}%`;
     if (speedEl) speedEl.innerText = speed;
-    if (fillEl) fillEl.style.width = `${percent}%`;
+    if (fillEl) {
+      fillEl.style.width = isCancelled ? '100%' : `${percent}%`;
+      if (isCancelled) fillEl.style.backgroundColor = '#ef4444';
+      else fillEl.style.backgroundColor = '';
+    }
     if (filesEl) filesEl.innerText = filesStr;
     if (bytesEl) bytesEl.innerText = `${copiedBytes} / ${totalBytes}`;
 
-    if (data.completed) {
+    if (isCompleted || isCancelled) {
       setTimeout(() => {
         if (expProg) expProg.style.display = 'none';
+        if (fillEl) fillEl.style.backgroundColor = '';
+        if (modalProg && isCancelled) modalProg.style.display = 'none';
+        if (state.activeFileOpTaskId === data.taskId) {
+          state.activeFileOpTaskId = null;
+        }
       }, 2500);
     }
+  }
+
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
   }
 }
 window.updateFileOpProgressUI = updateFileOpProgressUI;

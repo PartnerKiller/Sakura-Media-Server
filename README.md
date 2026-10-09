@@ -11,6 +11,7 @@ Designed to easily stream media files, mount local disks and Google Drive cloud 
 ### 📁 Media Explorer & File Manager
 - **Multiple & Batch File Uploads**: Select and upload multiple files simultaneously with real-time overall progress tracking.
 - **Upload Cancellation**: Instant `✕` cancel button to cleanly abort active chunk uploads and batch queues.
+- **Copy & Move Operations with Cancellation Controls**: Real-time batch progress overlay for Copy and Move operations with instantaneous speed metrics, transferred bytes, and file counters via SSE. Includes **Cancel File (Skip Individual)** to skip the current file and continue with remaining items, and **Cancel All** to immediately abort the batch and auto-delete incomplete destination files with zero corruption.
 - **Dynamic View Layouts**: Switch between a visual **Grid View** (cards) and a compact **List View** (table rows).
 - **Format Filtering**: Isolate items instantly by category (Folders, Videos, Images, Audio, or Other formats).
 - **Sort Controls**: Sort items dynamically by Name (A-Z / Z-A), Size (Smallest / Largest), and Date Modified (Newest / Oldest) with directory pinning.
