@@ -35,23 +35,9 @@ public class StorageService {
                 int index = 0;
                 storageRootRepository.save(new StorageRoot("Home", "/home/sakura", true, true, index++));
                 storageRootRepository.save(new StorageRoot("Storage", "/media/storage", true, true, index++));
-
-                File ssdDir = new File("/media/ssd");
-                if (ssdDir.exists()) {
-                    storageRootRepository.save(new StorageRoot("SSD", "/media/ssd", true, true, index++, "/dev/sdb1"));
-                }
-
                 storageRootRepository.save(new StorageRoot("HDD", "/media/hdd", true, true, index++));
                 storageRootRepository.save(new StorageRoot("Google Drive", "/media/gdrive", true, true, index++));
                 System.out.println("Initialized default storage roots in database.");
-            } else {
-                // If SSD exists on system but not in DB roots, add it if user hasn't configured it yet
-                File ssdDir = new File("/media/ssd");
-                if (ssdDir.exists() && !storageRootRepository.existsByPath("/media/ssd")) {
-                    int nextIdx = storageRootRepository.findAllByOrderByOrderIndexAsc().size();
-                    storageRootRepository.save(new StorageRoot("SSD", "/media/ssd", true, true, nextIdx, "/dev/sdb1"));
-                    System.out.println("Auto-registered existing SSD mount at /media/ssd");
-                }
             }
         } catch (Exception e) {
             System.err.println("Error initializing storage roots: " + e.getMessage());
