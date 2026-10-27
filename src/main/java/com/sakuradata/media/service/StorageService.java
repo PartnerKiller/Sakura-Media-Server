@@ -776,6 +776,251 @@ public class StorageService {
         return map;
     }
 
+    // =============================================================
+    // MOUNT POINT & DIRECTORY MANAGEMENT
+    // =============================================================
+
+    public List<Map<String, Object>> getMountPoints(String baseDir) {
+        if (baseDir == null || baseDir.trim().isEmpty()) {
+            baseDir = "/media";
+        }
+        String normalizedBase = normalizePath(baseDir.trim());
+        File baseFile = new File(normalizedBase);
+        if (!baseFile.exists() || !baseFile.isDirectory()) {
+            return Collections.emptyList();
+        }
+
+        Map<String, String> activeMounts = getActiveMountpoints();
+        List<StorageRoot> activeRoots = storageRootRepository.findAllByOrderByOrderIndexAsc();
+        Map<String, StorageRoot> rootPathMap = new HashMap<>();
+        for (StorageRoot r : activeRoots) {
+            rootPathMap.put(normalizePath(r.getPath()), r);
+        }
+
+        File[] files = baseFile.listFiles();
+        List<Map<String, Object>> result = new ArrayList<>();
+        if (files == null) return result;
+
+        for (File f : files) {
+            if (!f.isDirectory()) continue;
+            String normPath = normalizePath(f.getAbsolutePath());
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("name", f.getName());
+            item.put("path", normPath);
+            item.put("parentDir", normalizedBase);
+
+            String sourceDevice = activeMounts.get(normPath);
+            boolean isMounted = sourceDevice != null;
+            item.put("isMounted", isMounted);
+            item.put("sourceDevice", sourceDevice);
+
+            boolean isSystem = SYSTEM_PATHS.contains(normPath) || "/home".equals(normPath) || "/home/sakura".equals(normPath);
+            if (!isSystem && sourceDevice != null && (sourceDevice.equals("/dev/sda2") || (sourceDevice.startsWith("/dev/sda") && !sourceDevice.contains("sdb")))) {
+                isSystem = true;
+            }
+            item.put("isSystem", isSystem);
+
+            StorageRoot matchedRoot = rootPathMap.get(normPath);
+            if (matchedRoot != null) {
+                item.put("isAllocated", true);
+                item.put("allocatedRootId", matchedRoot.getId());
+                item.put("allocatedRootName", matchedRoot.getName());
+                item.put("allocatedRootEnabled", matchedRoot.isEnabled());
+            } else {
+                item.put("isAllocated", false);
+            }
+
+            int itemCount = 0;
+            if (!isMounted) {
+                File[] children = f.listFiles();
+                itemCount = children != null ? children.length : 0;
+            }
+            item.put("itemCount", itemCount);
+            item.put("isEmpty", itemCount == 0);
+
+            try {
+                if (isMounted) {
+                    long total = f.getTotalSpace();
+                    long usable = f.getUsableSpace();
+                    long used = total - usable;
+                    double percent = total > 0 ? (double) used / total * 100 : 0.0;
+                    item.put("totalSpace", total);
+                    item.put("usedSpace", used);
+                    item.put("usableSpace", usable);
+                    item.put("formattedTotal", formatBytes(total));
+                    item.put("formattedUsed", formatBytes(used));
+                    item.put("formattedFree", formatBytes(usable));
+                    item.put("usePercent", String.format(Locale.US, "%.1f%%", percent));
+                    item.put("usePercentVal", Math.round(percent));
+                }
+            } catch (Exception ignored) {}
+
+            result.add(item);
+        }
+
+        result.sort((a, b) -> {
+            boolean aMounted = Boolean.TRUE.equals(a.get("isMounted"));
+            boolean bMounted = Boolean.TRUE.equals(b.get("isMounted"));
+            if (aMounted != bMounted) return aMounted ? -1 : 1;
+            return ((String) a.get("name")).compareToIgnoreCase((String) b.get("name"));
+        });
+
+        return result;
+    }
+
+    public Map<String, Object> createMountPoint(String parentDir, String name, boolean allocateAsRoot, String rootName) throws Exception {
+        if (parentDir == null || parentDir.trim().isEmpty()) {
+            parentDir = "/media";
+        }
+        parentDir = normalizePath(parentDir.trim());
+
+        if (name == null || name.trim().isEmpty()) {
+            throw new IllegalArgumentException("Directory name is required");
+        }
+        String cleanName = name.trim().replaceAll("[/\\\\:*?\"<>|]", "").trim();
+        if (cleanName.isEmpty() || cleanName.contains("..")) {
+            throw new IllegalArgumentException("Invalid directory name: " + name);
+        }
+
+        if (SYSTEM_PATHS.contains(parentDir) && !"/media".equals(parentDir) && !"/mnt".equals(parentDir)) {
+            throw new IllegalArgumentException("Cannot create mount points directly inside protected system directory: " + parentDir);
+        }
+
+        String fullPath = normalizePath(parentDir + "/" + cleanName);
+        File targetDir = new File(fullPath);
+        if (targetDir.exists()) {
+            throw new IllegalArgumentException("Directory already exists: " + fullPath);
+        }
+
+        Map<String, Object> mkdirRes = executeCommand(new String[]{"sudo", "mkdir", "-p", fullPath});
+        if ((int) mkdirRes.get("exitCode") != 0) {
+            String err = (String) mkdirRes.get("stderr");
+            throw new Exception("Failed to create directory " + fullPath + ": " + (err != null ? err : "exit code " + mkdirRes.get("exitCode")));
+        }
+
+        executeCommand(new String[]{"sudo", "chown", "1000:1000", fullPath});
+        executeCommand(new String[]{"sudo", "chmod", "775", fullPath});
+
+        if (allocateAsRoot) {
+            String finalName = (rootName != null && !rootName.trim().isEmpty())
+                    ? rootName.trim()
+                    : cleanName.toUpperCase();
+            if (!storageRootRepository.existsByPath(fullPath)) {
+                int nextIdx = storageRootRepository.findAllByOrderByOrderIndexAsc().size();
+                StorageRoot newRoot = new StorageRoot(finalName, fullPath, true, true, nextIdx);
+                storageRootRepository.save(newRoot);
+            }
+        }
+
+        return Map.of("success", true, "message", "Mount point directory created successfully at " + fullPath, "path", fullPath);
+    }
+
+    public Map<String, Object> renameMountPoint(String path, String newName) throws Exception {
+        if (path == null || path.trim().isEmpty()) {
+            throw new IllegalArgumentException("Directory path is required");
+        }
+        path = normalizePath(path.trim());
+
+        if (newName == null || newName.trim().isEmpty()) {
+            throw new IllegalArgumentException("New directory name is required");
+        }
+        String cleanNewName = newName.trim().replaceAll("[/\\\\:*?\"<>|]", "").trim();
+        if (cleanNewName.isEmpty() || cleanNewName.contains("..")) {
+            throw new IllegalArgumentException("Invalid directory name: " + newName);
+        }
+
+        // Cannot rename root filesystem or base mount containers
+        if ("/media".equals(path) || "/mnt".equals(path) || SYSTEM_PATHS.contains(path) || "/home".equals(path) || "/home/sakura".equals(path)) {
+            throw new IllegalArgumentException("Cannot rename protected system directory: " + path);
+        }
+
+        // Cannot rename actively mounted directory
+        Map<String, String> activeMounts = getActiveMountpoints();
+        if (activeMounts.containsKey(path)) {
+            throw new IllegalArgumentException("Cannot rename directory '" + path + "' while it is mounted. Please unmount it first.");
+        }
+
+        File currentDir = new File(path);
+        if (!currentDir.exists() || !currentDir.isDirectory()) {
+            throw new IllegalArgumentException("Directory does not exist: " + path);
+        }
+
+        File parent = currentDir.getParentFile();
+        if (parent == null) {
+            throw new IllegalArgumentException("Invalid parent directory for: " + path);
+        }
+
+        String targetPath = normalizePath(new File(parent, cleanNewName).getAbsolutePath());
+        File targetDir = new File(targetPath);
+        if (targetDir.exists()) {
+            throw new IllegalArgumentException("A directory with name '" + cleanNewName + "' already exists at " + targetPath);
+        }
+
+        Map<String, Object> mvRes = executeCommand(new String[]{"sudo", "mv", path, targetPath});
+        if ((int) mvRes.get("exitCode") != 0) {
+            String err = (String) mvRes.get("stderr");
+            throw new Exception("Failed to rename directory " + path + ": " + (err != null ? err : "exit code " + mvRes.get("exitCode")));
+        }
+
+        // If an allocated StorageRoot was pointing to this path, update it in the database!
+        storageRootRepository.findByPath(path).ifPresent(root -> {
+            root.setPath(targetPath);
+            storageRootRepository.save(root);
+        });
+
+        return Map.of("success", true, "message", "Directory renamed to " + cleanNewName, "oldPath", path, "newPath", targetPath);
+    }
+
+    public Map<String, Object> deleteMountPoint(String path, boolean force) throws Exception {
+        if (path == null || path.trim().isEmpty()) {
+            throw new IllegalArgumentException("Directory path is required");
+        }
+        path = normalizePath(path.trim());
+
+        if ("/media".equals(path) || "/mnt".equals(path) || SYSTEM_PATHS.contains(path) || "/home".equals(path) || "/home/sakura".equals(path)) {
+            throw new IllegalArgumentException("Cannot delete protected system directory: " + path);
+        }
+
+        // Must be inside /media, /mnt, or user directories
+        if (!path.startsWith("/media/") && !path.startsWith("/mnt/") && !path.startsWith("/home/sakura/")) {
+            throw new IllegalArgumentException("Directory deletion is restricted to /media, /mnt, or user storage paths.");
+        }
+
+        // Check if actively mounted
+        Map<String, String> activeMounts = getActiveMountpoints();
+        if (activeMounts.containsKey(path)) {
+            throw new IllegalArgumentException("Cannot delete directory '" + path + "' because it is currently mounted to " + activeMounts.get(path) + ". Please unmount it first.");
+        }
+
+        File dir = new File(path);
+        if (!dir.exists()) {
+            // Already gone
+            storageRootRepository.findByPath(path).ifPresent(r -> storageRootRepository.delete(r));
+            return Map.of("success", true, "message", "Directory already removed.");
+        }
+        if (!dir.isDirectory()) {
+            throw new IllegalArgumentException("Path is not a directory: " + path);
+        }
+
+        File[] children = dir.listFiles();
+        if (children != null && children.length > 0 && !force) {
+            throw new IllegalArgumentException("Directory contains " + children.length + " item(s). Please confirm force deletion to remove.");
+        }
+
+        Map<String, Object> rmRes = executeCommand(new String[]{"sudo", "rm", "-rf", path});
+        if ((int) rmRes.get("exitCode") != 0) {
+            String err = (String) rmRes.get("stderr");
+            throw new Exception("Failed to delete directory " + path + ": " + (err != null ? err : "exit code " + rmRes.get("exitCode")));
+        }
+
+        // If an allocated StorageRoot was pointing to this path, remove it from the database!
+        storageRootRepository.findByPath(path).ifPresent(root -> {
+            storageRootRepository.delete(root);
+        });
+
+        return Map.of("success", true, "message", "Directory " + path + " deleted successfully.");
+    }
+
     private String normalizePath(String path) {
         if (path == null) return null;
         return Paths.get(path).toAbsolutePath().normalize().toString().replace("\\", "/");

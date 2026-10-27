@@ -1347,6 +1347,81 @@ public class AdminController {
         }
     }
 
+    // MOUNT POINT & DIRECTORIES ENDPOINTS
+
+    @GetMapping("/admin/storage/mountpoints")
+    public ResponseEntity<?> getMountPoints(@RequestParam(value = "baseDir", required = false) String baseDir, HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        try {
+            List<Map<String, Object>> mountPoints = storageService.getMountPoints(baseDir);
+            return ResponseEntity.ok(mountPoints);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to retrieve mount points: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/admin/storage/mountpoints")
+    public ResponseEntity<?> createMountPoint(@RequestBody Map<String, Object> payload, HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        String parentDir = (String) payload.get("parentDir");
+        String name = (String) payload.get("name");
+        boolean allocateAsRoot = Boolean.TRUE.equals(payload.get("allocateAsRoot"));
+        String rootName = (String) payload.get("rootName");
+
+        try {
+            Map<String, Object> result = storageService.createMountPoint(parentDir, name, allocateAsRoot, rootName);
+            return ResponseEntity.ok(result);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to create mount point: " + e.getMessage()));
+        }
+    }
+
+    @PutMapping("/admin/storage/mountpoints/rename")
+    public ResponseEntity<?> renameMountPoint(@RequestBody Map<String, Object> payload, HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        String path = (String) payload.get("path");
+        String newName = (String) payload.get("newName");
+
+        try {
+            Map<String, Object> result = storageService.renameMountPoint(path, newName);
+            return ResponseEntity.ok(result);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to rename mount point: " + e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/admin/storage/mountpoints")
+    public ResponseEntity<?> deleteMountPoint(@RequestBody Map<String, Object> payload, HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admin access required"));
+        }
+        String path = (String) payload.get("path");
+        boolean force = Boolean.TRUE.equals(payload.get("force"));
+
+        try {
+            Map<String, Object> result = storageService.deleteMountPoint(path, force);
+            return ResponseEntity.ok(result);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to delete mount point: " + e.getMessage()));
+        }
+    }
+
     @GetMapping("/admin/storage/roots")
     public ResponseEntity<?> getManagedRoots(HttpServletRequest request) {
         if (!isAdmin(request)) {

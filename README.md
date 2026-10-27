@@ -45,6 +45,11 @@ Designed to easily stream media files, mount local disks and Google Drive cloud 
 ### 💽 Hardware Disks & Storage Management
 - **Connected Storage Scanner**: Real-time hardware disk and partition scanner powered by native `lsblk` telemetry.
 - **Smart Partition Filtering**: Automatically filters out unusable system-reserved metadata partitions (e.g., 1 MB BIOS boot, 127 MB MSR, LDM metadata, swap) so only genuine storage devices are presented.
+- **Mount Point Directories Manager (`/media`)**:
+  - **Visual Directory Manager**: Inspect all filesystem mount point directories directly in `/media` (or `/mnt`), viewing real-time mount state (`Mounted` / `Unmounted`), item count, empty status, and explorer root allocation.
+  - **Create Mount Points**: Create new mount folders with custom names and automatic permission configuration (`chmod 775`, `chown 1000:1000`) and optional auto-allocation to Sakura Explorer.
+  - **Rename Mount Point Folders**: Rename unmounted directories on the fly without SSH terminal commands; automatically propagates path changes to registered Explorer roots.
+  - **Delete Mount Point Directories**: Clean up empty or leftover mount directories (e.g., `/media/ssd`, `/media/newvolume`) with safety guards preventing accidental deletion of actively mounted or system paths.
 - **Convenient Mount, Unmount & Eject Options**:
   - **Mount**: 1-click default mount (`/media/<name>`) or custom destination path modal with auto-allocation as Media Library root.
   - **Unmount**: Cleanly unmount partitions or entire physical disks (`sudo umount` with automatic lazy unmount `-l` fallback if busy).

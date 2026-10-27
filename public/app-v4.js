@@ -4164,6 +4164,7 @@ function triggerSubTabLoad(tabId) {
     loadServerMetrics();
   } else if (tabId === 'tab-storage-mounts') {
     loadStorageDevices();
+    loadMountPoints();
     loadManagedRoots();
     loadCloudDrives();
   } else if (tabId === 'tab-smb-management') {
@@ -6249,6 +6250,298 @@ function renderStorageDevices(disks) {
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
+// =============================================================
+// MOUNT POINT & DIRECTORY MANAGEMENT (/media)
+// =============================================================
+
+let cachedMountPoints = [];
+
+async function loadMountPoints(baseDir = '/media') {
+  const container = document.getElementById('mountpoints-container');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="storage-loading">
+      <i data-lucide="loader" class="animate-spin"></i>
+      <span>Loading mount point directories...</span>
+    </div>
+  `;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  try {
+    const data = await apiCall(`/api/admin/storage/mountpoints?baseDir=${encodeURIComponent(baseDir)}&_cb=${Date.now()}`);
+    cachedMountPoints = data || [];
+    renderMountPoints(cachedMountPoints);
+  } catch (err) {
+    console.error('Failed to load mount points:', err);
+    container.innerHTML = `
+      <div class="p-3 text-center text-error" style="background: rgba(239,68,68,0.08); border-radius: 8px;">
+        <i data-lucide="alert-circle" style="margin-bottom: 4px;"></i>
+        <div>Failed to load mount points: ${escapeHtml(err.message)}</div>
+      </div>
+    `;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+}
+
+function renderMountPoints(mountpoints) {
+  const container = document.getElementById('mountpoints-container');
+  if (!container) return;
+
+  if (!mountpoints || mountpoints.length === 0) {
+    container.innerHTML = `
+      <div style="padding: 24px; text-align: center; color: var(--text-secondary);">
+        <i data-lucide="folder-x" style="width: 32px; height: 32px; margin-bottom: 8px; opacity: 0.5;"></i>
+        <div style="font-size: 14px; font-weight: 500;">No mount point directories found in /media.</div>
+        <div style="font-size: 12px; margin-top: 4px;">Click <strong>Create Mount Point</strong> above to create a new folder for mounting disks.</div>
+      </div>
+    `;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    return;
+  }
+
+  let html = `
+    <div class="table-responsive">
+      <table class="users-table">
+        <thead>
+          <tr>
+            <th>Directory</th>
+            <th>Server Path</th>
+            <th>Mount Status</th>
+            <th>Explorer Root</th>
+            <th>Details</th>
+            <th style="text-align: right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  mountpoints.forEach(mp => {
+    const isMounted = !!mp.isMounted;
+    const isAllocated = !!mp.isAllocated;
+    const isEmpty = !!mp.isEmpty;
+    const itemCount = mp.itemCount || 0;
+    const path = mp.path;
+    const name = mp.name;
+
+    html += `
+      <tr>
+        <td>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <i data-lucide="${isMounted ? 'hard-drive' : 'folder'}" style="color: ${isMounted ? 'var(--primary)' : 'var(--text-secondary)'}; width: 17px; height: 17px; flex-shrink: 0;"></i>
+            <span style="font-weight: 600; color: var(--text-main); font-size: 13.5px;">${escapeHtml(name)}</span>
+          </div>
+        </td>
+        <td>
+          <code style="background: rgba(255,255,255,0.06); padding: 3px 8px; border-radius: 6px; font-size: 12px; color: var(--text-main); font-family: monospace;">${escapeHtml(path)}</code>
+        </td>
+        <td>
+          ${isMounted ? `
+            <span class="badge-mount-status mounted">
+              <i data-lucide="check" style="width: 12px; height: 12px;"></i> Mounted: ${escapeHtml(mp.sourceDevice || 'Active')}
+            </span>
+          ` : `
+            <span class="badge-mount-status unmounted">
+              <i data-lucide="circle-slash" style="width: 12px; height: 12px;"></i> Unmounted
+            </span>
+            <span style="font-size: 11.5px; color: var(--text-secondary); margin-left: 6px;">${isEmpty ? '(Empty)' : `(${itemCount} items)`}</span>
+          `}
+        </td>
+        <td>
+          ${isAllocated ? `
+            <span class="badge-mount-status allocated"><i data-lucide="library" style="width: 12px; height: 12px;"></i> ${escapeHtml(mp.allocatedRootName)}</span>
+          ` : `
+            <span class="badge-tag" style="background: rgba(255,255,255,0.04); color: var(--text-secondary); font-size: 11px;">Not in Explorer</span>
+          `}
+        </td>
+        <td>
+          ${isMounted ? `
+            <div style="font-size: 12px; color: var(--text-main);">
+              ${mp.formattedUsed ? `${mp.formattedUsed} / ${mp.formattedTotal} (${mp.usePercent})` : 'Active mount'}
+            </div>
+            ${mp.totalSpace ? `
+              <div class="partition-progress-bar" style="margin-top: 4px; width: 130px;">
+                <div class="partition-progress-fill" style="width: ${mp.usePercentVal}%;"></div>
+              </div>
+            ` : ''}
+          ` : `
+            <span style="font-size: 12px; color: var(--text-secondary);">
+              ${isEmpty ? 'Ready for mounting' : `${itemCount} item(s) on disk`}
+            </span>
+          `}
+        </td>
+        <td style="text-align: right;">
+          <div style="display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: wrap;">
+            ${isMounted ? `
+              <button class="btn btn-secondary text-warning" style="padding: 5px 9px; font-size: 11.5px;" title="Unmount directory" onclick="unmountDevice('${escapeHtml(path)}')">
+                <i data-lucide="circle-slash" style="width: 13px; height: 13px;"></i>
+                <span>Unmount</span>
+              </button>
+              <button class="btn btn-secondary text-danger" style="padding: 5px 9px; font-size: 11.5px;" title="Safely eject hardware drive" onclick="ejectDevice('${escapeHtml(mp.sourceDevice || path)}', '${escapeHtml(name)}')">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none; flex-shrink:0;"><path d="m5 15 7-9 7 9Z"/><path d="M5 19h14"/></svg>
+                <span>Eject</span>
+              </button>
+            ` : `
+              ${!isAllocated ? `
+                <button class="btn btn-secondary" style="padding: 5px 9px; font-size: 11.5px;" title="Allocate this directory as an Explorer root" onclick="openAllocateModal('${escapeHtml(path)}', '${escapeHtml(name)}')">
+                  <i data-lucide="folder-plus" style="width: 13px; height: 13px;"></i>
+                  <span>Allocate</span>
+                </button>
+              ` : ''}
+              <button class="btn btn-secondary" style="padding: 5px 9px; font-size: 11.5px;" title="Rename directory name" onclick="openRenameMountPointModal('${escapeHtml(path)}', '${escapeHtml(name)}')">
+                <i data-lucide="edit-3" style="width: 13px; height: 13px;"></i>
+                <span>Rename</span>
+              </button>
+              <button class="btn btn-secondary text-danger" style="padding: 5px 9px; font-size: 11.5px;" title="Delete directory folder from server" onclick="deleteMountPoint('${escapeHtml(path)}', '${escapeHtml(name)}', ${isEmpty})">
+                <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
+                <span>Delete</span>
+              </button>
+            `}
+          </div>
+        </td>
+      </tr>
+    `;
+  });
+
+  html += `
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  container.innerHTML = html;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function openCreateMountPointModal() {
+  document.getElementById('create-mp-parent').value = '/media';
+  document.getElementById('create-mp-name').value = '';
+  document.getElementById('create-mp-preview').textContent = '/media/';
+  document.getElementById('create-mp-allocate').checked = true;
+  document.getElementById('create-mp-root-name').value = '';
+  openModal('modal-create-mountpoint');
+}
+
+function updateMountPathPreview() {
+  const parent = (document.getElementById('create-mp-parent').value || '/media').trim().replace(/\/+$/, '');
+  const name = (document.getElementById('create-mp-name').value || '').trim().replace(/^\/+/, '');
+  const preview = document.getElementById('create-mp-preview');
+  if (preview) {
+    preview.textContent = parent + '/' + name;
+  }
+}
+
+async function handleCreateMountPointSubmit(event) {
+  event.preventDefault();
+  const btn = document.getElementById('btn-submit-create-mp');
+  const originalHtml = btn.innerHTML;
+
+  const parentDir = (document.getElementById('create-mp-parent').value || '/media').trim();
+  const name = (document.getElementById('create-mp-name').value || '').trim();
+  const allocateAsRoot = document.getElementById('create-mp-allocate').checked;
+  const rootName = (document.getElementById('create-mp-root-name').value || '').trim();
+
+  if (!name) {
+    showToast('Directory name is required.', 'error');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = `<i data-lucide="loader" class="animate-spin" style="width: 14px; height: 14px;"></i> <span>Creating...</span>`;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  try {
+    const res = await apiCall('/api/admin/storage/mountpoints', {
+      method: 'POST',
+      body: JSON.stringify({ parentDir, name, allocateAsRoot, rootName })
+    });
+
+    closeModal('modal-create-mountpoint');
+    showToast(res.message || `Directory ${res.path || name} created successfully!`, 'success');
+    loadMountPoints();
+    loadManagedRoots();
+    if (typeof loadRoots === 'function') loadRoots();
+  } catch (err) {
+    console.error('Create mount point error:', err);
+    showToast(`Failed to create mount point: ${err.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+}
+
+function openRenameMountPointModal(path, currentName) {
+  document.getElementById('rename-mp-path').value = path;
+  document.getElementById('rename-mp-current-path').textContent = path;
+  document.getElementById('rename-mp-new-name').value = currentName || '';
+  openModal('modal-rename-mountpoint');
+}
+
+async function handleRenameMountPointSubmit(event) {
+  event.preventDefault();
+  const btn = document.getElementById('btn-submit-rename-mp');
+  const originalHtml = btn.innerHTML;
+
+  const path = document.getElementById('rename-mp-path').value.trim();
+  const newName = document.getElementById('rename-mp-new-name').value.trim();
+
+  if (!path || !newName) {
+    showToast('New directory name is required.', 'error');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = `<i data-lucide="loader" class="animate-spin" style="width: 14px; height: 14px;"></i> <span>Renaming...</span>`;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  try {
+    const res = await apiCall('/api/admin/storage/mountpoints/rename', {
+      method: 'PUT',
+      body: JSON.stringify({ path, newName })
+    });
+
+    closeModal('modal-rename-mountpoint');
+    showToast(res.message || `Renamed to ${newName}!`, 'success');
+    loadMountPoints();
+    loadManagedRoots();
+    if (typeof loadRoots === 'function') loadRoots();
+  } catch (err) {
+    console.error('Rename mount point error:', err);
+    showToast(`Failed to rename directory: ${err.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+}
+
+async function deleteMountPoint(path, name, isEmpty) {
+  let promptMsg = `Are you sure you want to delete the directory "${path}" from the server filesystem?`;
+  if (!isEmpty) {
+    promptMsg = `WARNING: The directory "${path}" is NOT empty and contains files!\n\nAre you sure you want to permanently delete this directory and all its contents?`;
+  }
+
+  if (!confirm(promptMsg)) return;
+
+  try {
+    showToast(`Deleting directory ${path}...`, 'info');
+    const res = await apiCall('/api/admin/storage/mountpoints', {
+      method: 'DELETE',
+      body: JSON.stringify({ path, force: !isEmpty })
+    });
+
+    showToast(res.message || `Directory ${path} deleted.`, 'success');
+    loadMountPoints();
+    loadManagedRoots();
+    loadStorageDevices();
+    if (typeof loadRoots === 'function') loadRoots();
+  } catch (err) {
+    console.error('Delete mount point error:', err);
+    showToast(`Failed to delete directory: ${err.message}`, 'error');
+  }
+}
+
 async function loadManagedRoots() {
   const tbody = document.getElementById('roots-table-body');
   if (!tbody) return;
@@ -6625,6 +6918,14 @@ async function deleteRoot(id, name) {
 
 // Expose to window for inline onclick handlers
 window.loadStorageDevices = loadStorageDevices;
+window.loadMountPoints = loadMountPoints;
+window.renderMountPoints = renderMountPoints;
+window.openCreateMountPointModal = openCreateMountPointModal;
+window.updateMountPathPreview = updateMountPathPreview;
+window.handleCreateMountPointSubmit = handleCreateMountPointSubmit;
+window.openRenameMountPointModal = openRenameMountPointModal;
+window.handleRenameMountPointSubmit = handleRenameMountPointSubmit;
+window.deleteMountPoint = deleteMountPoint;
 window.loadManagedRoots = loadManagedRoots;
 window.openMountModal = openMountModal;
 window.setMountSuggestion = setMountSuggestion;

@@ -566,6 +566,37 @@
               </div>
             </div>
 
+            <!-- Server Mount Points & Storage Directories (/media) Section -->
+            <div class="users-list-card" style="margin-top: 24px;">
+              <div class="admin-section-title-container" style="padding: 16px 24px; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <div>
+                  <h3 class="admin-section-title" style="margin: 0; display: flex; align-items: center; gap: 8px;">
+                    <i data-lucide="folder" style="color: var(--primary);"></i>
+                    Server Mount Points & Storage Directories (<code style="font-size: 13px; font-family: monospace;">/media</code>)
+                  </h3>
+                  <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.85rem;">
+                    Manage filesystem mount destination folders on the server. Create new mount points, rename directory names, or delete empty/unused folders.
+                  </p>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                  <button class="btn btn-secondary" onclick="loadMountPoints()">
+                    <i data-lucide="refresh-cw"></i>
+                    <span>Refresh</span>
+                  </button>
+                  <button class="btn btn-primary" onclick="openCreateMountPointModal()">
+                    <i data-lucide="folder-plus"></i>
+                    <span>Create Mount Point</span>
+                  </button>
+                </div>
+              </div>
+              <div id="mountpoints-container" style="padding: 20px;">
+                <div class="storage-loading">
+                  <i data-lucide="loader" class="animate-spin"></i>
+                  <span>Loading mount point directories...</span>
+                </div>
+              </div>
+            </div>
+
             <!-- Attached Google Drives & Cloud Mounts Section -->
             <div class="users-list-card" style="margin-top: 24px;">
               <div class="admin-section-title-container" style="padding: 16px 24px; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
@@ -2013,6 +2044,94 @@
           <span>Delete</span>
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- CREATE MOUNT POINT DIRECTORY MODAL -->
+  <div class="modal-backdrop" id="modal-create-mountpoint" style="z-index: 1100;">
+    <div class="modal" style="max-width: 500px; width: 92%;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="folder-plus" style="color: var(--primary); width: 20px; height: 20px;"></i>
+          <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Create Mount Point Directory</h3>
+        </div>
+        <button class="btn-close-modal" onclick="closeModal('modal-create-mountpoint')">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <form id="form-create-mountpoint" onsubmit="handleCreateMountPointSubmit(event)">
+        <div class="modal-body" style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+          <div>
+            <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase;">Parent Directory</label>
+            <input type="text" id="create-mp-parent" value="/media" required placeholder="/media" oninput="updateMountPathPreview()" style="width: 100%; padding: 10px 14px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-main); font-size: 14px; font-family: monospace;">
+            <div style="display: flex; gap: 6px; margin-top: 6px; align-items: center;">
+              <span style="font-size: 11px; color: var(--text-secondary);">Quick options:</span>
+              <button type="button" class="btn btn-secondary" style="padding: 2px 8px; font-size: 11px; font-family: monospace;" onclick="document.getElementById('create-mp-parent').value='/media'; updateMountPathPreview();">/media</button>
+              <button type="button" class="btn btn-secondary" style="padding: 2px 8px; font-size: 11px; font-family: monospace;" onclick="document.getElementById('create-mp-parent').value='/mnt'; updateMountPathPreview();">/mnt</button>
+            </div>
+          </div>
+          <div>
+            <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase;">Directory Name *</label>
+            <input type="text" id="create-mp-name" required placeholder="e.g. ssd, external, backup, games" oninput="updateMountPathPreview()" style="width: 100%; padding: 10px 14px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-main); font-size: 14px;">
+          </div>
+          <div style="padding: 10px 14px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: 8px;">
+            <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Full Path Preview:</div>
+            <div id="create-mp-preview" style="font-size: 13.5px; font-family: monospace; color: var(--primary); margin-top: 4px;">/media/</div>
+          </div>
+          <div style="padding: 14px; background: rgba(236,72,153,0.06); border: 1px solid rgba(236,72,153,0.2); border-radius: 10px; display: flex; flex-direction: column; gap: 10px;">
+            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none;">
+              <input type="checkbox" id="create-mp-allocate" checked style="width: 17px; height: 17px; accent-color: var(--primary);">
+              <span style="font-size: 13.5px; font-weight: 500; color: var(--text-main);">Automatically add to Sakura Explorer Roots</span>
+            </label>
+            <div id="create-mp-root-name-group">
+              <label style="display: block; font-size: 11.5px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Explorer Display Name</label>
+              <input type="text" id="create-mp-root-name" placeholder="e.g. SSD, External Storage" style="width: 100%; padding: 8px 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-main); font-size: 13px;">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer" style="padding: 16px 20px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 10px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-create-mountpoint')">Cancel</button>
+          <button type="submit" id="btn-submit-create-mp" class="btn btn-primary" style="display: flex; align-items: center; gap: 6px;">
+            <i data-lucide="check"></i>
+            <span>Create Directory</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- RENAME MOUNT POINT DIRECTORY MODAL -->
+  <div class="modal-backdrop" id="modal-rename-mountpoint" style="z-index: 1100;">
+    <div class="modal" style="max-width: 460px; width: 92%;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="edit-3" style="color: var(--primary); width: 20px; height: 20px;"></i>
+          <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Rename Mount Point Directory</h3>
+        </div>
+        <button class="btn-close-modal" onclick="closeModal('modal-rename-mountpoint')">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <form id="form-rename-mountpoint" onsubmit="handleRenameMountPointSubmit(event)">
+        <input type="hidden" id="rename-mp-path">
+        <div class="modal-body" style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+          <div>
+            <label style="display: block; font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; text-transform: uppercase;">Current Directory Path</label>
+            <div id="rename-mp-current-path" style="font-family: monospace; font-size: 13px; color: var(--text-main); padding: 8px 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 6px;">/media/ssd</div>
+          </div>
+          <div>
+            <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase;">New Name *</label>
+            <input type="text" id="rename-mp-new-name" required placeholder="New directory name" style="width: 100%; padding: 10px 14px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-main); font-size: 14px;">
+          </div>
+        </div>
+        <div class="modal-footer" style="padding: 16px 20px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 10px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-rename-mountpoint')">Cancel</button>
+          <button type="submit" id="btn-submit-rename-mp" class="btn btn-primary" style="display: flex; align-items: center; gap: 6px;">
+            <i data-lucide="check"></i>
+            <span>Save Name</span>
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 
