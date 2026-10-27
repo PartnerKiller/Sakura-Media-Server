@@ -6013,6 +6013,9 @@ async function loadStorageDevices() {
     }
 
     renderStorageDevices(data.disks || []);
+    if (typeof loadMountPoints === 'function') {
+      loadMountPoints();
+    }
   } catch (err) {
     console.error('Failed to load storage devices:', err);
     container.innerHTML = `
@@ -6260,13 +6263,15 @@ async function loadMountPoints(baseDir = '/media') {
   const container = document.getElementById('mountpoints-container');
   if (!container) return;
 
-  container.innerHTML = `
-    <div class="storage-loading">
-      <i data-lucide="loader" class="animate-spin"></i>
-      <span>Loading mount point directories...</span>
-    </div>
-  `;
-  if (typeof lucide !== 'undefined') lucide.createIcons();
+  if (!cachedMountPoints || cachedMountPoints.length === 0) {
+    container.innerHTML = `
+      <div class="storage-loading">
+        <i data-lucide="loader" class="animate-spin"></i>
+        <span>Loading mount point directories...</span>
+      </div>
+    `;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
 
   try {
     const data = await apiCall(`/api/admin/storage/mountpoints?baseDir=${encodeURIComponent(baseDir)}&_cb=${Date.now()}`);
@@ -6357,11 +6362,11 @@ function renderMountPoints(mountpoints) {
         <td>
           ${isMounted ? `
             <div style="font-size: 12px; color: var(--text-main);">
-              ${mp.formattedUsed ? `${mp.formattedUsed} / ${mp.formattedTotal} (${mp.usePercent})` : 'Active mount'}
+              ${mp.formattedUsed ? `${escapeHtml(mp.formattedUsed)} / ${escapeHtml(mp.formattedTotal)} (${escapeHtml(mp.usePercent)})` : 'Active mount'}
             </div>
             ${mp.totalSpace ? `
               <div class="partition-progress-bar" style="margin-top: 4px; width: 130px;">
-                <div class="partition-progress-fill" style="width: ${mp.usePercentVal}%;"></div>
+                <div class="partition-progress-fill" style="width: ${Number(mp.usePercentVal) || 0}%;"></div>
               </div>
             ` : ''}
           ` : `
@@ -6373,26 +6378,26 @@ function renderMountPoints(mountpoints) {
         <td style="text-align: right;">
           <div style="display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: wrap;">
             ${isMounted ? `
-              <button class="btn btn-secondary text-warning" style="padding: 5px 9px; font-size: 11.5px;" title="Unmount directory" onclick="unmountDevice('${escapeHtml(path)}')">
+              <button class="btn btn-secondary text-warning" style="padding: 5px 9px; font-size: 11.5px;" title="Unmount directory" onclick="unmountDevice('${escapeJsStr(path)}')">
                 <i data-lucide="circle-slash" style="width: 13px; height: 13px;"></i>
                 <span>Unmount</span>
               </button>
-              <button class="btn btn-secondary text-danger" style="padding: 5px 9px; font-size: 11.5px;" title="Safely eject hardware drive" onclick="ejectDevice('${escapeHtml(mp.sourceDevice || path)}', '${escapeHtml(name)}')">
+              <button class="btn btn-secondary text-danger" style="padding: 5px 9px; font-size: 11.5px;" title="Safely eject hardware drive" onclick="ejectDevice('${escapeJsStr(mp.sourceDevice || path)}', '${escapeJsStr(name)}')">
                 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none; flex-shrink:0;"><path d="m5 15 7-9 7 9Z"/><path d="M5 19h14"/></svg>
                 <span>Eject</span>
               </button>
             ` : `
               ${!isAllocated ? `
-                <button class="btn btn-secondary" style="padding: 5px 9px; font-size: 11.5px;" title="Allocate this directory as an Explorer root" onclick="openAllocateModal('${escapeHtml(path)}', '${escapeHtml(name)}')">
+                <button class="btn btn-secondary" style="padding: 5px 9px; font-size: 11.5px;" title="Allocate this directory as an Explorer root" onclick="openAllocateModal('${escapeJsStr(path)}', '${escapeJsStr(name)}')">
                   <i data-lucide="folder-plus" style="width: 13px; height: 13px;"></i>
                   <span>Allocate</span>
                 </button>
               ` : ''}
-              <button class="btn btn-secondary" style="padding: 5px 9px; font-size: 11.5px;" title="Rename directory name" onclick="openRenameMountPointModal('${escapeHtml(path)}', '${escapeHtml(name)}')">
+              <button class="btn btn-secondary" style="padding: 5px 9px; font-size: 11.5px;" title="Rename directory name" onclick="openRenameMountPointModal('${escapeJsStr(path)}', '${escapeJsStr(name)}')">
                 <i data-lucide="edit-3" style="width: 13px; height: 13px;"></i>
                 <span>Rename</span>
               </button>
-              <button class="btn btn-secondary text-danger" style="padding: 5px 9px; font-size: 11.5px;" title="Delete directory folder from server" onclick="deleteMountPoint('${escapeHtml(path)}', '${escapeHtml(name)}', ${isEmpty})">
+              <button class="btn btn-secondary text-danger" style="padding: 5px 9px; font-size: 11.5px;" title="Delete directory folder from server" onclick="deleteMountPoint('${escapeJsStr(path)}', '${escapeJsStr(name)}', ${isEmpty})">
                 <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
                 <span>Delete</span>
               </button>
